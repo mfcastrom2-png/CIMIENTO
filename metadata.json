@@ -1,0 +1,6 @@
+{
+  "name": "B GROUP INGENIERIA S.A.S. — Gestión Humana",
+  "description": "Sistema integral de gestión humana, nómina y prestaciones sociales colombianas (CST), SG-SST (21 estándares Resolución 0312 de 2019), manual de cargos, evaluaciones y plan de capacitaciones con asistencia y exámenes para B GROUP INGENIERIA S.A.S. (NIT 900.995.99-2).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

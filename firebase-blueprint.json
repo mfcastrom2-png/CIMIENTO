@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "Empleado": {
+      "collection": "empleados",
+      "fields": {
+        "id": { "type": "string", "description": "Identificador único del empleado" },
+        "nombre": { "type": "string", "description": "Nombre completo" },
+        "documento": { "type": "string", "description": "Número de identificación C.C." },
+        "cargoId": { "type": "string", "description": "ID del cargo asociado" },
+        "areaId": { "type": "string", "description": "ID del área organizacional" },
+        "email": { "type": "string", "description": "Correo institucional" },
+        "telefono": { "type": "string", "description": "Teléfono de contacto" },
+        "fechaIngreso": { "type": "string", "description": "Fecha de inicio del contrato" },
+        "salario": { "type": "number", "description": "Salario base mensual" },
+        "estado": { "type": "string", "description": "Activo, Inactivo, Vacaciones" },
+        "tallas": { "type": "object", "description": "Tallas de camisa, pantalón, calzado" }
+      }
+    },
+    "Cargo": {
+      "collection": "cargos",
+      "fields": {
+        "id": { "type": "string", "description": "Identificador único del cargo" },
+        "nombre": { "type": "string", "description": "Nombre del cargo" },
+        "areaId": { "type": "string", "description": "Área a la que pertenece" },
+        "salarioBase": { "type": "number", "description": "Salario de referencia" }
+      }
+    },
+    "InventarioEPP": {
+      "collection": "inventario_epp",
+      "fields": {
+        "id": { "type": "string", "description": "ID único del artículo EPP" },
+        "codigo": { "type": "string", "description": "Código interno de almacén" },
+        "nombre": { "type": "string", "description": "Nombre descriptivo del EPP" },
+        "categoria": { "type": "string", "description": "Categoría de protección corporal" },
+        "normaTecnica": { "type": "string", "description": "Norma ANSI / NTC / OSHA" },
+        "stockActual": { "type": "number", "description": "Cantidad física en almacén" },
+        "stockMinimo": { "type": "number", "description": "Umbral de reposición" },
+        "unidadMedida": { "type": "string", "description": "Par, Unidad, Kit" },
+        "vidaUtilMeses": { "type": "number", "description": "Durabilidad estimada" }
+      }
+    },
+    "SolicitudEntregaEPP": {
+      "collection": "solicitudes_epp",
+      "fields": {
+        "id": { "type": "string", "description": "ID único de la entrega" },
+        "codigoSolicitud": { "type": "string", "description": "Código consecutivo" },
+        "empleadoId": { "type": "string", "description": "ID del colaborador receptor" },
+        "eppId": { "type": "string", "description": "ID del EPP entregado" },
+        "cantidad": { "type": "number", "description": "Cantidad entregada" },
+        "fechaSolicitud": { "type": "string", "description": "Fecha de registro" },
+        "fechaEntrega": { "type": "string", "description": "Fecha de despacho físico" },
+        "estado": { "type": "string", "description": "Pendiente, Aprobada, Entregada, Rechazada" },
+        "responsableEntrega": { "type": "string", "description": "Responsable de almacén/SST" },
+        "actaEntregaNumero": { "type": "string", "description": "Número consecutivo de acta" },
+        "firmaConformidadTrabajador": { "type": "boolean", "description": "Firma del trabajador" }
+      }
+    },
+    "UsuarioSistema": {
+      "collection": "usuarios",
+      "fields": {
+        "id": { "type": "string", "description": "UID de Firebase Auth" },
+        "email": { "type": "string", "description": "Correo institucional" },
+        "nombre": { "type": "string", "description": "Nombre completo" },
+        "rol": { "type": "string", "description": "superadmin, admin_gh, responsable_sst, empleado" },
+        "estado": { "type": "string", "description": "activo o inactivo" }
+      }
+    }
+  }
+}

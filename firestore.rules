@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().rol == 'admin_gh' || 
+        getUserData().rol == 'superadmin' || 
+        request.auth.token.email == 'mf.castrom2@gmail.com' ||
+        request.auth.token.email.matches('.*@empresa\\.com')
+      );
+    }
+
+    // Colección de Usuarios del Sistema
+    match /usuarios/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Colección de Empleados
+    match /empleados/{empleadoId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Colección de Cargos y Estructura
+    match /cargos/{cargoId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /areas/{areaId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Colección de Inventario EPP
+    match /inventario_epp/{eppId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Colección de Solicitudes y Entregas de EPP
+    match /solicitudes_epp/{solicitudId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Colección de Solicitudes (Vacaciones, Permisos, Incapacidades)
+    match /solicitudes/{solicitudId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Colección de Evaluaciones de Desempeño
+    match /evaluaciones/{evaluacionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Colección de Nómina y Pagos
+    match /nominas/{nominaId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Configuración general de la empresa
+    match /configuracion_empresa/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Permitir operaciones de inicialización y primeros registros
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
