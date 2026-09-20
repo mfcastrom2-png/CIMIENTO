@@ -12,6 +12,7 @@ export type TipoProceso = 'Estratégico' | 'Misional / Operativo' | 'Apoyo' | 'C
 
 export interface ProcesoOrganizacion {
   id: string;
+  empresaId?: string;
   codigo?: string;
   nombre: string;
   tipo: TipoProceso;
@@ -22,6 +23,7 @@ export interface ProcesoOrganizacion {
 
 export interface AreaOrganizacion {
   id: string;
+  empresaId?: string;
   codigo?: string;
   nombre: string;
   procesoId?: string;
@@ -154,6 +156,7 @@ export interface FichaCargo {
 
 export interface Cargo {
   id: string;
+  empresaId?: string;
   nombre: string;
   reportaA: string | null;
   ficha: FichaCargo;
@@ -325,6 +328,7 @@ export interface SesgoDetectado {
 
 export interface EvaluacionDesempeno {
   id: string;
+  empresaId?: string;
   empleadoId: string;
   cargoId: string;
   periodo: string; // ej. "2026 - S1"
@@ -501,6 +505,7 @@ export interface LiquidacionEmpleadoNomina {
 
 export interface PeriodoNomina {
   id: string;
+  empresaId?: string;
   codigoPeriodo: string; // ej. "2026-03"
   nombre: string; // "Nómina Mensual Marzo 2026"
   mes: number;
@@ -853,6 +858,7 @@ export type CategoriaEPP =
 
 export interface ItemInventarioEPP {
   id: string;
+  empresaId?: string;
   codigo: string; // ej. EPP-CAS-01
   nombre: string;
   categoria: CategoriaEPP;
@@ -872,6 +878,7 @@ export type EstadoSolicitudEPP = 'Pendiente' | 'Aprobada' | 'Entregada' | 'Recha
 
 export interface SolicitudEntregaEPP {
   id: string;
+  empresaId?: string;
   empleadoId: string;
   empleadoNombre: string;
   cargoNombre: string;

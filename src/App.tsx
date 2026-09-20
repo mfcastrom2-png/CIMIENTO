@@ -20,7 +20,6 @@ import {
   initialEvaluaciones
 } from './data/initialData';
 import { INITIAL_INVENTARIO_EPP, INITIAL_SOLICITUDES_ENTREGA_EPP } from './data/eppData';
-import { INITIAL_USUARIOS_SISTEMA } from './data/usuariosYVotacionesData';
 import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
 import { EstructuraView } from './components/EstructuraView';
@@ -69,7 +68,8 @@ import {
   guardarUsuarioFB,
   registrarUsuarioEnAuth,
   enviarNotificacionCorreoNuevoUsuario,
-  cerrarSesion
+  cerrarSesion,
+  obtenerPerfilUsuario
 } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -80,21 +80,7 @@ export default function App() {
   >('dashboard');
 
   // Sesión y Autenticación
-  const [currentUser, setCurrentUser] = useState<UsuarioSistema | null>(() => {
-    const saved = localStorage.getItem('bgroup_session_user') || localStorage.getItem('cimiento_session_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && !parsed.email?.endsWith('@empresa.com')) {
-          return parsed;
-        }
-      } catch {
-        // Fallback al administrador real
-      }
-    }
-    // Usuario Super Administrador oficial
-    return INITIAL_USUARIOS_SISTEMA[0];
-  });
+  const [currentUser, setCurrentUser] = useState<UsuarioSistema | null>(null);
 
   const [userRole, setUserRole] = useState<Role>(() => {
     return currentUser?.rol === 'empleado' ? 'empleado' : 'admin';
@@ -132,7 +118,7 @@ export default function App() {
   const [solicitudesEpp, setSolicitudesEpp] = useState<SolicitudEntregaEPP[]>(() => {
     return localStorage.getItem('bgroup_datos_limpios') === 'true' ? [] : INITIAL_SOLICITUDES_ENTREGA_EPP;
   });
-  const [usuariosList, setUsuariosList] = useState<UsuarioSistema[]>(INITIAL_USUARIOS_SISTEMA);
+  const [usuariosList, setUsuariosList] = useState<UsuarioSistema[]>([]);
 
   // Estado de sincronización en la nube y preparación de autenticación
   const [cloudSynced, setCloudSynced] = useState<boolean>(false);
@@ -144,26 +130,28 @@ export default function App() {
 
   // Escuchar cambios de autenticación en Firebase
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setFbUser(user);
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
+      setFbUser(fbUser);
       setAuthReady(true);
-      if (user) {
-        // Usuario autenticado con Firebase Auth
-        const profile: UsuarioSistema = {
-          id: user.uid,
-          nombre: user.displayName || user.email?.split('@')[0] || 'Administrador',
-          email: user.email || '',
-          documento: '—',
-          rol: user.email?.toLowerCase() === 'mf.castrom2@gmail.com' ? 'superadmin' : (user.email?.includes('admin') ? 'admin_gh' : 'admin_gh'),
-          estado: 'activo',
-          ultimoAcceso: new Date().toISOString(),
-          fechaCreacion: new Date().toISOString(),
-          dobleFactorHabilitado: false,
-          permisos: ['dashboard', 'empleados', 'cargos', 'estructura', 'evaluaciones', 'solicitudes', 'nomina', 'sst', 'capacitaciones', 'vacaciones', 'usuarios', 'documentos']
-        };
+      if (!fbUser) {
+        setCurrentUser(null);
+        return;
+      }
+
+      try {
+        const profile = await obtenerPerfilUsuario(fbUser.uid);
+
+        if (!profile || profile.estado !== 'activo') {
+          await cerrarSesion();
+          setCurrentUser(null);
+          return;
+        }
+
         setCurrentUser(profile);
-        setUserRole('admin');
-        localStorage.setItem('bgroup_session_user', JSON.stringify(profile));
+        setUserRole(profile.rol === 'empleado' ? 'empleado' : 'admin');
+      } catch (err) {
+        console.warn('Error al verificar perfil institucional:', err);
+        setCurrentUser(null);
       }
     });
 
@@ -266,7 +254,6 @@ export default function App() {
   const handleLoginSuccess = (usuario: UsuarioSistema) => {
     setCurrentUser(usuario);
     setUserRole(usuario.rol === 'empleado' ? 'empleado' : 'admin');
-    localStorage.setItem('bgroup_session_user', JSON.stringify(usuario));
   };
 
   const handleLogout = async () => {
@@ -276,8 +263,6 @@ export default function App() {
       // Ignorar error si no había sesión de Firebase SDK activa
     }
     setCurrentUser(null);
-    localStorage.removeItem('bgroup_session_user');
-    localStorage.removeItem('cimiento_session_user');
   };
 
   // Handlers para mutaciones con guardado automático en Firebase Cloud

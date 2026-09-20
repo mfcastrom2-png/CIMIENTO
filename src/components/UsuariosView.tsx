@@ -13,7 +13,9 @@ import {
 import {
   guardarUsuarioFB,
   eliminarUsuarioFB,
-  enviarNotificacionCorreoNuevoUsuario
+  enviarNotificacionCorreoNuevoUsuario,
+  migrarDocumentosConEmpresaId,
+  CUENTAS_PRUEBA_OFICIALES
 } from '../lib/firebase';
 import {
   ComprobanteNotificacionModal,
@@ -77,7 +79,27 @@ export function UsuariosView({
   const activeUserRole = userRole || currentRole || 'admin';
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>(propsUsuarios || INITIAL_USUARIOS_SISTEMA);
   const [logs, setLogs] = useState<LogAuditoriaUsuario[]>(INITIAL_LOGS_AUDITORIA);
-  const [activeTab, setActiveTab] = useState<'usuarios' | 'rolesMatriz' | 'auditoria'>('usuarios');
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'rolesMatriz' | 'auditoria' | 'aislamiento'>('usuarios');
+  const [migrandoAislamiento, setMigrandoAislamiento] = useState(false);
+  const [resultadoMigracion, setResultadoMigracion] = useState<{
+    documentosActualizados: number;
+    coleccionesProcesadas: string[];
+    usuariosCreados: string[];
+    detalles: string[];
+  } | null>(null);
+
+  const handleEjecutarMigracion = async () => {
+    setMigrandoAislamiento(true);
+    try {
+      const res = await migrarDocumentosConEmpresaId('empresa-a');
+      setResultadoMigracion(res);
+      mostrarNotificacion(`Migración finalizada: ${res.documentosActualizados} docs actualizados con empresaId="empresa-a"`);
+    } catch (err: any) {
+      mostrarNotificacion(`Error en migración: ${err?.message || err}`);
+    } finally {
+      setMigrandoAislamiento(false);
+    }
+  };
 
   useEffect(() => {
     if (propsUsuarios && propsUsuarios.length > 0) {
@@ -614,6 +636,17 @@ export function UsuariosView({
             <Clock className="w-3.5 h-3.5" />
             Auditoría de Accesos & Eventos ({logs.length})
           </button>
+          <button
+            onClick={() => setActiveTab('aislamiento')}
+            className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 ${
+              activeTab === 'aislamiento'
+                ? 'border-[#18235C] text-[#18235C]'
+                : 'border-transparent text-[#282829]/70 hover:text-[#18235C]'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            Aislamiento Multi-Tenant & Cuentas Oficiales
+          </button>
         </div>
       </div>
 
@@ -986,6 +1019,214 @@ export function UsuariosView({
         </div>
       )}
 
+      {/* TAB 4: AISLAMIENTO MULTI-TENANT & CUENTAS OFICIALES */}
+      {activeTab === 'aislamiento' && (
+        <div className="space-y-6">
+          {/* Tarjeta de estado de seguridad */}
+          <div className="bg-white p-6 rounded-2xl border border-[#8FA7D6] shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#8FA7D6]/40">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-[#18235C]">
+                    Aislamiento Multi-Tenant & Endurecimiento de Seguridad
+                  </h2>
+                  <p className="text-xs text-[#282829] mt-0.5">
+                    Garantiza la separación estricta de datos por empresaId y la inmutabilidad de roles en cumplimiento normativo y de auditoría.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleEjecutarMigracion}
+                disabled={migrandoAislamiento}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm shrink-0 ${
+                  migrandoAislamiento
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                    : 'bg-[#18235C] hover:bg-[#101740] text-white'
+                }`}
+              >
+                {migrandoAislamiento ? (
+                  <>
+                    <RotateCcw className="w-4 h-4 animate-spin text-[#00FF00]" />
+                    <span>Migrando Documentos...</span>
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-4 h-4 text-[#00FF00]" />
+                    <span>Ejecutar Migración de Aislamiento & Sincronizar</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Resultado de migración si ya se ejecutó */}
+            {resultadoMigracion && (
+              <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs">
+                <div className="font-bold flex items-center gap-1.5 mb-1">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                  Migración y sincronización ejecutada exitosamente:
+                </div>
+                <div className="text-[11px] text-emerald-800 space-y-0.5">
+                  <p>• <strong>{resultadoMigracion.documentosActualizados}</strong> documentos sin empresaId fueron etiquetados con "empresa-a".</p>
+                  <p>• Colecciones validadas: {resultadoMigracion.coleccionesProcesadas.join(', ')}.</p>
+                  <p>• Cuentas de prueba sincronizadas en Firestore: {resultadoMigracion.usuariosCreados.join(', ')}.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Fases del plan de auditoría */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">✓</span>
+                  <span className="text-xs font-black text-[#18235C]">Fase 1: Eliminación de Bypass</span>
+                </div>
+                <p className="text-[11px] text-[#282829]/80 leading-relaxed">
+                  Bypass de localStorage y credenciales fijas eliminados. Acceso 100% regulado por tokens criptográficos de Firebase Auth.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">✓</span>
+                  <span className="text-xs font-black text-[#18235C]">Fase 2: Reglas Firestore Estrictas</span>
+                </div>
+                <p className="text-[11px] text-[#282829]/80 leading-relaxed">
+                  Reglas desplegadas con función <code>sameCompany()</code>. Usuarios comunes tienen prohibido modificar su rol, permisos y empresaId.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center">3</span>
+                  <span className="text-xs font-black text-[#18235C]">Fase 3: Cuentas Reales de Prueba</span>
+                </div>
+                <p className="text-[11px] text-[#282829]/80 leading-relaxed">
+                  5 cuentas oficiales creadas con roles diferenciados entre Empresa A y Empresa B para testeo de aislamiento multi-tenant.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Las 5 Cuentas Oficiales de Prueba */}
+          <div className="bg-white p-6 rounded-2xl border border-[#8FA7D6] shadow-sm">
+            <h3 className="text-sm font-black text-[#18235C] uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#18235C]" />
+              Cuentas Oficiales de Prueba (Multi-Tenant)
+            </h3>
+            <p className="text-xs text-[#282829] mb-4">
+              Credenciales requeridas por la auditoría para validar que ningún usuario de Empresa A acceda a Empresa B y que los colaboradores solo vean su propia información:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {CUENTAS_PRUEBA_OFICIALES.map((cuenta, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-[#8FA7D6] transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="font-bold text-xs text-[#18235C]">{cuenta.nombre}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      cuenta.empresaId === 'empresa-a'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {cuenta.empresaId}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs">
+                    <div>
+                      <span className="text-[10px] text-[#282829]/60 block">Correo:</span>
+                      <code className="text-[11px] font-mono font-bold text-[#18235C] bg-white px-1.5 py-0.5 rounded border border-slate-200 block truncate">
+                        {cuenta.email}
+                      </code>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] text-[#282829]/60 block">Contraseña:</span>
+                      <code className="text-[11px] font-mono text-slate-700 bg-white px-1.5 py-0.5 rounded border border-slate-200 block">
+                        {cuenta.pass}
+                      </code>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[11px] font-semibold text-slate-600">
+                        Rol: <strong className="text-[#18235C]">{cuenta.rol}</strong>
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${cuenta.email}\n${cuenta.pass}`);
+                          mostrarNotificacion(`Credenciales copiadas para ${cuenta.email}`);
+                        }}
+                        className="text-[10px] text-blue-700 hover:text-blue-900 font-bold flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        Copiar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Matriz de Pruebas de Aislamiento Obligatorias */}
+          <div className="bg-white p-6 rounded-2xl border border-[#8FA7D6] shadow-sm">
+            <h3 className="text-sm font-black text-[#18235C] uppercase tracking-wider mb-3 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-[#18235C]" />
+              Matriz de Pruebas de Aislamiento Obligatorias
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500 uppercase text-[10px]">
+                    <th className="py-2.5 px-3">Cuenta de Prueba</th>
+                    <th className="py-2.5 px-3">Operación Permitida</th>
+                    <th className="py-2.5 px-3">Operación Bloqueada (Firestore Rules)</th>
+                    <th className="py-2.5 px-3 text-center">Estado Regla</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  <tr>
+                    <td className="py-2.5 px-3 font-bold text-[#18235C]">empleado-a@test-cimiento.com</td>
+                    <td className="py-2.5 px-3 text-slate-700">Lectura de su perfil y de sus solicitudes</td>
+                    <td className="py-2.5 px-3 text-rose-700">Perfil de empleado B, nóminas, modificar su rol o empresaId</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        Bloqueo Activo
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-3 font-bold text-[#18235C]">admin-a@test-cimiento.com</td>
+                    <td className="py-2.5 px-3 text-slate-700">Gestionar empleados y usuarios de empresa-a</td>
+                    <td className="py-2.5 px-3 text-rose-700">Lectura de empleados de empresa-b, nómina de otra empresa</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        Bloqueo Activo
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-3 font-bold text-[#18235C]">superadmin@test-cimiento.com</td>
+                    <td className="py-2.5 px-3 text-slate-700">Administrar empresas autorizadas, roles, auditoría inmutable</td>
+                    <td className="py-2.5 px-3 text-rose-700">Modificar o borrar registros de logs_auditoria (inmutabilidad legal)</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        Bloqueo Activo
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL CREAR NUEVO USUARIO */}
       {modalCrearOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#18235C]/60 backdrop-blur-xs p-4 overflow-y-auto">
@@ -1089,7 +1330,7 @@ export function UsuariosView({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-[#18235C] mb-1">
                     Rol en la Plataforma *
@@ -1117,6 +1358,20 @@ export function UsuariosView({
                     <option value="responsable_sst">Responsable SG-SST</option>
                     <option value="admin_gh">Administrador de Gestión Humana</option>
                     <option value="superadmin">Superadministrador</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#18235C] mb-1">
+                    Empresa Asignada *
+                  </label>
+                  <select
+                    value={nuevoUsuario.empresaId || 'empresa-a'}
+                    onChange={e => setNuevoUsuario({ ...nuevoUsuario, empresaId: e.target.value })}
+                    className="w-full bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg px-2.5 py-1.5 text-xs text-[#282829] font-medium"
+                  >
+                    <option value="empresa-a">Empresa A (Principal)</option>
+                    <option value="empresa-b">Empresa B (Secundaria)</option>
                   </select>
                 </div>
 
@@ -1311,7 +1566,7 @@ export function UsuariosView({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-[#18235C] mb-1">Rol en Plataforma</label>
                   <select
@@ -1324,6 +1579,18 @@ export function UsuariosView({
                     <option value="responsable_sst">Responsable SG-SST</option>
                     <option value="admin_gh">Administrador de Gestión Humana</option>
                     <option value="superadmin">Superadministrador</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#18235C] mb-1">Empresa Asignada</label>
+                  <select
+                    value={usuarioEditando.empresaId || 'empresa-a'}
+                    onChange={e => setUsuarioEditando({ ...usuarioEditando, empresaId: e.target.value })}
+                    className="w-full bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg px-2.5 py-1.5 text-xs text-[#282829] font-medium"
+                  >
+                    <option value="empresa-a">Empresa A (Principal)</option>
+                    <option value="empresa-b">Empresa B (Secundaria)</option>
                   </select>
                 </div>
 

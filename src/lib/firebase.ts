@@ -130,6 +130,10 @@ export const loginConEmail = async (email: string, pass: string) => {
   return await signInWithEmailAndPassword(auth, email.trim(), pass);
 };
 
+export const solicitarRestablecimientoClave = async (email: string) => {
+  return await sendPasswordResetEmail(auth, email.trim());
+};
+
 export const registrarConEmail = async (
   email: string,
   pass: string,
@@ -147,6 +151,7 @@ export const registrarConEmail = async (
     email: email.trim().toLowerCase(),
     documento: documento || '—',
     rol: (rol as any) || 'admin_gh',
+    empresaId: 'empresa-a',
     estado: 'activo',
     ultimoAcceso: new Date().toISOString(),
     fechaCreacion: new Date().toISOString(),
@@ -174,6 +179,7 @@ export const loginConGoogle = async () => {
       email: (user.email || '').toLowerCase(),
       documento: '—',
       rol: 'admin_gh',
+      empresaId: 'empresa-a',
       estado: 'activo',
       ultimoAcceso: new Date().toISOString(),
       fechaCreacion: new Date().toISOString(),
@@ -235,7 +241,8 @@ export const suscribirColeccion = <T>(
 // 4. Operaciones de Escritura y Actualización
 export const guardarEmpleadoFB = async (empleado: Empleado) => {
   const docRef = doc(db, 'empleados', empleado.id);
-  await setDoc(docRef, empleado, { merge: true });
+  const data = { ...empleado, empresaId: empleado.empresaId || 'empresa-a' };
+  await setDoc(docRef, data, { merge: true });
 };
 
 export const eliminarEmpleadoFB = async (id: string) => {
@@ -244,7 +251,8 @@ export const eliminarEmpleadoFB = async (id: string) => {
 
 export const guardarCargoFB = async (cargo: Cargo) => {
   const docRef = doc(db, 'cargos', cargo.id);
-  await setDoc(docRef, cargo, { merge: true });
+  const data = { ...cargo, empresaId: cargo.empresaId || 'empresa-a' };
+  await setDoc(docRef, data, { merge: true });
 };
 
 export const eliminarCargoFB = async (id: string) => {
@@ -253,7 +261,8 @@ export const eliminarCargoFB = async (id: string) => {
 
 export const guardarAreaFB = async (area: AreaOrganizacion) => {
   const docRef = doc(db, 'areas', area.id);
-  await setDoc(docRef, area, { merge: true });
+  const data = { ...area, empresaId: area.empresaId || 'empresa-a' };
+  await setDoc(docRef, data, { merge: true });
 };
 
 export const eliminarAreaFB = async (id: string) => {
@@ -262,7 +271,8 @@ export const eliminarAreaFB = async (id: string) => {
 
 export const guardarProcesoFB = async (proceso: ProcesoOrganizacion) => {
   const docRef = doc(db, 'procesos', proceso.id);
-  await setDoc(docRef, proceso, { merge: true });
+  const data = { ...proceso, empresaId: proceso.empresaId || 'empresa-a' };
+  await setDoc(docRef, data, { merge: true });
 };
 
 export const eliminarProcesoFB = async (id: string) => {
@@ -290,22 +300,26 @@ export const obtenerParametrosNominaFB = async (): Promise<ParametrosLegalesNomi
 
 export const guardarInventarioEppFB = async (item: ItemInventarioEPP) => {
   const docRef = doc(db, 'inventario_epp', item.id);
-  await setDoc(docRef, item, { merge: true });
+  const data = { ...item, empresaId: item.empresaId || 'empresa-a' };
+  await setDoc(docRef, data, { merge: true });
 };
 
 export const guardarSolicitudEppFB = async (solicitud: SolicitudEntregaEPP) => {
   const docRef = doc(db, 'solicitudes_epp', solicitud.id);
-  await setDoc(docRef, solicitud, { merge: true });
+  const data = { ...solicitud, empresaId: solicitud.empresaId || 'empresa-a' };
+  await setDoc(docRef, data, { merge: true });
 };
 
 export const guardarSolicitudGeneralFB = async (solicitud: Solicitud) => {
   const docRef = doc(db, 'solicitudes', solicitud.id);
-  await setDoc(docRef, solicitud, { merge: true });
+  const data = { ...solicitud, empresaId: solicitud.empresaId || 'empresa-a' };
+  await setDoc(docRef, data, { merge: true });
 };
 
 export const guardarEvaluacionFB = async (evaluacion: EvaluacionDesempeno) => {
   const docRef = doc(db, 'evaluaciones', evaluacion.id);
-  await setDoc(docRef, evaluacion, { merge: true });
+  const data = { ...evaluacion, empresaId: evaluacion.empresaId || 'empresa-a' };
+  await setDoc(docRef, data, { merge: true });
 };
 
 export const eliminarEvaluacionFB = async (id: string) => {
@@ -316,7 +330,8 @@ export const guardarUsuarioFB = async (usuario: UsuarioSistema) => {
   const docRef = doc(db, 'usuarios', usuario.id);
   // CRÍTICO PARA SEGURIDAD: NUNCA persistir contraseñas en texto plano en la base de datos Firestore
   const { password, ...usuarioSinPassword } = usuario;
-  await setDoc(docRef, usuarioSinPassword, { merge: true });
+  const data = { ...usuarioSinPassword, empresaId: usuario.empresaId || 'empresa-a' };
+  await setDoc(docRef, data, { merge: true });
 };
 
 export const eliminarUsuarioFB = async (usuarioId: string) => {
@@ -672,3 +687,6 @@ export const cargarCatalogoBaseEppEnNube = async () => {
 
   await batch.commit();
 };
+
+export { migrarDocumentosConEmpresaId, CUENTAS_PRUEBA_OFICIALES } from './migracionEmpresa';
+
