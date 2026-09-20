@@ -21,9 +21,11 @@ export default defineConfig(() => {
     },
     build: {
       sourcemap: false,
+      cssCodeSplit: true,
       minify: 'esbuild' as const,
       rollupOptions: {
         output: {
+          sourcemap: false,
           manualChunks: {
             vendor: ['react', 'react-dom'],
             firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],

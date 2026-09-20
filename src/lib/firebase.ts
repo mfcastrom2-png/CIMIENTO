@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp, deleteApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -43,6 +44,25 @@ import {
 
 // 1. Inicialización de Firebase con soporte de Long Polling para proxies y contenedores
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// 1.1 Configuración de Firebase App Check (reCAPTCHA Enterprise)
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+if (typeof window !== 'undefined' && recaptchaSiteKey) {
+  try {
+    if (import.meta.env.DEV) {
+      // @ts-expect-error Firebase App Check debug token setup
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
+    }
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true
+    });
+    console.info('[Security] Firebase App Check activado con reCAPTCHA Enterprise.');
+  } catch (appCheckError) {
+    console.warn('[Security] Advertencia al inicializar App Check:', appCheckError);
+  }
+}
+
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -51,7 +71,7 @@ try {
   firestoreInstance = initializeFirestore(
     app,
     {
-      experimentalForceLongPolling: true
+      experimentalAutoDetectLongPolling: true
     },
     firebaseConfig.firestoreDatabaseId || undefined
   );
@@ -110,20 +130,15 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.warn('Diagnóstico Firestore: ', JSON.stringify(errInfo));
 }
 
-// Validación de conectividad al iniciar (directriz SKILL.md)
+// Validación de conectividad (no bloqueante y tolerante a reconexión)
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    await getDoc(doc(db, 'test', 'connection'));
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Cliente Firestore en modo local/offline temporal.');
-    }
     return false;
   }
 }
-// Ejecución de prueba de conexión sin bloquear inicio
-testConnection().catch(() => {});
 
 // 2. Servicios de Autenticación
 export const loginConEmail = async (email: string, pass: string) => {

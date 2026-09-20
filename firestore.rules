@@ -83,20 +83,32 @@ service cloud.firestore {
         && sameCompany(resource.data);
     }
 
-    // 4. Cargos, Áreas y Procesos Organizacionales
+    // 4. Cargos, Áreas y Procesos Organizacionales (Aislamiento Multi-Tenant)
     match /cargos/{cargoId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isAdmin() && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow update: if isAdmin()
+        && sameCompany(resource.data)
+        && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow delete: if isAdmin() && sameCompany(resource.data);
     }
 
     match /areas/{areaId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isAdmin() && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow update: if isAdmin()
+        && sameCompany(resource.data)
+        && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow delete: if isAdmin() && sameCompany(resource.data);
     }
 
     match /procesos/{procesoId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isAdmin() && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow update: if isAdmin()
+        && sameCompany(resource.data)
+        && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow delete: if isAdmin() && sameCompany(resource.data);
     }
 
     // 5. Inventario de EPP
