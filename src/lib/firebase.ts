@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, deleteApp } from 'firebase/app';
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
+  initializeFirestore,
   collection,
   doc,
   getDoc,
@@ -21,13 +22,17 @@ import {
   updateDoc,
   deleteDoc,
   onSnapshot,
-  writeBatch
+  writeBatch,
+  getDocFromServer,
+  Firestore
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import {
   Empleado,
   Cargo,
   AreaOrganizacion,
+  ProcesoOrganizacion,
+  ParametrosLegalesNomina,
   ItemInventarioEPP,
   SolicitudEntregaEPP,
   Solicitud,
@@ -36,13 +41,89 @@ import {
   RolSistema
 } from '../types';
 
-// 1. Inicialización de Firebase
+// 1. Inicialización de Firebase con soporte de Long Polling para proxies y contenedores
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-export const db = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+
+let firestoreInstance: Firestore;
+try {
+  firestoreInstance = initializeFirestore(
+    app,
+    {
+      experimentalForceLongPolling: true
+    },
+    firebaseConfig.firestoreDatabaseId || undefined
+  );
+} catch {
+  firestoreInstance = firebaseConfig.firestoreDatabaseId
+    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+    : getFirestore(app);
+}
+
+export const db = firestoreInstance;
+
+// Estructuras de Error y Diagnóstico según directriz SKILL.md
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write'
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): void {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.warn('Diagnóstico Firestore: ', JSON.stringify(errInfo));
+}
+
+// Validación de conectividad al iniciar (directriz SKILL.md)
+export async function testConnection(): Promise<boolean> {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Cliente Firestore en modo local/offline temporal.');
+    }
+    return false;
+  }
+}
+// Ejecución de prueba de conexión sin bloquear inicio
+testConnection().catch(() => {});
 
 // 2. Servicios de Autenticación
 export const loginConEmail = async (email: string, pass: string) => {
@@ -129,21 +210,26 @@ export const suscribirColeccion = <T>(
   onData: (data: T[]) => void,
   onError?: (error: Error) => void
 ) => {
-  const colRef = collection(db, nombreColeccion);
-  return onSnapshot(
-    colRef,
-    (snapshot) => {
-      const items: T[] = [];
-      snapshot.forEach((docSnap) => {
-        items.push({ ...(docSnap.data() as T), id: docSnap.id });
-      });
-      onData(items);
-    },
-    (err) => {
-      console.warn(`Error en suscripción a ${nombreColeccion}:`, err);
-      if (onError) onError(err);
-    }
-  );
+  try {
+    const colRef = collection(db, nombreColeccion);
+    return onSnapshot(
+      colRef,
+      (snapshot) => {
+        const items: T[] = [];
+        snapshot.forEach((docSnap) => {
+          items.push({ ...(docSnap.data() as T), id: docSnap.id });
+        });
+        onData(items);
+      },
+      (err) => {
+        handleFirestoreError(err, OperationType.LIST, nombreColeccion);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, nombreColeccion);
+    return () => {};
+  }
 };
 
 // 4. Operaciones de Escritura y Actualización
@@ -163,6 +249,43 @@ export const guardarCargoFB = async (cargo: Cargo) => {
 
 export const eliminarCargoFB = async (id: string) => {
   await deleteDoc(doc(db, 'cargos', id));
+};
+
+export const guardarAreaFB = async (area: AreaOrganizacion) => {
+  const docRef = doc(db, 'areas', area.id);
+  await setDoc(docRef, area, { merge: true });
+};
+
+export const eliminarAreaFB = async (id: string) => {
+  await deleteDoc(doc(db, 'areas', id));
+};
+
+export const guardarProcesoFB = async (proceso: ProcesoOrganizacion) => {
+  const docRef = doc(db, 'procesos', proceso.id);
+  await setDoc(docRef, proceso, { merge: true });
+};
+
+export const eliminarProcesoFB = async (id: string) => {
+  await deleteDoc(doc(db, 'procesos', id));
+};
+
+export const guardarParametrosNominaFB = async (parametros: ParametrosLegalesNomina) => {
+  const docRef = doc(db, 'configuracion_nomina', 'parametros_legales');
+  await setDoc(docRef, parametros, { merge: true });
+};
+
+export const obtenerParametrosNominaFB = async (): Promise<ParametrosLegalesNomina | null> => {
+  try {
+    const docRef = doc(db, 'configuracion_nomina', 'parametros_legales');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as ParametrosLegalesNomina;
+    }
+    return null;
+  } catch (err) {
+    console.warn('Error al obtener parámetros de nómina desde Firestore:', err);
+    return null;
+  }
 };
 
 export const guardarInventarioEppFB = async (item: ItemInventarioEPP) => {
@@ -191,11 +314,48 @@ export const eliminarEvaluacionFB = async (id: string) => {
 
 export const guardarUsuarioFB = async (usuario: UsuarioSistema) => {
   const docRef = doc(db, 'usuarios', usuario.id);
-  await setDoc(docRef, usuario, { merge: true });
+  // CRÍTICO PARA SEGURIDAD: NUNCA persistir contraseñas en texto plano en la base de datos Firestore
+  const { password, ...usuarioSinPassword } = usuario;
+  await setDoc(docRef, usuarioSinPassword, { merge: true });
 };
 
 export const eliminarUsuarioFB = async (usuarioId: string) => {
   await deleteDoc(doc(db, 'usuarios', usuarioId));
+};
+
+// Registrar cuenta de usuario en Firebase Authentication de manera aislada (sin cerrar sesión del administrador)
+export const registrarUsuarioEnAuth = async (
+  email: string,
+  pass: string,
+  nombre?: string
+): Promise<{ success: boolean; uid?: string; code?: string; message?: string }> => {
+  const emailLimpio = email.trim().toLowerCase();
+  const tempAppName = `auth-worker-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  try {
+    const tempApp = initializeApp(firebaseConfig, tempAppName);
+    const tempAuth = getAuth(tempApp);
+    const cred = await createUserWithEmailAndPassword(tempAuth, emailLimpio, pass);
+    if (nombre && cred.user) {
+      await updateProfile(cred.user, { displayName: nombre });
+    }
+    const uid = cred.user.uid;
+    try {
+      await deleteApp(tempApp);
+    } catch {
+      // Ignorar error al limpiar app temporal
+    }
+    return { success: true, uid };
+  } catch (err: any) {
+    if (err?.code === 'auth/email-already-in-use') {
+      return {
+        success: true,
+        code: 'auth/email-already-in-use',
+        message: 'La cuenta ya existía en Firebase Auth. Se procederá a enviar el enlace de activación.'
+      };
+    }
+    console.warn('Registro en Firebase Auth secundario:', err?.code, err?.message);
+    return { success: false, code: err?.code, message: err?.message };
+  }
 };
 
 export const enviarNotificacionCorreoNuevoUsuario = async (
@@ -203,29 +363,47 @@ export const enviarNotificacionCorreoNuevoUsuario = async (
   nombre: string,
   rol: string,
   passwordTemporal?: string
-): Promise<{ success: boolean; message: string; method: 'firebase_auth' | 'sistema_corporativo' }> => {
+): Promise<{
+  success: boolean;
+  message: string;
+  method: 'firebase_auth' | 'sistema_corporativo' | 'error_auth';
+  errorDetalle?: string;
+}> => {
   const emailLimpio = email.trim().toLowerCase();
+  if (!emailLimpio || !emailLimpio.includes('@')) {
+    return {
+      success: false,
+      message: `El correo "${email}" no tiene un formato válido.`,
+      method: 'error_auth',
+      errorDetalle: 'Formato inválido'
+    };
+  }
+
+  const passAUsar = passwordTemporal?.trim() || 'BGroup2026*';
+
+  // 1. Garantizar que el usuario exista primero en Firebase Authentication
+  await registrarUsuarioEnAuth(emailLimpio, passAUsar, nombre);
+
+  // 2. Despachar correo oficial de restablecimiento/activación vía Firebase Auth
   try {
-    // Intentar despacho de enlace oficial de activación vía Firebase Auth
     await sendPasswordResetEmail(auth, emailLimpio);
     return {
       success: true,
-      message: `Notificación y enlace de activación enviados exitosamente a ${emailLimpio} a través de Firebase Cloud.`,
+      message: `Enlace oficial de activación y restablecimiento de contraseña enviado a ${emailLimpio} a través de Firebase Authentication. Recuerde verificar la carpeta de Spam / Correo no deseado.`,
       method: 'firebase_auth'
     };
   } catch (err: any) {
-    // Si la cuenta aún no se ha creado en el proveedor Auth de Firebase o está en modo desarrollo local,
-    // el sistema gestiona la notificación corporativa y registra el despacho
-    console.info('Notificación gestionada mediante despacho institucional B GROUP:', err?.message || err);
+    console.warn('Error al enviar correo vía Firebase Auth:', err?.code, err?.message);
     return {
-      success: true,
-      message: `Notificación institucional y credenciales de acceso generadas y despachadas exitosamente a ${emailLimpio}.`,
-      method: 'sistema_corporativo'
+      success: false,
+      message: `Firebase no pudo despachar el correo automático (${err?.code || err?.message || 'Error'}). Utilice los accesos directos de Gmail Web, Outlook o Copiar Mensaje para entregar las credenciales al colaborador.`,
+      method: 'error_auth',
+      errorDetalle: err?.code || err?.message
     };
   }
 };
 
-// 5. Herramienta de Limpieza de Datos de Prueba para Producción Real
+// 5. Herramienta de Limpieza y Restablecimiento para Producción Institucional
 export const esAmbienteLimpio = (): boolean => {
   if (typeof window === 'undefined') return false;
   return localStorage.getItem('bgroup_datos_limpios') === 'true';
@@ -234,7 +412,7 @@ export const esAmbienteLimpio = (): boolean => {
 export const limpiarDatosDePruebaEnNube = async () => {
   const batch = writeBatch(db);
 
-  // 1. Limpiar solicitudes de prueba
+  // 1. Restablecer solicitudes
   try {
     const solSnapshot = await getDocs(collection(db, 'solicitudes'));
     solSnapshot.forEach(docSnap => batch.delete(docSnap.ref));
@@ -242,7 +420,7 @@ export const limpiarDatosDePruebaEnNube = async () => {
     console.warn('Error al vaciar solicitudes:', e);
   }
 
-  // 2. Limpiar solicitudes de EPP de prueba
+  // 2. Restablecer solicitudes de EPP
   try {
     const solEppSnapshot = await getDocs(collection(db, 'solicitudes_epp'));
     solEppSnapshot.forEach(docSnap => batch.delete(docSnap.ref));
@@ -250,7 +428,7 @@ export const limpiarDatosDePruebaEnNube = async () => {
     console.warn('Error al vaciar solicitudes_epp:', e);
   }
 
-  // 3. Limpiar evaluaciones de prueba
+  // 3. Restablecer evaluaciones
   try {
     const evalSnapshot = await getDocs(collection(db, 'evaluaciones'));
     evalSnapshot.forEach(docSnap => batch.delete(docSnap.ref));
@@ -258,7 +436,7 @@ export const limpiarDatosDePruebaEnNube = async () => {
     console.warn('Error al vaciar evaluaciones:', e);
   }
 
-  // 4. Limpiar empleados de prueba (Juan Pérez, Carlos Mendivelso de ejemplo, etc.)
+  // 4. Restablecer registros de colaboradores
   try {
     const empSnapshot = await getDocs(collection(db, 'empleados'));
     empSnapshot.forEach(docSnap => batch.delete(docSnap.ref));
@@ -266,7 +444,7 @@ export const limpiarDatosDePruebaEnNube = async () => {
     console.warn('Error al vaciar empleados:', e);
   }
 
-  // 5. Limpiar usuarios de prueba en Firestore
+  // 5. Restablecer usuarios temporales en Firestore
   try {
     const usrSnapshot = await getDocs(collection(db, 'usuarios'));
     usrSnapshot.forEach(docSnap => {
@@ -276,7 +454,7 @@ export const limpiarDatosDePruebaEnNube = async () => {
       }
     });
   } catch (e) {
-    console.warn('Error al vaciar usuarios de prueba:', e);
+    console.warn('Error al vaciar usuarios temporales:', e);
   }
 
   // 6. Limpiar vacaciones si existen en Firestore
@@ -287,7 +465,19 @@ export const limpiarDatosDePruebaEnNube = async () => {
     // collection might not exist
   }
 
-  // 7. Registrar marca permanente de base de datos de producción limpia
+  // 8. Limpiar registros de capacitaciones si existen en Firestore
+  try {
+    const capSnapshot = await getDocs(collection(db, 'capacitaciones'));
+    capSnapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      // Resetear participantes y evaluaciones de prueba manteniendo la ficha de capacitación
+      batch.update(docSnap.ref, { participantes: [] });
+    });
+  } catch (e) {
+    console.warn('Error al limpiar participantes de capacitaciones:', e);
+  }
+
+  // 9. Registrar marca permanente de base de datos de producción limpia
   const configRef = doc(db, 'configuracion_empresa', 'general');
   batch.set(configRef, {
     ambiente: 'PRODUCCIÓN',
@@ -299,13 +489,84 @@ export const limpiarDatosDePruebaEnNube = async () => {
 
   await batch.commit();
 
-  // 8. Purgar llaves locales del navegador para sincronización inmediata
+  // 10. Purgar llaves locales del navegador para sincronización inmediata
   if (typeof window !== 'undefined') {
     localStorage.setItem('bgroup_datos_limpios', 'true');
+    localStorage.setItem('bgroup_capacitaciones_limpias', 'true');
+    localStorage.setItem('bgroup_estructura_limpia', 'true');
     localStorage.removeItem('bgroup_vacaciones_controles');
     localStorage.removeItem('bgroup_vacaciones_solicitudes');
     localStorage.removeItem('bgroup_votaciones');
     localStorage.removeItem('bgroup_novedades_nomina');
+  }
+};
+
+// Limpieza modular y dedicada para la base de datos de EPPs (inventario y actas)
+export const limpiarBaseEppFB = async () => {
+  const batch = writeBatch(db);
+
+  // 1. Eliminar todas las solicitudes y actas de entrega de EPP
+  try {
+    const solEppSnapshot = await getDocs(collection(db, 'solicitudes_epp'));
+    solEppSnapshot.forEach(docSnap => batch.delete(docSnap.ref));
+  } catch (e) {
+    console.warn('Error al vaciar solicitudes_epp:', e);
+  }
+
+  // 2. Colocar todas las existencias de inventario en 0
+  try {
+    const invSnapshot = await getDocs(collection(db, 'inventario_epp'));
+    invSnapshot.forEach(docSnap => {
+      batch.update(docSnap.ref, { stockActual: 0 });
+    });
+  } catch (e) {
+    console.warn('Error al resetear stockActual de inventario_epp:', e);
+  }
+
+  await batch.commit();
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('bgroup_epp_limpio', 'true');
+  }
+};
+
+// Limpieza modular y dedicada para la base de datos de Capacitaciones
+export const limpiarCapacitacionesFB = async () => {
+  const batch = writeBatch(db);
+
+  try {
+    const capSnapshot = await getDocs(collection(db, 'capacitaciones'));
+    capSnapshot.forEach(docSnap => {
+      batch.update(docSnap.ref, { participantes: [] });
+    });
+    await batch.commit();
+  } catch (e) {
+    console.warn('Error al resetear participantes de capacitaciones en Firebase:', e);
+  }
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('bgroup_capacitaciones_limpias', 'true');
+  }
+};
+
+// Limpieza modular y dedicada para la Estructura Orgánica y Cargos
+export const limpiarEstructuraOrganicaFB = async (cargosBaseIds: string[] = ['c1', 'c2', 'c3', 'c4', 'c5']) => {
+  const batch = writeBatch(db);
+
+  try {
+    const cargosSnapshot = await getDocs(collection(db, 'cargos'));
+    cargosSnapshot.forEach(docSnap => {
+      // Eliminar cargos adicionales que hayan sido creados como pruebas no corporativas
+      if (!cargosBaseIds.includes(docSnap.id)) {
+        batch.delete(docSnap.ref);
+      }
+    });
+    await batch.commit();
+  } catch (e) {
+    console.warn('Error al depurar cargos en Firebase:', e);
+  }
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('bgroup_estructura_limpia', 'true');
   }
 };
 

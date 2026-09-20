@@ -16,9 +16,11 @@ import { uid } from '../data/initialData';
 
 interface ManualCargosViewProps {
   cargos: Cargo[];
-  selectedCargoId: string;
-  onSelectCargo: (id: string) => void;
-  onUpdateCargoFicha: (cargoId: string, updatedFicha: FichaCargo) => void;
+  selectedCargoId?: string;
+  onSelectCargo?: (id: string) => void;
+  onUpdateCargoFicha?: (cargoId: string, updatedFicha: FichaCargo) => void;
+  onUpdateCargo?: (cargo: Cargo) => void;
+  onAddCargo?: (cargo: Cargo) => void;
 }
 
 export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
@@ -26,8 +28,16 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
   selectedCargoId,
   onSelectCargo,
   onUpdateCargoFicha,
+  onUpdateCargo,
+  onAddCargo,
 }) => {
-  const currentCargo = cargos.find(c => c.id === selectedCargoId) || cargos[0];
+  const [internalId, setInternalId] = useState<string>(cargos[0]?.id || "");
+  const activeId = selectedCargoId || internalId;
+  const currentCargo = cargos.find(c => c.id === activeId) || cargos[0];
+  const handleSelect = (id: string) => {
+    setInternalId(id);
+    if (onSelectCargo) onSelectCargo(id);
+  };
   const [activeTab, setActiveTab] = useState<string>('ident');
   const [saveToast, setSaveToast] = useState(false);
 
@@ -64,7 +74,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
 
   if (!currentCargo) {
     return (
-      <div className="p-8 text-center bg-white rounded border border-[#DCD6C8]">
+      <div className="p-8 text-center bg-white rounded border border-[#8FA7D6]">
         No se ha seleccionado ningún cargo.
       </div>
     );
@@ -249,30 +259,30 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
     <div className="space-y-6">
       {/* Toast Save */}
       {saveToast && (
-        <div className="fixed bottom-5 right-5 z-50 bg-[#2F5D50] text-white text-xs px-4 py-2.5 rounded shadow-lg flex items-center gap-2 animate-bounce">
+        <div className="fixed bottom-5 right-5 z-50 bg-[#18235C] text-white text-xs px-4 py-2.5 rounded shadow-lg flex items-center gap-2 animate-bounce">
           <Check className="w-4 h-4" />
           <span>Cambios guardados con éxito en la ficha del cargo.</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-[#DCD6C8]">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-[#8FA7D6]">
         <div>
-          <h1 className="font-serif-title text-3xl font-medium text-[#1E2A24]">
+          <h1 className="font-bold tracking-tight text-3xl font-medium text-[#18235C]">
             Manual de Cargos
           </h1>
-          <p className="text-sm text-[#5B6A62] mt-1 max-w-2xl">
+          <p className="text-sm text-[#282829] mt-1 max-w-2xl">
             Ficha técnica digital por cargo: base estructural para la evaluación de desempeño, funciones críticas, indicadores verificables y competencias conductuales.
           </p>
         </div>
 
         {/* Cargo Selector */}
         <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-[#5B6A62]">Seleccionar cargo:</label>
+          <label className="text-xs font-semibold text-[#282829]">Seleccionar cargo:</label>
           <select
             value={currentCargo.id}
-            onChange={e => onSelectCargo(e.target.value)}
-            className="text-xs font-semibold p-2 rounded border border-[#DCD6C8] bg-white text-[#1E2A24] focus:outline-none focus:border-[#2F5D50]"
+            onChange={e => handleSelect(e.target.value)}
+            className="text-xs font-semibold p-2 rounded border border-[#8FA7D6] bg-white text-[#18235C] focus:outline-none focus:border-[#18235C]"
           >
             {cargos.map(c => (
               <option key={c.id} value={c.id}>
@@ -284,25 +294,25 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
       </div>
 
       {/* Ficha Card */}
-      <div className="bg-white rounded border border-[#DCD6C8] p-5 shadow-xs">
+      <div className="bg-white rounded border border-[#8FA7D6] p-5 shadow-xs">
         {/* Ficha Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#DCD6C8] mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#8FA7D6] mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-serif-title text-2xl font-medium text-[#1E2A24]">
+              <h2 className="font-bold tracking-tight text-2xl font-medium text-[#18235C]">
                 {currentCargo.nombre}
               </h2>
-              <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#E4EDE9] text-[#2F5D50] border border-[#2F5D50]/20">
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#8FA7D6/20] text-[#18235C] border border-[#18235C]/20">
                 {f.identificacion.estado}
               </span>
             </div>
-            <p className="text-xs text-[#5B6A62] mt-0.5">
-              Código: <strong className="text-[#1E2A24]">{f.identificacion.codigo || 'S/C'}</strong> · Área: <strong>{f.identificacion.area || '—'}</strong> · Proceso: <strong>{f.identificacion.proceso || '—'}</strong>
+            <p className="text-xs text-[#282829] mt-0.5">
+              Código: <strong className="text-[#18235C]">{f.identificacion.codigo || 'S/C'}</strong> · Área: <strong>{f.identificacion.area || '—'}</strong> · Proceso: <strong>{f.identificacion.proceso || '—'}</strong>
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-xs text-[#5B6A62] font-mono bg-[#F6F4EF] px-2.5 py-1 rounded border border-[#DCD6C8]">
+            <span className="text-xs text-[#282829] font-mono bg-[#F8FAFC] px-2.5 py-1 rounded border border-[#8FA7D6]">
               Versión {f.identificacion.version}
             </span>
             <button
@@ -315,15 +325,15 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         </div>
 
         {/* Tabs Bar */}
-        <div className="flex gap-2 border-b border-[#DCD6C8] overflow-x-auto pb-1 mb-5 text-xs">
+        <div className="flex gap-2 border-b border-[#8FA7D6] overflow-x-auto pb-1 mb-5 text-xs">
           {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
               className={`px-3 py-2 whitespace-nowrap rounded-t font-semibold transition-colors ${
                 activeTab === t.id
-                  ? 'text-[#2F5D50] border-b-2 border-[#2F5D50] bg-[#F6F4EF]/50'
-                  : 'text-[#5B6A62] hover:text-[#1E2A24]'
+                  ? 'text-[#18235C] border-b-2 border-[#18235C] bg-[#F8FAFC]/50'
+                  : 'text-[#282829] hover:text-[#18235C]'
               }`}
             >
               {t.label}
@@ -336,56 +346,56 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">Código</label>
+                <label className="block text-xs font-semibold text-[#282829] mb-1">Código</label>
                 <input
                   type="text"
                   value={f.identificacion.codigo}
                   onChange={e => handleUpdateFicha({ identificacion: { ...f.identificacion, codigo: e.target.value } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">Familia</label>
+                <label className="block text-xs font-semibold text-[#282829] mb-1">Familia</label>
                 <input
                   type="text"
                   value={f.identificacion.familia}
                   onChange={e => handleUpdateFicha({ identificacion: { ...f.identificacion, familia: e.target.value } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">Área</label>
+                <label className="block text-xs font-semibold text-[#282829] mb-1">Área</label>
                 <input
                   type="text"
                   value={f.identificacion.area}
                   onChange={e => handleUpdateFicha({ identificacion: { ...f.identificacion, area: e.target.value } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">Proceso</label>
+                <label className="block text-xs font-semibold text-[#282829] mb-1">Proceso</label>
                 <input
                   type="text"
                   value={f.identificacion.proceso}
                   onChange={e => handleUpdateFicha({ identificacion: { ...f.identificacion, proceso: e.target.value } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">Tipo Vinculación</label>
+                <label className="block text-xs font-semibold text-[#282829] mb-1">Tipo Vinculación</label>
                 <input
                   type="text"
                   value={f.identificacion.tipoVinculacion}
                   onChange={e => handleUpdateFicha({ identificacion: { ...f.identificacion, tipoVinculacion: e.target.value } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">Modalidad</label>
+                <label className="block text-xs font-semibold text-[#282829] mb-1">Modalidad</label>
                 <select
                   value={f.identificacion.modalidad}
                   onChange={e => handleUpdateFicha({ identificacion: { ...f.identificacion, modalidad: e.target.value as any } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 >
                   <option value="Presencial">Presencial</option>
                   <option value="Remoto">Remoto</option>
@@ -393,27 +403,27 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">Ubicación</label>
+                <label className="block text-xs font-semibold text-[#282829] mb-1">Ubicación</label>
                 <input
                   type="text"
                   value={f.identificacion.ubicacion}
                   onChange={e => handleUpdateFicha({ identificacion: { ...f.identificacion, ubicacion: e.target.value } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">Personal a Cargo</label>
+                <label className="block text-xs font-semibold text-[#282829] mb-1">Personal a Cargo</label>
                 <input
                   type="text"
                   value={f.identificacion.personalACargo}
                   onChange={e => handleUpdateFicha({ identificacion: { ...f.identificacion, personalACargo: e.target.value } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
             </div>
 
-            <div className="p-3 bg-[#F6F4EF] rounded border border-[#DCD6C8] text-xs text-[#5B6A62]">
-              Jefe Inmediato: <strong className="text-[#1E2A24]">{currentCargo.reportaA ? cargos.find(c => c.id === currentCargo.reportaA)?.nombre : 'Cargo Raíz (Sin superior)'}</strong>. La jerarquía se gestiona desde el módulo de Estructura Organizacional.
+            <div className="p-3 bg-[#F8FAFC] rounded border border-[#8FA7D6] text-xs text-[#282829]">
+              Jefe Inmediato: <strong className="text-[#18235C]">{currentCargo.reportaA ? cargos.find(c => c.id === currentCargo.reportaA)?.nombre : 'Cargo Raíz (Sin superior)'}</strong>. La jerarquía se gestiona desde el módulo de Estructura Organizacional.
             </div>
           </div>
         )}
@@ -422,17 +432,17 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         {activeTab === 'proposito' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-[#5B6A62] mb-1">
+              <label className="block text-xs font-semibold text-[#282829] mb-1">
                 Propósito Fundamental del Cargo
               </label>
-              <p className="text-xs text-[#5B6A62] mb-2">
+              <p className="text-xs text-[#282829] mb-2">
                 Razón de ser del cargo en la organización: qué hace, para qué lo hace y cuál es el impacto esperado.
               </p>
               <textarea
                 rows={5}
                 value={f.proposito}
                 onChange={e => handleUpdateFicha({ proposito: e.target.value })}
-                className="w-full text-xs p-3 rounded border border-[#DCD6C8] bg-[#F6F4EF] focus:outline-none focus:border-[#2F5D50]"
+                className="w-full text-xs p-3 rounded border border-[#8FA7D6] bg-[#F8FAFC] focus:outline-none focus:border-[#18235C]"
                 placeholder="Describa el propósito principal del cargo..."
               />
             </div>
@@ -442,48 +452,48 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         {/* TAB: FUNCIONES */}
         {activeTab === 'funciones' && (
           <div className="space-y-5">
-            <form onSubmit={addFuncion} className="bg-[#F6F4EF] p-3.5 rounded border border-[#DCD6C8] space-y-3">
-              <div className="text-xs font-semibold text-[#1E2A24]">Agregar Función Esencial</div>
+            <form onSubmit={addFuncion} className="bg-[#F8FAFC] p-3.5 rounded border border-[#8FA7D6] space-y-3">
+              <div className="text-xs font-semibold text-[#18235C]">Agregar Función Esencial</div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2">
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Acción (Verbo + Objeto)</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Acción (Verbo + Objeto)</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Realizar empalmes de fibra óptica en cajas NAP"
                     value={fnTexto}
                     onChange={e => setFnTexto(e.target.value)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Condición</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Condición</label>
                   <input
                     type="text"
                     placeholder="Bajo norma técnica y protocolo de SST"
                     value={fnCondicion}
                     onChange={e => setFnCondicion(e.target.value)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Resultado Esperado</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Resultado Esperado</label>
                   <input
                     type="text"
                     placeholder="Atenuación < 0.2 dB"
                     value={fnResultado}
                     onChange={e => setFnResultado(e.target.value)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   />
                 </div>
               </div>
               <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center gap-3 text-xs">
-                  <label className="font-semibold text-[#5B6A62]">Criticidad:</label>
+                  <label className="font-semibold text-[#282829]">Criticidad:</label>
                   <select
                     value={fnCriticidad}
                     onChange={e => setFnCriticidad(e.target.value as any)}
-                    className="text-xs p-1.5 rounded border border-[#DCD6C8] bg-white"
+                    className="text-xs p-1.5 rounded border border-[#8FA7D6] bg-white"
                   >
                     <option value="Alta">Alta</option>
                     <option value="Media">Media</option>
@@ -492,7 +502,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                 </div>
                 <button
                   type="submit"
-                  className="px-3 py-1.5 bg-[#2F5D50] hover:bg-[#223F37] text-white text-xs font-semibold rounded flex items-center gap-1"
+                  className="px-3 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Agregar función</span>
@@ -503,7 +513,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#DCD6C8] text-[#5B6A62]">
+                  <tr className="border-b border-[#8FA7D6] text-[#282829]">
                     <th className="py-2 px-3 font-semibold">Función</th>
                     <th className="py-2 px-3 font-semibold">Condición</th>
                     <th className="py-2 px-3 font-semibold">Resultado Esperado</th>
@@ -511,16 +521,16 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                     <th className="py-2 px-3 font-semibold text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#DCD6C8]/60">
+                <tbody className="divide-y divide-[#8FA7D6]/60">
                   {f.funciones.map(fn => (
-                    <tr key={fn.id} className="hover:bg-[#F6F4EF]/50">
-                      <td className="py-2.5 px-3 font-medium text-[#1E2A24]">{fn.texto}</td>
-                      <td className="py-2.5 px-3 text-[#5B6A62]">{fn.condicion || '—'}</td>
-                      <td className="py-2.5 px-3 text-[#5B6A62]">{fn.resultado || '—'}</td>
+                    <tr key={fn.id} className="hover:bg-[#F8FAFC]/50">
+                      <td className="py-2.5 px-3 font-medium text-[#18235C]">{fn.texto}</td>
+                      <td className="py-2.5 px-3 text-[#282829]">{fn.condicion || '—'}</td>
+                      <td className="py-2.5 px-3 text-[#282829]">{fn.resultado || '—'}</td>
                       <td className="py-2.5 px-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           fn.criticidad === 'Alta' ? 'bg-[#F3E3DE] text-[#A8503E]' :
-                          fn.criticidad === 'Media' ? 'bg-[#F5EAD4] text-[#B5842A]' : 'bg-[#E4EDE9] text-[#2F5D50]'
+                          fn.criticidad === 'Media' ? 'bg-[#F5EAD4] text-[#B5842A]' : 'bg-[#8FA7D6/20] text-[#18235C]'
                         }`}>
                           {fn.criticidad}
                         </span>
@@ -538,7 +548,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                   ))}
                   {(f.funciones?.length || 0) === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center text-[#5B6A62]">
+                      <td colSpan={5} className="py-6 text-center text-[#282829]">
                         No hay funciones registradas para este cargo. Se recomiendan entre 6 y 10 funciones esenciales.
                       </td>
                     </tr>
@@ -552,13 +562,13 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         {/* TAB: RESPONSABILIDADES */}
         {activeTab === 'resp' && (
           <div className="space-y-5">
-            <form onSubmit={addResponsabilidad} className="bg-[#F6F4EF] p-3.5 rounded border border-[#DCD6C8] flex flex-wrap items-end gap-3">
+            <form onSubmit={addResponsabilidad} className="bg-[#F8FAFC] p-3.5 rounded border border-[#8FA7D6] flex flex-wrap items-end gap-3">
               <div>
-                <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Categoría</label>
+                <label className="block text-[11px] font-semibold text-[#282829] mb-1">Categoría</label>
                 <select
                   value={rsCategoria}
                   onChange={e => setRsCategoria(e.target.value as any)}
-                  className="text-xs p-2 rounded border border-[#DCD6C8] bg-white min-w-[130px]"
+                  className="text-xs p-2 rounded border border-[#8FA7D6] bg-white min-w-[130px]"
                 >
                   <option value="Operativa">Operativa</option>
                   <option value="Cliente">Cliente</option>
@@ -572,19 +582,19 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                 </select>
               </div>
               <div className="flex-1 min-w-[240px]">
-                <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Descripción de la Responsabilidad</label>
+                <label className="block text-[11px] font-semibold text-[#282829] mb-1">Descripción de la Responsabilidad</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej. Asegurar uso permanente de EPP y reporte de condiciones inseguras"
                   value={rsDescripcion}
                   onChange={e => setRsDescripcion(e.target.value)}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                 />
               </div>
               <button
                 type="submit"
-                className="px-3.5 py-2 bg-[#2F5D50] hover:bg-[#223F37] text-white text-xs font-semibold rounded flex items-center gap-1"
+                className="px-3.5 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Agregar</span>
@@ -593,10 +603,10 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
 
             <div className="space-y-2">
               {f.responsabilidades.map(rs => (
-                <div key={rs.id} className="flex items-center justify-between p-3 rounded border border-[#DCD6C8] bg-white text-xs">
+                <div key={rs.id} className="flex items-center justify-between p-3 rounded border border-[#8FA7D6] bg-white text-xs">
                   <div>
-                    <span className="font-bold text-[#2F5D50] mr-2">[{rs.categoria}]</span>
-                    <span className="text-[#1E2A24]">{rs.descripcion}</span>
+                    <span className="font-bold text-[#18235C] mr-2">[{rs.categoria}]</span>
+                    <span className="text-[#18235C]">{rs.descripcion}</span>
                   </div>
                   <button
                     onClick={() => deleteResponsabilidad(rs.id)}
@@ -607,7 +617,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                 </div>
               ))}
               {(f.responsabilidades?.length || 0) === 0 && (
-                <div className="py-6 text-center text-xs text-[#5B6A62]">
+                <div className="py-6 text-center text-xs text-[#282829]">
                   Sin responsabilidades registradas.
                 </div>
               )}
@@ -618,48 +628,48 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         {/* TAB: INDICADORES (CONEXIÓN DIRECTA AL MODELO TÉCNICO DE EVALUACIÓN) */}
         {activeTab === 'indic' && (
           <div className="space-y-5">
-            <div className="p-3 bg-[#E4EDE9] text-[#2F5D50] rounded border border-[#2F5D50]/20 text-xs">
+            <div className="p-3 bg-[#8FA7D6/20] text-[#18235C] rounded border border-[#18235C]/20 text-xs">
               <strong>Nota técnica de alineación:</strong> Estos indicadores son tomados de forma automática al generar la evaluación de desempeño de quien ocupe este cargo (Componente 1: Resultados del cargo - 50% de la nota final).
             </div>
 
-            <form onSubmit={addIndicador} className="bg-[#F6F4EF] p-3.5 rounded border border-[#DCD6C8] space-y-3">
-              <div className="text-xs font-semibold text-[#1E2A24]">Nuevo Indicador de Desempeño</div>
+            <form onSubmit={addIndicador} className="bg-[#F8FAFC] p-3.5 rounded border border-[#8FA7D6] space-y-3">
+              <div className="text-xs font-semibold text-[#18235C]">Nuevo Indicador de Desempeño</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="md:col-span-2">
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Nombre del Indicador</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Nombre del Indicador</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. % órdenes sin reproceso"
                     value={inNombre}
                     onChange={e => setInNombre(e.target.value)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Fórmula de Cálculo</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Fórmula de Cálculo</label>
                   <input
                     type="text"
                     placeholder="Órdenes OK / Total * 100"
                     value={inFormula}
                     onChange={e => setInFormula(e.target.value)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Unidad & Frecuencia</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Unidad & Frecuencia</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       placeholder="%"
                       value={inUnidad}
                       onChange={e => setInUnidad(e.target.value)}
-                      className="w-14 text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                      className="w-14 text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                     />
                     <select
                       value={inFrecuencia}
                       onChange={e => setInFrecuencia(e.target.value as any)}
-                      className="text-xs p-2 rounded border border-[#DCD6C8] bg-white flex-1"
+                      className="text-xs p-2 rounded border border-[#8FA7D6] bg-white flex-1"
                     >
                       <option value="Mensual">Mensual</option>
                       <option value="Trimestral">Trimestral</option>
@@ -669,21 +679,21 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Peso Sugerido (%)</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Peso Sugerido (%)</label>
                   <input
                     type="number"
                     min="1"
                     max="50"
                     value={inPeso}
                     onChange={e => setInPeso(Number(e.target.value))}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   />
                 </div>
               </div>
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="px-3.5 py-2 bg-[#2F5D50] hover:bg-[#223F37] text-white text-xs font-semibold rounded flex items-center gap-1"
+                  className="px-3.5 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Agregar indicador</span>
@@ -694,7 +704,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#DCD6C8] text-[#5B6A62]">
+                  <tr className="border-b border-[#8FA7D6] text-[#282829]">
                     <th className="py-2 px-3 font-semibold">Indicador</th>
                     <th className="py-2 px-3 font-semibold">Fórmula</th>
                     <th className="py-2 px-3 font-semibold">Unidad</th>
@@ -703,15 +713,15 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                     <th className="py-2 px-3 font-semibold text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#DCD6C8]/60">
+                <tbody className="divide-y divide-[#8FA7D6]/60">
                   {f.indicadores.map(ind => (
-                    <tr key={ind.id} className="hover:bg-[#F6F4EF]/50">
-                      <td className="py-2.5 px-3 font-medium text-[#1E2A24]">{ind.nombre}</td>
-                      <td className="py-2.5 px-3 text-[#5B6A62] font-mono text-[11px]">{ind.formula || '—'}</td>
-                      <td className="py-2.5 px-3 text-[#5B6A62]">{ind.unidad}</td>
-                      <td className="py-2.5 px-3 text-[#5B6A62]">{ind.frecuencia}</td>
+                    <tr key={ind.id} className="hover:bg-[#F8FAFC]/50">
+                      <td className="py-2.5 px-3 font-medium text-[#18235C]">{ind.nombre}</td>
+                      <td className="py-2.5 px-3 text-[#282829] font-mono text-[11px]">{ind.formula || '—'}</td>
+                      <td className="py-2.5 px-3 text-[#282829]">{ind.unidad}</td>
+                      <td className="py-2.5 px-3 text-[#282829]">{ind.frecuencia}</td>
                       <td className="py-2.5 px-3">
-                        <span className="font-bold text-[#2F5D50] bg-[#E4EDE9] px-2 py-0.5 rounded text-[11px]">
+                        <span className="font-bold text-[#18235C] bg-[#8FA7D6/20] px-2 py-0.5 rounded text-[11px]">
                           {ind.pesoSugerido || 10}%
                         </span>
                       </td>
@@ -727,7 +737,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                   ))}
                   {(f.indicadores?.length || 0) === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-[#5B6A62]">
+                      <td colSpan={6} className="py-6 text-center text-[#282829]">
                         Sin indicadores registrados. En la evaluación de desempeño este cargo no tendrá métricas objetivas directas hasta que se configuren.
                       </td>
                     </tr>
@@ -742,115 +752,115 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         {activeTab === 'autoridad' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#5B6A62] mb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#282829] mb-3">
                 Niveles de Autoridad y Facultades
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Puede Decidir</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Puede Decidir</label>
                   <textarea
                     rows={2}
                     value={f.autoridad.decide}
                     onChange={e => handleUpdateFicha({ autoridad: { ...f.autoridad, decide: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Puede Aprobar</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Puede Aprobar</label>
                   <textarea
                     rows={2}
                     value={f.autoridad.aprueba}
                     onChange={e => handleUpdateFicha({ autoridad: { ...f.autoridad, aprueba: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Puede Modificar</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Puede Modificar</label>
                   <textarea
                     rows={2}
                     value={f.autoridad.modifica}
                     onChange={e => handleUpdateFicha({ autoridad: { ...f.autoridad, modifica: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Debe Consultar</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Debe Consultar</label>
                   <textarea
                     rows={2}
                     value={f.autoridad.consulta}
                     onChange={e => handleUpdateFicha({ autoridad: { ...f.autoridad, consulta: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Debe Escalar</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Debe Escalar</label>
                   <textarea
                     rows={2}
                     value={f.autoridad.escala}
                     onChange={e => handleUpdateFicha({ autoridad: { ...f.autoridad, escala: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
               </div>
             </div>
 
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#5B6A62] mb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#282829] mb-3">
                 Relaciones Organizacionales e Interacción
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Supervisa A</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Supervisa A</label>
                   <input
                     type="text"
                     value={f.relaciones.supervisaA}
                     onChange={e => handleUpdateFicha({ relaciones: { ...f.relaciones, supervisaA: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Coordina Con</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Coordina Con</label>
                   <input
                     type="text"
                     value={f.relaciones.coordinaCon}
                     onChange={e => handleUpdateFicha({ relaciones: { ...f.relaciones, coordinaCon: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Soporta A</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Soporta A</label>
                   <input
                     type="text"
                     value={f.relaciones.soportaA}
                     onChange={e => handleUpdateFicha({ relaciones: { ...f.relaciones, soportaA: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Recibe De</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Recibe De</label>
                   <input
                     type="text"
                     value={f.relaciones.recibeDe}
                     onChange={e => handleUpdateFicha({ relaciones: { ...f.relaciones, recibeDe: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Entrega A</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Entrega A</label>
                   <input
                     type="text"
                     value={f.relaciones.entregaA}
                     onChange={e => handleUpdateFicha({ relaciones: { ...f.relaciones, entregaA: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Consulta A</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Consulta A</label>
                   <input
                     type="text"
                     value={f.relaciones.consultaA}
                     onChange={e => handleUpdateFicha({ relaciones: { ...f.relaciones, consultaA: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
               </div>
@@ -861,41 +871,41 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         {/* TAB: COMPETENCIAS & REQUISITOS (CONEXIÓN DIRECTA AL MODELO TÉCNICO) */}
         {activeTab === 'comp' && (
           <div className="space-y-6">
-            <div className="p-3 bg-[#E4EDE9] text-[#2F5D50] rounded border border-[#2F5D50]/20 text-xs">
+            <div className="p-3 bg-[#8FA7D6/20] text-[#18235C] rounded border border-[#18235C]/20 text-xs">
               <strong>Evaluación por conductas observables:</strong> Las competencias aquí definidas alimentan el Componente 2 de la evaluación de desempeño (25% de la calificación). Se evitan preguntas subjetivas y se califican comportamientos con evidencias reales.
             </div>
 
-            <form onSubmit={addCompetencia} className="bg-[#F6F4EF] p-3.5 rounded border border-[#DCD6C8] space-y-3">
-              <div className="text-xs font-semibold text-[#1E2A24]">Agregar Competencia Requerida</div>
+            <form onSubmit={addCompetencia} className="bg-[#F8FAFC] p-3.5 rounded border border-[#8FA7D6] space-y-3">
+              <div className="text-xs font-semibold text-[#18235C]">Agregar Competencia Requerida</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2">
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Nombre de la Competencia</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Nombre de la Competencia</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Diagnóstico de fallas en redes"
                     value={cpNombre}
                     onChange={e => setCpNombre(e.target.value)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Tipo</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Tipo</label>
                   <select
                     value={cpTipo}
                     onChange={e => setCpTipo(e.target.value as any)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   >
                     <option value="Técnica">Técnica</option>
                     <option value="Corporativa">Corporativa</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Nivel Esperado</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Nivel Esperado</label>
                   <select
                     value={cpNivel}
                     onChange={e => setCpNivel(e.target.value as any)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   >
                     <option value="Alto">Alto</option>
                     <option value="Intermedio">Intermedio</option>
@@ -904,19 +914,19 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Conductas Observables Esperadas</label>
+                <label className="block text-[11px] font-semibold text-[#282829] mb-1">Conductas Observables Esperadas</label>
                 <input
                   type="text"
                   placeholder="Ej. Aísla la causa raíz con instrumental óptico y no reemplaza equipos sin comprobar fallas"
                   value={cpConductas}
                   onChange={e => setCpConductas(e.target.value)}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                 />
               </div>
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="px-3.5 py-2 bg-[#2F5D50] hover:bg-[#223F37] text-white text-xs font-semibold rounded flex items-center gap-1"
+                  className="px-3.5 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Agregar competencia</span>
@@ -927,7 +937,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#DCD6C8] text-[#5B6A62]">
+                  <tr className="border-b border-[#8FA7D6] text-[#282829]">
                     <th className="py-2 px-3 font-semibold">Competencia</th>
                     <th className="py-2 px-3 font-semibold">Tipo</th>
                     <th className="py-2 px-3 font-semibold">Nivel</th>
@@ -935,19 +945,19 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                     <th className="py-2 px-3 font-semibold text-right"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#DCD6C8]/60">
+                <tbody className="divide-y divide-[#8FA7D6]/60">
                   {f.competencias.map(cp => (
-                    <tr key={cp.id} className="hover:bg-[#F6F4EF]/50">
-                      <td className="py-2.5 px-3 font-medium text-[#1E2A24]">{cp.nombre}</td>
+                    <tr key={cp.id} className="hover:bg-[#F8FAFC]/50">
+                      <td className="py-2.5 px-3 font-medium text-[#18235C]">{cp.nombre}</td>
                       <td className="py-2.5 px-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          cp.tipo === 'Técnica' ? 'bg-[#F5EAD4] text-[#B5842A]' : 'bg-[#E4EDE9] text-[#2F5D50]'
+                          cp.tipo === 'Técnica' ? 'bg-[#F5EAD4] text-[#B5842A]' : 'bg-[#8FA7D6/20] text-[#18235C]'
                         }`}>
                           {cp.tipo}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-[#5B6A62] font-semibold">{cp.nivel}</td>
-                      <td className="py-2.5 px-3 text-[#5B6A62]">{cp.conductas}</td>
+                      <td className="py-2.5 px-3 text-[#282829] font-semibold">{cp.nivel}</td>
+                      <td className="py-2.5 px-3 text-[#282829]">{cp.conductas}</td>
                       <td className="py-2.5 px-3 text-right">
                         <button
                           onClick={() => deleteCompetencia(cp.id)}
@@ -963,45 +973,45 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
             </div>
 
             {/* Requisitos del Cargo */}
-            <div className="pt-4 border-t border-[#DCD6C8]">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#5B6A62] mb-3">
+            <div className="pt-4 border-t border-[#8FA7D6]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#282829] mb-3">
                 Requisitos del Perfil de Cargo
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Formación Académica</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Formación Académica</label>
                   <textarea
                     rows={2}
                     value={f.requisitos.formacion}
                     onChange={e => handleUpdateFicha({ requisitos: { ...f.requisitos, formacion: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Experiencia Laboral</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Experiencia Laboral</label>
                   <textarea
                     rows={2}
                     value={f.requisitos.experiencia}
                     onChange={e => handleUpdateFicha({ requisitos: { ...f.requisitos, experiencia: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Conocimientos Específicos</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Conocimientos Específicos</label>
                   <textarea
                     rows={2}
                     value={f.requisitos.conocimientos}
                     onChange={e => handleUpdateFicha({ requisitos: { ...f.requisitos, conocimientos: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Certificaciones / Licencias Obligatorias</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Certificaciones / Licencias Obligatorias</label>
                   <textarea
                     rows={2}
                     value={f.requisitos.certificaciones}
                     onChange={e => handleUpdateFicha({ requisitos: { ...f.requisitos, certificaciones: e.target.value } })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
               </div>
@@ -1014,64 +1024,64 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">
+                <label className="block text-xs font-semibold text-[#282829] mb-1">
                   Seguridad y Salud en el Trabajo (SG-SST)
                 </label>
                 <textarea
                   rows={4}
                   value={f.cumplimiento.sst}
                   onChange={e => handleUpdateFicha({ cumplimiento: { ...f.cumplimiento, sst: e.target.value } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   placeholder="Responsabilidades de EPP, autocuidado y reporte de condiciones..."
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">
+                <label className="block text-xs font-semibold text-[#282829] mb-1">
                   Protección de Datos & Confidencialidad
                 </label>
                 <textarea
                   rows={4}
                   value={f.cumplimiento.datos}
                   onChange={e => handleUpdateFicha({ cumplimiento: { ...f.cumplimiento, datos: e.target.value } })}
-                  className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   placeholder="Custodia de información sensible, claves de acceso o credenciales..."
                 />
               </div>
             </div>
 
             {/* Normativa */}
-            <div className="pt-2 border-t border-[#DCD6C8]">
+            <div className="pt-2 border-t border-[#8FA7D6]">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#5B6A62]">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#282829]">
                   Normativa Externa e Interna Aplicable
                 </h3>
               </div>
 
-              <form onSubmit={addNormativa} className="bg-[#F6F4EF] p-3 rounded border border-[#DCD6C8] flex flex-wrap gap-2 items-end mb-3">
+              <form onSubmit={addNormativa} className="bg-[#F8FAFC] p-3 rounded border border-[#8FA7D6] flex flex-wrap gap-2 items-end mb-3">
                 <div className="flex-1 min-w-[140px]">
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Norma o Decreto</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Norma o Decreto</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Resolución 4272 de 2021"
                     value={noNorma}
                     onChange={e => setNoNorma(e.target.value)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   />
                 </div>
                 <div className="flex-1 min-w-[140px]">
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">Tema / Objeto</label>
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">Tema / Objeto</label>
                   <input
                     type="text"
                     placeholder="Trabajo seguro en alturas"
                     value={noTema}
                     onChange={e => setNoTema(e.target.value)}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-white"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-white"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="px-3 py-2 bg-[#2F5D50] hover:bg-[#223F37] text-white text-xs font-semibold rounded flex items-center gap-1"
+                  className="px-3 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Agregar norma</span>
@@ -1080,9 +1090,9 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
 
               <div className="space-y-1.5">
                 {f.cumplimiento.normativa.map(nm => (
-                  <div key={nm.id} className="flex items-center justify-between p-2 rounded border border-[#DCD6C8] bg-white text-xs">
+                  <div key={nm.id} className="flex items-center justify-between p-2 rounded border border-[#8FA7D6] bg-white text-xs">
                     <div>
-                      <strong className="text-[#1E2A24]">{nm.norma}</strong> — <span className="text-[#5B6A62]">{nm.tema}</span>
+                      <strong className="text-[#18235C]">{nm.norma}</strong> — <span className="text-[#282829]">{nm.tema}</span>
                     </div>
                     <button
                       onClick={() => deleteNormativa(nm.id)}
@@ -1096,8 +1106,8 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
             </div>
 
             {/* Documentos Relacionados */}
-            <div className="pt-2 border-t border-[#DCD6C8]">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#5B6A62] mb-2">
+            <div className="pt-2 border-t border-[#8FA7D6]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#282829] mb-2">
                 Documentos y Procedimientos Asociados
               </h3>
               <form onSubmit={addDocumento} className="flex gap-2 mb-3">
@@ -1106,11 +1116,11 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                   placeholder="Nombre de formato, protocolo o manual..."
                   value={docNombre}
                   onChange={e => setDocNombre(e.target.value)}
-                  className="flex-1 text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="flex-1 text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
                 <button
                   type="submit"
-                  className="px-3 py-2 bg-[#2F5D50] hover:bg-[#223F37] text-white text-xs font-semibold rounded flex items-center gap-1"
+                  className="px-3 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Vincular</span>
@@ -1119,8 +1129,8 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
 
               <div className="space-y-1">
                 {f.documentos.map(doc => (
-                  <div key={doc.id} className="flex items-center justify-between p-2 rounded bg-white border border-[#DCD6C8] text-xs">
-                    <span className="text-[#1E2A24] font-medium">{doc.nombre}</span>
+                  <div key={doc.id} className="flex items-center justify-between p-2 rounded bg-white border border-[#8FA7D6] text-xs">
+                    <span className="text-[#18235C] font-medium">{doc.nombre}</span>
                     <button
                       onClick={() => deleteDocumento(doc.id)}
                       className="text-[#A8503E] hover:text-red-700 p-1"
@@ -1138,7 +1148,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         {activeTab === 'hist' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-[#5B6A62] max-w-xl">
+              <p className="text-xs text-[#282829] max-w-xl">
                 Toda modificación de funciones, responsabilidades o competencias críticas debe formalizarse como una nueva versión con revisión y aprobación humana explícita.
               </p>
               <button
@@ -1153,7 +1163,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-[#DCD6C8] text-[#5B6A62]">
+                  <tr className="border-b border-[#8FA7D6] text-[#282829]">
                     <th className="py-2 px-3 font-semibold">Versión</th>
                     <th className="py-2 px-3 font-semibold">Fecha</th>
                     <th className="py-2 px-3 font-semibold">Motivo del Ajuste</th>
@@ -1161,19 +1171,19 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                     <th className="py-2 px-3 font-semibold">Aprobó</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#DCD6C8]/60">
+                <tbody className="divide-y divide-[#8FA7D6]/60">
                   {f.historial.slice().reverse().map(h => (
-                    <tr key={h.id} className="hover:bg-[#F6F4EF]/50">
-                      <td className="py-2.5 px-3 font-mono font-bold text-[#2F5D50]">{h.version}</td>
-                      <td className="py-2.5 px-3 text-[#5B6A62]">{h.fecha}</td>
-                      <td className="py-2.5 px-3 text-[#1E2A24] font-medium">{h.motivo}</td>
-                      <td className="py-2.5 px-3 text-[#5B6A62]">{h.responsable}</td>
-                      <td className="py-2.5 px-3 text-[#5B6A62] font-semibold">{h.aprobador}</td>
+                    <tr key={h.id} className="hover:bg-[#F8FAFC]/50">
+                      <td className="py-2.5 px-3 font-mono font-bold text-[#18235C]">{h.version}</td>
+                      <td className="py-2.5 px-3 text-[#282829]">{h.fecha}</td>
+                      <td className="py-2.5 px-3 text-[#18235C] font-medium">{h.motivo}</td>
+                      <td className="py-2.5 px-3 text-[#282829]">{h.responsable}</td>
+                      <td className="py-2.5 px-3 text-[#282829] font-semibold">{h.aprobador}</td>
                     </tr>
                   ))}
                   {(f.historial?.length || 0) === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center text-[#5B6A62]">
+                      <td colSpan={5} className="py-6 text-center text-[#282829]">
                         Sin historial de versiones registrado.
                       </td>
                     </tr>
@@ -1188,51 +1198,51 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
       {/* Modal Nueva Versión */}
       {versionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="bg-white rounded border border-[#DCD6C8] max-w-md w-full p-6 shadow-xl">
-            <h3 className="font-serif-title text-xl font-medium text-[#1E2A24] mb-1">
+          <div className="bg-white rounded border border-[#8FA7D6] max-w-md w-full p-6 shadow-xl">
+            <h3 className="font-bold tracking-tight text-xl font-medium text-[#18235C] mb-1">
               Registrar y Aprobar Versión
             </h3>
-            <p className="text-xs text-[#5B6A62] mb-4">
+            <p className="text-xs text-[#282829] mb-4">
               Formaliza los cambios en la ficha técnica del cargo {currentCargo.nombre}.
             </p>
 
             <form onSubmit={registrarNuevaVersion} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-[#5B6A62] mb-1">Motivo de la actualización *</label>
+                <label className="block font-semibold text-[#282829] mb-1">Motivo de la actualización *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej. Ajuste de indicadores para alineación con modelo de evaluación"
                   value={vMotivo}
                   onChange={e => setVMotivo(e.target.value)}
-                  className="w-full p-2.5 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full p-2.5 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
               <div>
-                <label className="block font-semibold text-[#5B6A62] mb-1">Responsable del cambio</label>
+                <label className="block font-semibold text-[#282829] mb-1">Responsable del cambio</label>
                 <input
                   type="text"
                   value={vResponsable}
                   onChange={e => setVResponsable(e.target.value)}
-                  className="w-full p-2.5 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full p-2.5 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
               <div>
-                <label className="block font-semibold text-[#5B6A62] mb-1">Aprobador formal *</label>
+                <label className="block font-semibold text-[#282829] mb-1">Aprobador formal *</label>
                 <input
                   type="text"
                   required
                   value={vAprobador}
                   onChange={e => setVAprobador(e.target.value)}
-                  className="w-full p-2.5 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full p-2.5 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#DCD6C8]">
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#8FA7D6]">
                 <button
                   type="button"
                   onClick={() => setVersionModal(false)}
-                  className="px-3.5 py-2 text-[#5B6A62] hover:bg-[#F6F4EF] rounded border border-[#DCD6C8]"
+                  className="px-3.5 py-2 text-[#282829] hover:bg-[#F8FAFC] rounded border border-[#8FA7D6]"
                 >
                   Cancelar
                 </button>

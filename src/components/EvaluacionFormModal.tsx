@@ -325,14 +325,14 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div>
-                  <label className="block font-semibold text-[#5B6A62] mb-1">
+                  <label className="block font-semibold text-[#282829] mb-1">
                     Colaborador a Evaluar *
                   </label>
                   <select
                     disabled={!!evaluacionToEdit}
                     value={empleadoId}
                     onChange={e => setEmpleadoId(e.target.value)}
-                    className="w-full p-2.5 rounded border border-[#DCD6C8] bg-white font-medium"
+                    className="w-full p-2.5 rounded border border-[#8FA7D6] bg-white font-medium"
                   >
                     {empleados.map(emp => {
                       const c = cargos.find(cg => cg.id === emp.cargoId);
@@ -346,7 +346,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#5B6A62] mb-1">
+                  <label className="block font-semibold text-[#282829] mb-1">
                     Periodo de Evaluación *
                   </label>
                   <input
@@ -354,49 +354,49 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                     value={periodo}
                     onChange={e => setPeriodo(e.target.value)}
                     placeholder="Ej. 2026 - S1"
-                    className="w-full p-2.5 rounded border border-[#DCD6C8] bg-white font-medium"
+                    className="w-full p-2.5 rounded border border-[#8FA7D6] bg-white font-medium"
                   />
                 </div>
               </div>
 
               {/* Ficha resumen del cargo asociado */}
-              <div className="bg-[#F6F4EF] p-4 rounded border border-[#DCD6C8] space-y-2 text-xs">
+              <div className="bg-[#F8FAFC] p-4 rounded border border-[#8FA7D6] space-y-2 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-[#1E2A24] text-sm">
+                  <span className="font-bold text-[#18235C] text-sm">
                     Ficha Técnica Vinculada: {selectedCargo?.nombre}
                   </span>
-                  <span className="font-mono text-[#5B6A62]">
+                  <span className="font-mono text-[#282829]">
                     Código: {selectedCargo?.ficha.identificacion.codigo || 'S/C'}
                   </span>
                 </div>
-                <p className="text-[#5B6A62]">
+                <p className="text-[#282829]">
                   <strong>Propósito del cargo:</strong> {selectedCargo?.ficha.proposito}
                 </p>
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#DCD6C8]/60 text-[11px]">
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#8FA7D6]/60 text-[11px]">
                   <div>
-                    <span className="text-[#5B6A62] block">Indicadores del cargo:</span>
-                    <strong className="text-[#2F5D50]">{selectedCargo?.ficha?.indicadores?.length || 0} definidos</strong>
+                    <span className="text-[#282829] block">Indicadores del cargo:</span>
+                    <strong className="text-[#18235C]">{selectedCargo?.ficha?.indicadores?.length || 0} definidos</strong>
                   </div>
                   <div>
-                    <span className="text-[#5B6A62] block">Competencias a evaluar:</span>
-                    <strong className="text-[#2F5D50]">{selectedCargo?.ficha?.competencias?.length || 0} requeridas</strong>
+                    <span className="text-[#282829] block">Competencias a evaluar:</span>
+                    <strong className="text-[#18235C]">{selectedCargo?.ficha?.competencias?.length || 0} requeridas</strong>
                   </div>
                   <div>
-                    <span className="text-[#5B6A62] block">Funciones esenciales:</span>
-                    <strong className="text-[#2F5D50]">{selectedCargo?.ficha?.funciones?.length || 0} funciones</strong>
+                    <span className="text-[#282829] block">Funciones esenciales:</span>
+                    <strong className="text-[#18235C]">{selectedCargo?.ficha?.funciones?.length || 0} funciones</strong>
                   </div>
                 </div>
               </div>
 
               {/* Flujo de Estados */}
               <div>
-                <label className="block text-xs font-semibold text-[#5B6A62] mb-1">
+                <label className="block text-xs font-semibold text-[#282829] mb-1">
                   Estado Actual de la Evaluación
                 </label>
                 <select
                   value={estado}
                   onChange={e => setEstado(e.target.value as EstadoEvaluacion)}
-                  className="w-full text-xs p-2.5 rounded border border-[#DCD6C8] bg-white font-semibold text-[#1E2A24]"
+                  className="w-full text-xs p-2.5 rounded border border-[#8FA7D6] bg-white font-semibold text-[#18235C]"
                 >
                   <option value="BORRADOR">BORRADOR (En preparación por RRHH)</option>
                   <option value="AUTOEVALUACION">AUTOEVALUACIÓN (Habilitada para el colaborador)</option>
@@ -407,7 +407,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                   <option value="APROBADA">APROBADA (Firmada por ambas partes)</option>
                   <option value="CERRADA">CERRADA (Inmutable con trazabilidad permanente)</option>
                 </select>
-                <p className="text-[11px] text-[#5B6A62] mt-1">
+                <p className="text-[11px] text-[#282829] mt-1">
                   El ciclo asegura trazabilidad: una vez cerrada, no se modifica directamente y cualquier ajuste genera auditoría.
                 </p>
               </div>
@@ -417,25 +417,25 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
           {/* STEP 2: COMPONENTE 1 - RESULTADOS DEL CARGO (50%) */}
           {step === 2 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-[#DCD6C8]">
+              <div className="flex items-center justify-between pb-2 border-b border-[#8FA7D6]">
                 <div>
-                  <h3 className="font-serif-title text-base font-medium text-[#1E2A24]">
+                  <h3 className="font-bold tracking-tight text-base font-medium text-[#18235C]">
                     Componente 1 — Resultados del Cargo (Peso: 50%)
                   </h3>
-                  <p className="text-xs text-[#5B6A62]">
+                  <p className="text-xs text-[#282829]">
                     Escala de cumplimiento: ≥110% (5 - Excepcional) | 100-109% (4 - Superior) | 90-99% (3 - Esperado) | 70-89% (2 - En desarrollo) | &lt;70% (1 - Crítico)
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-[#5B6A62] block font-medium">Subtotal Resultados:</span>
-                  <span className="font-serif-title text-xl font-bold text-[#2F5D50]">
+                  <span className="text-xs text-[#282829] block font-medium">Subtotal Resultados:</span>
+                  <span className="font-bold tracking-tight text-xl font-bold text-[#18235C]">
                     {subResultados} / 50 pts
                   </span>
                 </div>
               </div>
 
               {resultados.length === 0 ? (
-                <div className="p-6 text-center text-xs text-[#5B6A62] bg-[#F6F4EF] rounded border border-[#DCD6C8]">
+                <div className="p-6 text-center text-xs text-[#282829] bg-[#F8FAFC] rounded border border-[#8FA7D6]">
                   Este cargo no tiene indicadores registrados en su manual. Regresa al Manual de Cargos para definir sus indicadores técnicos.
                 </div>
               ) : (
@@ -443,21 +443,21 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                   {resultados.map((res, idx) => {
                     const cumplimientoPct = res.meta > 0 ? Math.round((res.resultadoReal / res.meta) * 100) : 0;
                     return (
-                      <div key={res.id} className="p-4 rounded border border-[#DCD6C8] bg-white space-y-3 shadow-xs">
+                      <div key={res.id} className="p-4 rounded border border-[#8FA7D6] bg-white space-y-3 shadow-xs">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <span className="font-bold text-sm text-[#1E2A24] block">
+                            <span className="font-bold text-sm text-[#18235C] block">
                               {res.indicadorNombre}
                             </span>
-                            <span className="text-[11px] text-[#5B6A62] font-mono">
+                            <span className="text-[11px] text-[#282829] font-mono">
                               Fórmula: {res.formula || 'Registro numérico directo'}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#E4EDE9] text-[#2F5D50]">
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#8FA7D6/20] text-[#18235C]">
                               Peso: {res.peso}%
                             </span>
-                            <span className="text-xs font-bold text-[#1E2A24] bg-[#F6F4EF] px-2.5 py-1 rounded border border-[#DCD6C8]">
+                            <span className="text-xs font-bold text-[#18235C] bg-[#F8FAFC] px-2.5 py-1 rounded border border-[#8FA7D6]">
                               Aporte: {res.puntajePonderado} pts
                             </span>
                           </div>
@@ -466,7 +466,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                         {/* Metas y Resultados */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                           <div>
-                            <label className="block font-semibold text-[#5B6A62] mb-1">
+                            <label className="block font-semibold text-[#282829] mb-1">
                               Meta Pactada ({res.unidad})
                             </label>
                             <input
@@ -474,12 +474,12 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                               step="any"
                               value={res.meta}
                               onChange={e => handleResultadoChange(idx, 'meta', e.target.value)}
-                              className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF] font-bold"
+                              className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC] font-bold"
                             />
                           </div>
 
                           <div>
-                            <label className="block font-semibold text-[#5B6A62] mb-1">
+                            <label className="block font-semibold text-[#282829] mb-1">
                               Resultado Real ({res.unidad})
                             </label>
                             <input
@@ -487,24 +487,24 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                               step="any"
                               value={res.resultadoReal}
                               onChange={e => handleResultadoChange(idx, 'resultadoReal', e.target.value)}
-                              className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF] font-bold text-[#2F5D50]"
+                              className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC] font-bold text-[#18235C]"
                             />
                           </div>
 
                           <div>
-                            <label className="block font-semibold text-[#5B6A62] mb-1">
+                            <label className="block font-semibold text-[#282829] mb-1">
                               Cumplimiento (%)
                             </label>
-                            <div className="p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF] font-bold text-[#1E2A24]">
+                            <div className="p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC] font-bold text-[#18235C]">
                               {cumplimientoPct}%
                             </div>
                           </div>
 
                           <div>
-                            <label className="block font-semibold text-[#5B6A62] mb-1">
+                            <label className="block font-semibold text-[#282829] mb-1">
                               Nivel Calculado
                             </label>
-                            <div className="p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF] font-semibold text-xs text-[#2F5D50]">
+                            <div className="p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC] font-semibold text-xs text-[#18235C]">
                               {getNivelLabel(res.nivelCalculado)}
                             </div>
                           </div>
@@ -512,7 +512,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
 
                         {/* Evidencia Obligatoria */}
                         <div>
-                          <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">
+                          <label className="block text-[11px] font-semibold text-[#282829] mb-1">
                             Evidencia Verificable (Obligatorio: Reporte, OT, Ticket, Informe) *
                           </label>
                           <input
@@ -520,7 +520,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                             placeholder="Ej. Reporte del sistema de órdenes OT-2026-09"
                             value={res.evidencia}
                             onChange={e => handleResultadoChange(idx, 'evidencia', e.target.value)}
-                            className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                            className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                           />
                         </div>
                       </div>
@@ -534,37 +534,37 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
           {/* STEP 3: COMPONENTE 2 - COMPETENCIAS (25%) */}
           {step === 3 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-[#DCD6C8]">
+              <div className="flex items-center justify-between pb-2 border-b border-[#8FA7D6]">
                 <div>
-                  <h3 className="font-serif-title text-base font-medium text-[#1E2A24]">
+                  <h3 className="font-bold tracking-tight text-base font-medium text-[#18235C]">
                     Componente 2 — Competencias del Cargo (Peso: 25%)
                   </h3>
-                  <p className="text-xs text-[#5B6A62]">
+                  <p className="text-xs text-[#282829]">
                     Evaluación por conductas observables: se evitan preguntas subjetivas genéricas y se requiere evidencia objetiva.
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-[#5B6A62] block font-medium">Subtotal Competencias:</span>
-                  <span className="font-serif-title text-xl font-bold text-[#2F5D50]">
+                  <span className="text-xs text-[#282829] block font-medium">Subtotal Competencias:</span>
+                  <span className="font-bold tracking-tight text-xl font-bold text-[#18235C]">
                     {subCompetencias} / 25 pts
                   </span>
                 </div>
               </div>
 
               {competencias.length === 0 ? (
-                <div className="p-6 text-center text-xs text-[#5B6A62] bg-[#F6F4EF] rounded border border-[#DCD6C8]">
+                <div className="p-6 text-center text-xs text-[#282829] bg-[#F8FAFC] rounded border border-[#8FA7D6]">
                   Este cargo no tiene competencias asociadas en su manual. Regresa al Manual de Cargos para definirlas.
                 </div>
               ) : (
                 <div className="space-y-4">
                   {competencias.map((comp, idx) => (
-                    <div key={comp.id} className="p-4 rounded border border-[#DCD6C8] bg-white space-y-3 shadow-xs">
+                    <div key={comp.id} className="p-4 rounded border border-[#8FA7D6] bg-white space-y-3 shadow-xs">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <span className="font-bold text-sm text-[#1E2A24] block">
+                          <span className="font-bold text-sm text-[#18235C] block">
                             {comp.competenciaNombre}
                           </span>
-                          <div className="flex gap-2 text-[11px] text-[#5B6A62] mt-0.5">
+                          <div className="flex gap-2 text-[11px] text-[#282829] mt-0.5">
                             <span>Tipo: <strong>{comp.tipo}</strong></span>
                             <span>·</span>
                             <span>Nivel Requerido: <strong>{comp.nivelRequerido}</strong></span>
@@ -573,11 +573,11 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
 
                         {/* Selector de Nivel 1 a 5 */}
                         <div className="flex items-center gap-2">
-                          <label className="text-xs font-semibold text-[#5B6A62]">Calificación:</label>
+                          <label className="text-xs font-semibold text-[#282829]">Calificación:</label>
                           <select
                             value={comp.calificacionNivel}
                             onChange={e => handleCompetenciaChange(idx, 'calificacionNivel', Number(e.target.value) as NivelCumplimiento)}
-                            className="text-xs font-bold p-1.5 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#2F5D50]"
+                            className="text-xs font-bold p-1.5 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
                           >
                             <option value={5}>5 — Excepcional (Anticipa y supera)</option>
                             <option value={4}>4 — Superior (Cumple y comunica claro)</option>
@@ -590,7 +590,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
 
                       {/* Conducta Observable Descriptiva */}
                       <div>
-                        <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">
+                        <label className="block text-[11px] font-semibold text-[#282829] mb-1">
                           Conducta Observable Demostrada durante el Periodo
                         </label>
                         <textarea
@@ -598,14 +598,14 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                           placeholder="Describa comportamientos específicos observados..."
                           value={comp.conductaObservable}
                           onChange={e => handleCompetenciaChange(idx, 'conductaObservable', e.target.value)}
-                          className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                          className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                         />
                       </div>
 
                       {/* Evidencia y Observación */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         <div>
-                          <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">
+                          <label className="block text-[11px] font-semibold text-[#282829] mb-1">
                             Evidencia Objetiva Registrada * (Ej. Caso PQR, acta, certificado)
                           </label>
                           <input
@@ -613,11 +613,11 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                             placeholder="Ej. Caso PQR-2026-0198 felicitación de cliente"
                             value={comp.evidencia}
                             onChange={e => handleCompetenciaChange(idx, 'evidencia', e.target.value)}
-                            className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                            className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">
+                          <label className="block text-[11px] font-semibold text-[#282829] mb-1">
                             Observación / Contexto del Evaluador
                           </label>
                           <input
@@ -625,7 +625,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                             placeholder="Comentario de retroalimentación constructiva"
                             value={comp.observacion}
                             onChange={e => handleCompetenciaChange(idx, 'observacion', e.target.value)}
-                            className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                            className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                           />
                         </div>
                       </div>
@@ -639,31 +639,31 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
           {/* STEP 4: COMPONENTE 3 - RESPONSABILIDADES Y CUMPLIMIENTO (15%) */}
           {step === 4 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-[#DCD6C8]">
+              <div className="flex items-center justify-between pb-2 border-b border-[#8FA7D6]">
                 <div>
-                  <h3 className="font-serif-title text-base font-medium text-[#1E2A24]">
+                  <h3 className="font-bold tracking-tight text-base font-medium text-[#18235C]">
                     Componente 3 — Responsabilidades y Cumplimiento (Peso: 15%)
                   </h3>
-                  <p className="text-xs text-[#5B6A62]">
+                  <p className="text-xs text-[#282829]">
                     Aspectos transversales con evidencia y contexto. No penaliza accidentes per se, sino cumplimiento de normas y EPP.
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-[#5B6A62] block font-medium">Subtotal Cumplimiento:</span>
-                  <span className="font-serif-title text-xl font-bold text-[#2F5D50]">
+                  <span className="text-xs text-[#282829] block font-medium">Subtotal Cumplimiento:</span>
+                  <span className="font-bold tracking-tight text-xl font-bold text-[#18235C]">
                     {subCumplimiento} / 15 pts
                   </span>
                 </div>
               </div>
 
               {/* SG-SST (4 pts) */}
-              <div className="p-4 rounded border border-[#DCD6C8] bg-white space-y-3 shadow-xs">
+              <div className="p-4 rounded border border-[#8FA7D6] bg-white space-y-3 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-bold text-sm text-[#1E2A24] block">
+                    <span className="font-bold text-sm text-[#18235C] block">
                       Seguridad y Salud en el Trabajo (SG-SST) — 4%
                     </span>
-                    <span className="text-[11px] text-[#5B6A62]">
+                    <span className="text-[11px] text-[#282829]">
                       Evaluación de autocuidado, reporte y trabajo seguro.
                     </span>
                   </div>
@@ -673,7 +673,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       ...cumplimiento,
                       sgSst: { ...cumplimiento.sgSst, nivel: Number(e.target.value) as NivelCumplimiento }
                     })}
-                    className="text-xs font-bold p-1.5 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#2F5D50]"
+                    className="text-xs font-bold p-1.5 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
                   >
                     <option value={5}>Nivel 5 (Excelente cumplimiento SST)</option>
                     <option value={4}>Nivel 4 (Cumple estándares seguros)</option>
@@ -684,7 +684,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
-                  <label className="flex items-center gap-2 p-2 rounded bg-[#F6F4EF] border border-[#DCD6C8] cursor-pointer">
+                  <label className="flex items-center gap-2 p-2 rounded bg-[#F8FAFC] border border-[#8FA7D6] cursor-pointer">
                     <input
                       type="checkbox"
                       checked={cumplimiento.sgSst.usaEpp}
@@ -692,12 +692,12 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                         ...cumplimiento,
                         sgSst: { ...cumplimiento.sgSst, usaEpp: e.target.checked }
                       })}
-                      className="rounded text-[#2F5D50]"
+                      className="rounded text-[#18235C]"
                     />
                     <span>Usa EPP completos</span>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2 rounded bg-[#F6F4EF] border border-[#DCD6C8] cursor-pointer">
+                  <label className="flex items-center gap-2 p-2 rounded bg-[#F8FAFC] border border-[#8FA7D6] cursor-pointer">
                     <input
                       type="checkbox"
                       checked={cumplimiento.sgSst.reportaCondiciones}
@@ -705,12 +705,12 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                         ...cumplimiento,
                         sgSst: { ...cumplimiento.sgSst, reportaCondiciones: e.target.checked }
                       })}
-                      className="rounded text-[#2F5D50]"
+                      className="rounded text-[#18235C]"
                     />
                     <span>Reporta condiciones inseguras</span>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2 rounded bg-[#F6F4EF] border border-[#DCD6C8] cursor-pointer">
+                  <label className="flex items-center gap-2 p-2 rounded bg-[#F8FAFC] border border-[#8FA7D6] cursor-pointer">
                     <input
                       type="checkbox"
                       checked={cumplimiento.sgSst.cumpleTrabajoSeguro}
@@ -718,12 +718,12 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                         ...cumplimiento,
                         sgSst: { ...cumplimiento.sgSst, cumpleTrabajoSeguro: e.target.checked }
                       })}
-                      className="rounded text-[#2F5D50]"
+                      className="rounded text-[#18235C]"
                     />
                     <span>Trabajo seguro en alturas/sitio</span>
                   </label>
 
-                  <label className="flex items-center gap-2 p-2 rounded bg-[#F6F4EF] border border-[#DCD6C8] cursor-pointer">
+                  <label className="flex items-center gap-2 p-2 rounded bg-[#F8FAFC] border border-[#8FA7D6] cursor-pointer">
                     <input
                       type="checkbox"
                       checked={cumplimiento.sgSst.participaCapacitaciones}
@@ -731,14 +731,14 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                         ...cumplimiento,
                         sgSst: { ...cumplimiento.sgSst, participaCapacitaciones: e.target.checked }
                       })}
-                      className="rounded text-[#2F5D50]"
+                      className="rounded text-[#18235C]"
                     />
                     <span>Capacitaciones obligatorias</span>
                   </label>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-[#5B6A62] mb-1">
+                  <label className="block text-[11px] font-semibold text-[#282829] mb-1">
                     Evidencia en SST (Inspecciones de campo, reporte de condiciones)
                   </label>
                   <input
@@ -748,23 +748,23 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       ...cumplimiento,
                       sgSst: { ...cumplimiento.sgSst, evidencia: e.target.value }
                     })}
-                    className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
               </div>
 
               {/* Procedimientos y Gestión de Información */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-3.5 rounded border border-[#DCD6C8] bg-white space-y-2">
+                <div className="p-3.5 rounded border border-[#8FA7D6] bg-white space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#1E2A24]">Cumplimiento de Procedimientos (4%)</span>
+                    <span className="font-bold text-[#18235C]">Cumplimiento de Procedimientos (4%)</span>
                     <select
                       value={cumplimiento.cumplimientoProcedimientos.nivel}
                       onChange={e => setCumplimiento({
                         ...cumplimiento,
                         cumplimientoProcedimientos: { ...cumplimiento.cumplimientoProcedimientos, nivel: Number(e.target.value) as NivelCumplimiento }
                       })}
-                      className="font-bold p-1 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#2F5D50]"
+                      className="font-bold p-1 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
                     >
                       {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>Nivel {n}</option>)}
                     </select>
@@ -777,20 +777,20 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       ...cumplimiento,
                       cumplimientoProcedimientos: { ...cumplimiento.cumplimientoProcedimientos, evidencia: e.target.value }
                     })}
-                    className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
 
-                <div className="p-3.5 rounded border border-[#DCD6C8] bg-white space-y-2">
+                <div className="p-3.5 rounded border border-[#8FA7D6] bg-white space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#1E2A24]">Gestión de Información & Datos (3%)</span>
+                    <span className="font-bold text-[#18235C]">Gestión de Información & Datos (3%)</span>
                     <select
                       value={cumplimiento.gestionInformacion.nivel}
                       onChange={e => setCumplimiento({
                         ...cumplimiento,
                         gestionInformacion: { ...cumplimiento.gestionInformacion, nivel: Number(e.target.value) as NivelCumplimiento }
                       })}
-                      className="font-bold p-1 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#2F5D50]"
+                      className="font-bold p-1 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
                     >
                       {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>Nivel {n}</option>)}
                     </select>
@@ -803,23 +803,23 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       ...cumplimiento,
                       gestionInformacion: { ...cumplimiento.gestionInformacion, evidencia: e.target.value }
                     })}
-                    className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
               </div>
 
               {/* Administrativo y Convivencia */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-3.5 rounded border border-[#DCD6C8] bg-white space-y-2">
+                <div className="p-3.5 rounded border border-[#8FA7D6] bg-white space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#1E2A24]">Cumplimiento Administrativo (2%)</span>
+                    <span className="font-bold text-[#18235C]">Cumplimiento Administrativo (2%)</span>
                     <select
                       value={cumplimiento.cumplimientoAdministrativo.nivel}
                       onChange={e => setCumplimiento({
                         ...cumplimiento,
                         cumplimientoAdministrativo: { ...cumplimiento.cumplimientoAdministrativo, nivel: Number(e.target.value) as NivelCumplimiento }
                       })}
-                      className="font-bold p-1 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#2F5D50]"
+                      className="font-bold p-1 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
                     >
                       {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>Nivel {n}</option>)}
                     </select>
@@ -832,20 +832,20 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       ...cumplimiento,
                       cumplimientoAdministrativo: { ...cumplimiento.cumplimientoAdministrativo, evidencia: e.target.value }
                     })}
-                    className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
 
-                <div className="p-3.5 rounded border border-[#DCD6C8] bg-white space-y-2">
+                <div className="p-3.5 rounded border border-[#8FA7D6] bg-white space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#1E2A24]">Convivencia y Conducta Laboral (2%)</span>
+                    <span className="font-bold text-[#18235C]">Convivencia y Conducta Laboral (2%)</span>
                     <select
                       value={cumplimiento.convivenciaConducta.nivel}
                       onChange={e => setCumplimiento({
                         ...cumplimiento,
                         convivenciaConducta: { ...cumplimiento.convivenciaConducta, nivel: Number(e.target.value) as NivelCumplimiento }
                       })}
-                      className="font-bold p-1 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#2F5D50]"
+                      className="font-bold p-1 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
                     >
                       {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>Nivel {n}</option>)}
                     </select>
@@ -858,7 +858,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       ...cumplimiento,
                       convivenciaConducta: { ...cumplimiento.convivenciaConducta, evidencia: e.target.value }
                     })}
-                    className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
               </div>
@@ -868,29 +868,29 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
           {/* STEP 5: COMPONENTE 4 - DESARROLLO Y MEJORA (10%) */}
           {step === 5 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-[#DCD6C8]">
+              <div className="flex items-center justify-between pb-2 border-b border-[#8FA7D6]">
                 <div>
-                  <h3 className="font-serif-title text-base font-medium text-[#1E2A24]">
+                  <h3 className="font-bold tracking-tight text-base font-medium text-[#18235C]">
                     Componente 4 — Desarrollo y Mejora (Peso: 10%)
                   </h3>
-                  <p className="text-xs text-[#5B6A62]">
+                  <p className="text-xs text-[#282829]">
                     Asegura que la evaluación no sea puramente punitiva, reconociendo el aprendizaje y las propuestas de optimización.
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-[#5B6A62] block font-medium">Subtotal Desarrollo:</span>
-                  <span className="font-serif-title text-xl font-bold text-[#2F5D50]">
+                  <span className="text-xs text-[#282829] block font-medium">Subtotal Desarrollo:</span>
+                  <span className="font-bold tracking-tight text-xl font-bold text-[#18235C]">
                     {subDesarrollo} / 10 pts
                   </span>
                 </div>
               </div>
 
               {/* Cumplimiento del plan anterior (4%) */}
-              <div className="p-4 rounded border border-[#DCD6C8] bg-white space-y-2 text-xs shadow-xs">
+              <div className="p-4 rounded border border-[#8FA7D6] bg-white space-y-2 text-xs shadow-xs">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-bold text-[#1E2A24] block">Cumplimiento del Plan de Desarrollo Anterior (4%)</span>
-                    <span className="text-[11px] text-[#5B6A62]">Avance en los compromisos concertados en el ciclo previo.</span>
+                    <span className="font-bold text-[#18235C] block">Cumplimiento del Plan de Desarrollo Anterior (4%)</span>
+                    <span className="text-[11px] text-[#282829]">Avance en los compromisos concertados en el ciclo previo.</span>
                   </div>
                   <select
                     value={desarrollo.cumplimientoPlanAnterior.nivel}
@@ -898,7 +898,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       ...desarrollo,
                       cumplimientoPlanAnterior: { ...desarrollo.cumplimientoPlanAnterior, nivel: Number(e.target.value) as NivelCumplimiento }
                     })}
-                    className="font-bold p-1.5 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#2F5D50]"
+                    className="font-bold p-1.5 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
                   >
                     {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>Nivel {n}</option>)}
                   </select>
@@ -910,17 +910,17 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                     ...desarrollo,
                     cumplimientoPlanAnterior: { ...desarrollo.cumplimientoPlanAnterior, detalle: e.target.value }
                   })}
-                  className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   placeholder="Detalle los compromisos cumplidos..."
                 />
               </div>
 
               {/* Aprendizaje / Capacitación (3%) */}
-              <div className="p-4 rounded border border-[#DCD6C8] bg-white space-y-2 text-xs shadow-xs">
+              <div className="p-4 rounded border border-[#8FA7D6] bg-white space-y-2 text-xs shadow-xs">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-bold text-[#1E2A24] block">Aprendizaje y Capacitación Continua (3%)</span>
-                    <span className="text-[11px] text-[#5B6A62]">Aprobación de cursos, certificaciones o entrenamientos técnicos.</span>
+                    <span className="font-bold text-[#18235C] block">Aprendizaje y Capacitación Continua (3%)</span>
+                    <span className="text-[11px] text-[#282829]">Aprobación de cursos, certificaciones o entrenamientos técnicos.</span>
                   </div>
                   <select
                     value={desarrollo.aprendizajeCapacitacion.nivel}
@@ -928,7 +928,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       ...desarrollo,
                       aprendizajeCapacitacion: { ...desarrollo.aprendizajeCapacitacion, nivel: Number(e.target.value) as NivelCumplimiento }
                     })}
-                    className="font-bold p-1.5 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#2F5D50]"
+                    className="font-bold p-1.5 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
                   >
                     {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>Nivel {n}</option>)}
                   </select>
@@ -940,17 +940,17 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                     ...desarrollo,
                     aprendizajeCapacitacion: { ...desarrollo.aprendizajeCapacitacion, detalle: e.target.value }
                   })}
-                  className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   placeholder="Cursos aprobados, nuevas herramientas aprendidas..."
                 />
               </div>
 
               {/* Iniciativas de Mejora (3%) */}
-              <div className="p-4 rounded border border-[#DCD6C8] bg-white space-y-2 text-xs shadow-xs">
+              <div className="p-4 rounded border border-[#8FA7D6] bg-white space-y-2 text-xs shadow-xs">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-bold text-[#1E2A24] block">Iniciativas de Mejora y Aportes Proactivos (3%)</span>
-                    <span className="text-[11px] text-[#5B6A62]">Propuestas concretas implementadas que redujeron reprocesos o costos.</span>
+                    <span className="font-bold text-[#18235C] block">Iniciativas de Mejora y Aportes Proactivos (3%)</span>
+                    <span className="text-[11px] text-[#282829]">Propuestas concretas implementadas que redujeron reprocesos o costos.</span>
                   </div>
                   <select
                     value={desarrollo.iniciativasMejora.nivel}
@@ -958,7 +958,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       ...desarrollo,
                       iniciativasMejora: { ...desarrollo.iniciativasMejora, nivel: Number(e.target.value) as NivelCumplimiento }
                     })}
-                    className="font-bold p-1.5 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#2F5D50]"
+                    className="font-bold p-1.5 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
                   >
                     {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>Nivel {n}</option>)}
                   </select>
@@ -970,7 +970,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                     ...desarrollo,
                     iniciativasMejora: { ...desarrollo.iniciativasMejora, detalle: e.target.value }
                   })}
-                  className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   placeholder="Ej. Propuso lista de verificación de configuración Wi-Fi que disminuyó reprocesos en un 18%."
                 />
               </div>
@@ -981,21 +981,21 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
           {step === 6 && (
             <div className="space-y-5">
               {/* Detección de Sesgos (Páginas 9-10 del documento) */}
-              <div className="p-4 rounded border border-[#DCD6C8] bg-white space-y-3 shadow-xs">
+              <div className="p-4 rounded border border-[#8FA7D6] bg-white space-y-3 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ShieldAlert className="w-5 h-5 text-[#B5842A]" />
-                    <h3 className="font-serif-title text-base font-medium text-[#1E2A24]">
+                    <h3 className="font-bold tracking-tight text-base font-medium text-[#18235C]">
                       Auditoría Técnica y Detección de Sesgos (Asistente IA)
                     </h3>
                   </div>
-                  <span className="text-xs text-[#5B6A62]">
+                  <span className="text-xs text-[#282829]">
                     {sesgos.length === 0 ? 'Sin inconsistencias' : `${sesgos.length} alerta(s) identificada(s)`}
                   </span>
                 </div>
 
                 {sesgos.length === 0 ? (
-                  <div className="p-3 bg-[#E4EDE9] text-[#2F5D50] rounded border border-[#2F5D50]/20 text-xs flex items-center gap-2">
+                  <div className="p-3 bg-[#8FA7D6/20] text-[#18235C] rounded border border-[#18235C]/20 text-xs flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
                     <span>Evaluación consistente: todos los indicadores y competencias sobresalientes cuentan con evidencias registradas y no se detecta efecto halo ni discrepancia en fórmulas.</span>
                   </div>
@@ -1026,13 +1026,13 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
               </div>
 
               {/* Plan de Desarrollo Automático (Páginas 10-11 del documento) */}
-              <div className="p-4 rounded border border-[#DCD6C8] bg-white space-y-3 shadow-xs">
+              <div className="p-4 rounded border border-[#8FA7D6] bg-white space-y-3 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-serif-title text-base font-medium text-[#1E2A24]">
+                    <h3 className="font-bold tracking-tight text-base font-medium text-[#18235C]">
                       Plan de Desarrollo y Cierre de Brechas
                     </h3>
-                    <p className="text-xs text-[#5B6A62]">
+                    <p className="text-xs text-[#282829]">
                       Estructura: Competencia / Brecha → Causa → Acción → Responsable → Fecha → Evidencia.
                     </p>
                   </div>
@@ -1048,22 +1048,22 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
 
                 <div className="space-y-2">
                   {planDesarrollo.map((p, idx) => (
-                    <div key={p.id || idx} className="p-3 bg-[#F6F4EF] rounded border border-[#DCD6C8] text-xs space-y-2">
-                      <div className="flex justify-between font-semibold text-[#1E2A24]">
+                    <div key={p.id || idx} className="p-3 bg-[#F8FAFC] rounded border border-[#8FA7D6] text-xs space-y-2">
+                      <div className="flex justify-between font-semibold text-[#18235C]">
                         <span>{p.competenciaOIndicador}</span>
-                        <span className="text-[#2F5D50]">Fecha límite: {p.fechaCompromiso}</span>
+                        <span className="text-[#18235C]">Fecha límite: {p.fechaCompromiso}</span>
                       </div>
-                      <p className="text-[#5B6A62]">
+                      <p className="text-[#282829]">
                         <strong>Acción propuesta:</strong> {p.accionPropuesta}
                       </p>
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-[#5B6A62] pt-1 border-t border-[#DCD6C8]/60">
+                      <div className="grid grid-cols-2 gap-2 text-[11px] text-[#282829] pt-1 border-t border-[#8FA7D6]/60">
                         <span>Responsable: <strong>{p.responsable}</strong></span>
                         <span>Evidencia esperada: <strong>{p.evidenciaEsperada}</strong></span>
                       </div>
                     </div>
                   ))}
                   {planDesarrollo.length === 0 && (
-                    <div className="py-6 text-center text-xs text-[#5B6A62]">
+                    <div className="py-6 text-center text-xs text-[#282829]">
                       No hay acciones registradas en el plan de desarrollo. Haz clic en "Generar con IA sugerida" para crearlas según las brechas detectadas.
                     </div>
                   )}
@@ -1071,15 +1071,15 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
               </div>
 
               {/* Retroalimentación General del Evaluador */}
-              <div className="p-4 rounded border border-[#DCD6C8] bg-white space-y-2 text-xs shadow-xs">
-                <label className="block font-semibold text-[#1E2A24]">
+              <div className="p-4 rounded border border-[#8FA7D6] bg-white space-y-2 text-xs shadow-xs">
+                <label className="block font-semibold text-[#18235C]">
                   Retroalimentación Cualitativa Formal (Acta de la sesión de feedback)
                 </label>
                 <textarea
                   rows={4}
                   value={retroalimentacion}
                   onChange={e => setRetroalimentacion(e.target.value)}
-                  className="w-full p-3 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full p-3 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   placeholder="Escriba el resumen concertado con el colaborador respondiendo a: ¿Qué logró? ¿Cómo lo logró? y ¿Qué debe desarrollar?..."
                 />
               </div>

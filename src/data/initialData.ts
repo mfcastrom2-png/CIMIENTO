@@ -1,9 +1,11 @@
 import {
+  AreaOrganizacion,
   Cargo,
   Empleado,
   Encuesta,
   EvaluacionDesempeno,
   FichaCargo,
+  ProcesoOrganizacion,
   Solicitud
 } from '../types';
 
@@ -1090,9 +1092,133 @@ export const initialEmpleados = INITIAL_EMPLEADOS;
 export const initialSolicitudes = INITIAL_SOLICITUDES;
 export const initialEvaluaciones = INITIAL_EVALUACIONES;
 
-export const initialAreas = [
-  { id: 'ar_1', nombre: 'Gerencia General', lider: 'Andrés Pinilla' },
-  { id: 'ar_2', nombre: 'Operaciones & Redes', lider: 'Carlos Mendivelso' },
-  { id: 'ar_3', nombre: 'Administración & Finanzas', lider: 'Laura Beltrán' }
+export const initialProcesos: ProcesoOrganizacion[] = [
+  {
+    id: 'proc_1',
+    codigo: 'DE-01',
+    nombre: 'Direccionamiento Estratégico',
+    tipo: 'Estratégico',
+    objetivo: 'Definir la visión, metas corporativas, inversiones y políticas de la organización.',
+    liderCargoId: 'c1',
+    liderNombre: 'Andrés Pinilla'
+  },
+  {
+    id: 'proc_2',
+    codigo: 'OP-02',
+    nombre: 'Operaciones de Ingeniería y Montajes',
+    tipo: 'Misional / Operativo',
+    objetivo: 'Planear, coordinar y ejecutar proyectos de telecomunicaciones, redes e infraestructura técnica.',
+    liderCargoId: 'c4',
+    liderNombre: 'Carlos Mendivelso'
+  },
+  {
+    id: 'proc_3',
+    codigo: 'GH-03',
+    nombre: 'Gestión Humana y SG-SST',
+    tipo: 'Apoyo',
+    objetivo: 'Administrar el talento humano, nómina, prestaciones, bienestar y Sistema de Gestión SST (Res. 0312).',
+    liderCargoId: 'c2',
+    liderNombre: 'Coordinador(a) GH & SST'
+  },
+  {
+    id: 'proc_4',
+    codigo: 'AF-04',
+    nombre: 'Gestión Administrativa y Financiera',
+    tipo: 'Apoyo',
+    objetivo: 'Garantizar el control contable, tributario, tesorería, compras y custodia de activos.',
+    liderCargoId: 'c3',
+    liderNombre: 'Laura Beltrán'
+  },
+  {
+    id: 'proc_5',
+    codigo: 'COM-05',
+    nombre: 'Comercial y Licitaciones',
+    tipo: 'Misional / Operativo',
+    objetivo: 'Gestionar oportunidades de negocio, licitaciones y fidelización de clientes corporativos.',
+    liderCargoId: 'c1',
+    liderNombre: 'Dirección Comercial'
+  },
+  {
+    id: 'proc_6',
+    codigo: 'CE-06',
+    nombre: 'Control de Calidad y Evaluación',
+    tipo: 'Control y Evaluación',
+    objetivo: 'Monitorear el cumplimiento de estándares técnicos, evaluación de desempeño y mejora continua.',
+    liderCargoId: 'c1',
+    liderNombre: 'Comité de Calidad'
+  }
+];
+
+export const initialAreas: AreaOrganizacion[] = [
+  {
+    id: 'ar_1',
+    codigo: 'AR-GER',
+    nombre: 'Gerencia General',
+    procesoId: 'proc_1',
+    procesoNombre: 'Direccionamiento Estratégico',
+    lider: 'Andrés Pinilla',
+    liderCargoId: 'c1',
+    descripcion: 'Toma de decisiones estratégicas, representación legal y dirección general ejecutiva.'
+  },
+  {
+    id: 'ar_2',
+    codigo: 'AR-RED',
+    nombre: 'Operaciones, Redes y Fibra Óptica',
+    procesoId: 'proc_2',
+    procesoNombre: 'Operaciones de Ingeniería y Montajes',
+    lider: 'Carlos Mendivelso',
+    liderCargoId: 'c4',
+    descripcion: 'Ejecución técnica en campo, tendido de cableado estructurado, empalmes y soporte.'
+  },
+  {
+    id: 'ar_3',
+    codigo: 'AR-SST',
+    nombre: 'Seguridad y Salud en el Trabajo (SG-SST)',
+    procesoId: 'proc_3',
+    procesoNombre: 'Gestión Humana y SG-SST',
+    lider: 'Responsable SG-SST',
+    liderCargoId: 'c2',
+    descripcion: 'Implementación de los 21 estándares Resolución 0312, COPASST, matriz de riesgos y EPPs.'
+  },
+  {
+    id: 'ar_4',
+    codigo: 'AR-TAL',
+    nombre: 'Talento Humano y Compensación',
+    procesoId: 'proc_3',
+    procesoNombre: 'Gestión Humana y SG-SST',
+    lider: 'Coordinación GH',
+    liderCargoId: 'c2',
+    descripcion: 'Contratación, nómina, prestaciones sociales, inducción y bienestar laboral.'
+  },
+  {
+    id: 'ar_5',
+    codigo: 'AR-CON',
+    nombre: 'Contabilidad y Finanzas',
+    procesoId: 'proc_4',
+    procesoNombre: 'Gestión Administrativa y Financiera',
+    lider: 'Laura Beltrán',
+    liderCargoId: 'c3',
+    descripcion: 'Registro contable, estados financieros, liquidaciones tributarias y tesorería.'
+  },
+  {
+    id: 'ar_6',
+    codigo: 'AR-LOG',
+    nombre: 'Compras, Almacén y Logística',
+    procesoId: 'proc_4',
+    procesoNombre: 'Gestión Administrativa y Financiera',
+    lider: 'Almacenista General',
+    liderCargoId: 'c3',
+    descripcion: 'Adquisición de materiales, inventario de herramientas, dotaciones y EPPs.'
+  },
+  {
+    id: 'ar_7',
+    codigo: 'AR-COM',
+    nombre: 'Comercial y Licitaciones',
+    procesoId: 'proc_5',
+    procesoNombre: 'Comercial y Licitaciones',
+    lider: 'Director Comercial',
+    liderCargoId: 'c1',
+    descripcion: 'Estructuración de ofertas técnicas, cotizaciones y relaciones comerciales.'
+  }
 ];
 

@@ -58,6 +58,7 @@ import {
 import { GestionNovedadesView } from './GestionNovedadesView';
 import { ControlVacacionesView } from './ControlVacacionesView';
 import { ReservasProvisionesView } from './ReservasProvisionesView';
+import { ParametrosNominaView } from './ParametrosNominaView';
 
 interface NominaViewProps {
   empleados: Empleado[];
@@ -740,7 +741,7 @@ export function NominaView({
         </div>
 
         {/* BARRA DE NAVEGACIÓN Y CONTROL DE PERÍODOS (TODOS LOS MESES Y AÑOS) */}
-        <div className="bg-[#FAF8F5] rounded-xl border border-[#8FA7D6] p-3 sm:p-4 mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+        <div className="bg-[#FFFFFF] rounded-xl border border-[#8FA7D6] p-3 sm:p-4 mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => handleNavegarPeriodo('anterior')}
@@ -1031,7 +1032,7 @@ export function NominaView({
 
                       <td className="py-3 px-3 font-bold text-[#18235C]">
                         {formatMonedaCOP(liq.salarioBasicoPactado)}
-                        {liq.tieneDerestoAuxilioTransporte && (
+                        {liq.tieneDerechoAuxilioTransporte && (
                           <div className="text-[9px] text-[#18235C] font-semibold">+ Aux. Transporte</div>
                         )}
                       </td>
@@ -1757,145 +1758,14 @@ export function NominaView({
 
       {/* TAB 4: Parámetros y Normatividad Legal 2026 */}
       {activeTab === 'parametros' && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FAF8F5] p-4 rounded-2xl border border-[#8FA7D6]">
-            <div>
-              <h3 className="font-black text-[#18235C] text-sm flex items-center gap-2">
-                <Percent className="w-4 h-4 text-[#18235C]" />
-                Parámetros y Tablas Laborales Vigentes — Colombia 2026
-              </h3>
-              <p className="text-xs text-[#282829] mt-0.5">
-                Valores actualizados según decretos gubernamentales, Ley 2101/2021 (42 horas semanales) y estatuto tributario.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => {
-                  setFormParametros({ ...parametrosLegales });
-                  setModalParametrosAbierto(true);
-                }}
-                className="px-3.5 py-2 text-xs font-bold bg-[#18235C] hover:bg-[#101740] text-white rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs"
-              >
-                <Edit3 className="w-3.5 h-3.5 text-[#00FF00]" />
-                Ajustar Parámetros
-              </button>
-              <button
-                onClick={() => {
-                  setParametrosLegales(PARAMETROS_COLOMBIA_2026);
-                  setFormParametros(PARAMETROS_COLOMBIA_2026);
-                  guardarParametrosConfigurados(PARAMETROS_COLOMBIA_2026);
-                }}
-                className="px-3 py-2 text-xs font-bold bg-white text-[#18235C] border border-[#8FA7D6] hover:bg-[#8FA7D6]/10 rounded-xl flex items-center gap-1.5 transition-colors"
-                title="Restablecer a valores legales colombianos 2026"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-[#18235C]" />
-                Restablecer a Oficiales 2026
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-[#FFFFFF] rounded-2xl border border-[#8FA7D6] p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-[#8FA7D6]/30 pb-3">
-                <h4 className="font-bold text-sm text-[#18235C] flex items-center gap-2">
-                  <Coins className="w-4 h-4 text-[#18235C]" />
-                  Bases Salariales y Jornada Laboral 2026
-                </h4>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300">
-                  Año 2026
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs divide-y divide-[#8FA7D6]/20">
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Salario Mínimo Mensual Legal Vigente (SMMLV):</span>
-                  <span className="font-black text-[#18235C]">{formatMonedaCOP(parametrosLegales.smmlv)}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Auxilio Legal de Transporte Mensual:</span>
-                  <span className="font-black text-[#18235C]">{formatMonedaCOP(parametrosLegales.auxilioTransporte)}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Tope máximo para Auxilio de Transporte (2 SMMLV):</span>
-                  <span className="font-bold text-[#18235C]">{formatMonedaCOP(parametrosLegales.smmlv * 2)}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Unidad de Valor Tributario (UVT DIAN 2026):</span>
-                  <span className="font-bold text-[#18235C]">{formatMonedaCOP(parametrosLegales.uvt)}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Jornada Máxima Semanal (Ley 2101 de 2021):</span>
-                  <span className="font-bold text-[#18235C]">{parametrosLegales.horasSemanalesJornada} horas / semana</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Divisor cálculo valor hora ordinaria (Mensual):</span>
-                  <span className="font-black text-emerald-700">{parametrosLegales.horasMensualesJornada} horas</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Aporte Salud Trabajador:</span>
-                  <span className="font-bold text-[#18235C]">{(parametrosLegales.saludEmpleado * 100).toFixed(1)}% del IBC</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Aporte Pensión Trabajador:</span>
-                  <span className="font-bold text-[#18235C]">{(parametrosLegales.pensionEmpleado * 100).toFixed(1)}% del IBC</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Fondo de Solidaridad Pensional:</span>
-                  <span className="font-bold text-[#18235C]">1.0% a 2.0% (si IBC ≥ 4 SMMLV)</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#FFFFFF] rounded-2xl border border-[#8FA7D6] p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-[#8FA7D6]/30 pb-3">
-                <h4 className="font-bold text-sm text-[#18235C] flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-[#18235C]" />
-                  Aportes Patronales y Reservas de Prestaciones
-                </h4>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-300">
-                  CST & E.T.
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs divide-y divide-[#8FA7D6]/20">
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Aporte Pensión a cargo del Empleador:</span>
-                  <span className="font-bold text-[#18235C]">{(parametrosLegales.pensionEmpleador * 100).toFixed(1)}% del IBC</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Caja de Compensación Familiar (CCF):</span>
-                  <span className="font-bold text-[#18235C]">{(parametrosLegales.cajaCompensacion * 100).toFixed(1)}% del IBC</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Provisión Cesantías (Art. 249 CST):</span>
-                  <span className="font-bold text-[#18235C]">{(parametrosLegales.provisionCesantias * 100).toFixed(2)}% (1 mes/año)</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Provisión Intereses sobre Cesantías (Ley 52/1975):</span>
-                  <span className="font-bold text-[#18235C]">{(parametrosLegales.provisionInteresesCesantias * 100).toFixed(2)}% mensual (12% anual)</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Provisión Prima de Servicios (Art. 306 CST):</span>
-                  <span className="font-bold text-[#18235C]">{(parametrosLegales.provisionPrima * 100).toFixed(2)}% (15 días por semestre)</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-[#282829]">Provisión Vacaciones (Art. 186 CST):</span>
-                  <span className="font-bold text-[#18235C]">{(parametrosLegales.provisionVacaciones * 100).toFixed(2)}% (15 días hábiles/año)</span>
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-[#8FA7D6]/15 rounded-xl border border-[#8FA7D6] text-xs space-y-1 mt-3">
-                <div className="font-bold text-[#18235C] flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-[#18235C]" />
-                  Exoneración Tributaria Art. 114-1 E.T. (Ley 1819/2016):
-                </div>
-                <p className="text-[#282829] text-[11px] leading-relaxed">
-                  B GROUP INGENIERIA S.A.S. está legalmente exonerada de aportar al <strong>SENA (2%)</strong>, <strong>ICBF (3%)</strong> y <strong>Salud Patronal (8.5%)</strong> por todos los colaboradores que devenguen individualmente menos de 10 SMMLV ({formatMonedaCOP(parametrosLegales.smmlv * 10)}).
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ParametrosNominaView
+          parametros={parametrosLegales}
+          onSaveParametros={(nuevos) => {
+            setParametrosLegales(nuevos);
+            guardarParametrosConfigurados(nuevos);
+          }}
+          isSuperAdmin={true}
+        />
       )}
 
       {/* MODAL 1: APERTURA DE NUEVO PERÍODO (TODOS LOS MESES Y AÑOS) */}
@@ -1973,7 +1843,7 @@ export function NominaView({
                 </div>
               </div>
 
-              <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#8FA7D6] space-y-2">
+              <div className="p-3 bg-[#FFFFFF] rounded-xl border border-[#8FA7D6] space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -2105,13 +1975,13 @@ export function NominaView({
                 </div>
               </div>
 
-              <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#8FA7D6] space-y-1.5">
+              <div className="p-3 bg-[#FFFFFF] rounded-xl border border-[#8FA7D6] space-y-1.5">
                 <div className="font-bold text-[#18235C]">Porcentajes de Provisiones Prestacionales:</div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                  <div>Cesantías: <strong>{(formParametros.provisionCesantias * 100).toFixed(2)}%</strong></div>
-                  <div>Intereses: <strong>{(formParametros.provisionInteresesCesantias * 100).toFixed(2)}%</strong></div>
-                  <div>Prima: <strong>{(formParametros.provisionPrima * 100).toFixed(2)}%</strong></div>
-                  <div>Vacaciones: <strong>{(formParametros.provisionVacaciones * 100).toFixed(2)}%</strong></div>
+                  <div>Cesantías: <strong>{(formParametros.pctCesantias * 100).toFixed(2)}%</strong></div>
+                  <div>Intereses: <strong>{(formParametros.pctInteresesCesantias * 100).toFixed(2)}%</strong></div>
+                  <div>Prima: <strong>{(formParametros.pctPrimaServicios * 100).toFixed(2)}%</strong></div>
+                  <div>Vacaciones: <strong>{(formParametros.pctVacaciones * 100).toFixed(2)}%</strong></div>
                 </div>
               </div>
 

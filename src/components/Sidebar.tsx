@@ -19,7 +19,8 @@ import {
   LogOut,
   Package,
   FileDown,
-  Warehouse
+  Warehouse,
+  Scale
 } from 'lucide-react';
 import { Role, UsuarioSistema } from '../types';
 
@@ -425,6 +426,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span className="text-[10px] bg-[#101740] text-[#00FF00] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
                     <Lock className="w-2.5 h-2.5 text-[#00FF00]" />
                     Admin
+                  </span>
+                </button>
+
+                <button
+                  id="nav-parametros-nomina"
+                  onClick={() => onNavigate('parametros-nomina')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                    currentView === 'parametros-nomina'
+                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Scale className={`w-4 h-4 ${currentView === 'parametros-nomina' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                    <span>Parámetros de Nómina</span>
+                  </div>
+                  <span className="text-[10px] bg-[#101740] text-[#00FF00] px-1.5 py-0.5 rounded font-bold">
+                    SMMLV
                   </span>
                 </button>
 

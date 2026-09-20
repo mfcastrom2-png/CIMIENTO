@@ -33,7 +33,6 @@ export const INITIAL_USUARIOS_SISTEMA: UsuarioSistema[] = [
     ultimoAcceso: '2026-09-15 12:40',
     fechaCreacion: '2026-01-01',
     dobleFactorHabilitado: true,
-    password: 'admin123',
     permisos: [
       'dashboard', 'estructura', 'cargos', 'empleados', 'evaluaciones',
       'solicitudes', 'capacitaciones', 'sst', 'epps', 'nomina', 'usuarios', 'documentos'

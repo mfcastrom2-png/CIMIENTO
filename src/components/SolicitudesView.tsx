@@ -86,18 +86,18 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-[#DCD6C8]">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-[#8FA7D6]">
         <div>
-          <h1 className="font-serif-title text-3xl font-medium text-[#1E2A24]">
+          <h1 className="font-bold tracking-tight text-3xl font-medium text-[#18235C]">
             Gestión de Solicitudes y Novedades
           </h1>
-          <p className="text-sm text-[#5B6A62] mt-1 max-w-2xl">
+          <p className="text-sm text-[#282829] mt-1 max-w-2xl">
             Permisos, vacaciones, incapacidades y solicitudes administrativas con flujo de aprobación formal.
           </p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
-          className="px-4 py-2 bg-[#2F5D50] hover:bg-[#223F37] text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow-xs transition-colors"
+          className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow-xs transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span>Radicar solicitud</span>
@@ -105,25 +105,25 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white p-4 rounded border border-[#DCD6C8] shadow-xs flex flex-wrap gap-3 items-center justify-between">
+      <div className="bg-white p-4 rounded border border-[#8FA7D6] shadow-xs flex flex-wrap gap-3 items-center justify-between">
         <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#5B6A62]" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#282829]" />
           <input
             type="text"
             placeholder="Buscar por empleado o motivo..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full text-xs pl-9 pr-3 py-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+            className="w-full text-xs pl-9 pr-3 py-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-[#5B6A62] font-semibold">Estado:</span>
+            <span className="text-[#282829] font-semibold">Estado:</span>
             <select
               value={filterEstado}
               onChange={e => setFilterEstado(e.target.value)}
-              className="p-1.5 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#1E2A24]"
+              className="p-1.5 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
             >
               <option value="TODOS">Todos</option>
               <option value="Pendiente">Pendiente</option>
@@ -133,11 +133,11 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-[#5B6A62] font-semibold">Tipo:</span>
+            <span className="text-[#282829] font-semibold">Tipo:</span>
             <select
               value={filterTipo}
               onChange={e => setFilterTipo(e.target.value)}
-              className="p-1.5 rounded border border-[#DCD6C8] bg-[#F6F4EF] text-[#1E2A24]"
+              className="p-1.5 rounded border border-[#8FA7D6] bg-[#F8FAFC] text-[#18235C]"
             >
               <option value="TODOS">Todos</option>
               <option value="Permiso">Permiso</option>
@@ -151,11 +151,11 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded border border-[#DCD6C8] overflow-hidden shadow-xs">
+      <div className="bg-white rounded border border-[#8FA7D6] overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-[#DCD6C8] text-[#5B6A62] bg-[#F6F4EF]/60">
+              <tr className="border-b border-[#8FA7D6] text-[#282829] bg-[#F8FAFC]/60">
                 <th className="py-3 px-4 font-semibold">Empleado</th>
                 <th className="py-3 px-4 font-semibold">Tipo de Solicitud</th>
                 <th className="py-3 px-4 font-semibold">Vigencia / Fechas</th>
@@ -165,30 +165,30 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                 <th className="py-3 px-4 font-semibold text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#DCD6C8]/60">
+            <tbody className="divide-y divide-[#8FA7D6]/60">
               {filtered.map(sol => (
-                <tr key={sol.id} className="hover:bg-[#F6F4EF]/50">
-                  <td className="py-3 px-4 font-medium text-[#1E2A24]">
+                <tr key={sol.id} className="hover:bg-[#F8FAFC]/50">
+                  <td className="py-3 px-4 font-medium text-[#18235C]">
                     {getEmpleadoNombre(sol.empleadoId)}
                   </td>
-                  <td className="py-3 px-4 font-semibold text-[#1E2A24]">
+                  <td className="py-3 px-4 font-semibold text-[#18235C]">
                     {sol.tipo}
                   </td>
-                  <td className="py-3 px-4 text-[#5B6A62]">
+                  <td className="py-3 px-4 text-[#282829]">
                     {sol.inicio} al {sol.fin}
                   </td>
-                  <td className="py-3 px-4 text-[#5B6A62] max-w-xs truncate" title={sol.motivo}>
+                  <td className="py-3 px-4 text-[#282829] max-w-xs truncate" title={sol.motivo}>
                     {sol.motivo}
                   </td>
                   <td className="py-3 px-4">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      sol.estado === 'Aprobada' ? 'bg-[#E4EDE9] text-[#2F5D50]' :
+                      sol.estado === 'Aprobada' ? 'bg-[#8FA7D6/20] text-[#18235C]' :
                       sol.estado === 'Rechazada' ? 'bg-[#F3E3DE] text-[#A8503E]' : 'bg-[#F5EAD4] text-[#B5842A]'
                     }`}>
                       {sol.estado}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-[#5B6A62]">
+                  <td className="py-3 px-4 text-[#282829]">
                     {sol.fechaDecision ? `${sol.fechaDecision}: ${sol.comentario || 'Aprobado sin observaciones'}` : 'En espera de revisión'}
                   </td>
                   <td className="py-3 px-4 text-right">
@@ -196,7 +196,7 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => setDecisionModal({ id: sol.id, accion: 'Aprobada' })}
-                          className="px-2.5 py-1 rounded bg-[#2F5D50] hover:bg-[#223F37] text-white font-semibold transition-colors flex items-center gap-1"
+                          className="px-2.5 py-1 rounded bg-[#18235C] hover:bg-[#101740] text-white font-semibold transition-colors flex items-center gap-1"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Aprobar</span>
@@ -210,14 +210,14 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                         </button>
                       </div>
                     ) : (
-                      <span className="text-[#5B6A62] italic text-[11px]">Trámite completado</span>
+                      <span className="text-[#282829] italic text-[11px]">Trámite completado</span>
                     )}
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-[#5B6A62]">
+                  <td colSpan={7} className="py-8 text-center text-[#282829]">
                     No se encontraron solicitudes que coincidan con la búsqueda.
                   </td>
                 </tr>
@@ -230,14 +230,14 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       {/* Modal Crear Solicitud */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="bg-white rounded border border-[#DCD6C8] max-w-md w-full p-6 shadow-xl space-y-4">
-            <h3 className="font-serif-title text-xl font-medium text-[#1E2A24]">
+          <div className="bg-white rounded border border-[#8FA7D6] max-w-md w-full p-6 shadow-xl space-y-4">
+            <h3 className="font-bold tracking-tight text-xl font-medium text-[#18235C]">
               Radicar Novedad o Solicitud
             </h3>
 
             <form onSubmit={handleCreate} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-[#5B6A62] mb-1">Colaborador *</label>
+                <label className="block font-semibold text-[#282829] mb-1">Colaborador *</label>
                 {empleados.length === 0 ? (
                   <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200">
                     No hay colaboradores registrados. Agregue primero el personal en el módulo de Empleados.
@@ -246,7 +246,7 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                   <select
                     value={empleadoId || empleados[0]?.id}
                     onChange={e => setEmpleadoId(e.target.value)}
-                    className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   >
                     {empleados.map(e => (
                       <option key={e.id} value={e.id}>{e.nombre}</option>
@@ -256,11 +256,11 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-[#5B6A62] mb-1">Tipo de Trámite</label>
+                <label className="block font-semibold text-[#282829] mb-1">Tipo de Trámite</label>
                 <select
                   value={tipo}
                   onChange={e => setTipo(e.target.value as any)}
-                  className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 >
                   <option value="Permiso">Permiso laboral / personal</option>
                   <option value="Vacaciones">Vacaciones reglamentarias</option>
@@ -272,48 +272,48 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-[#5B6A62] mb-1">Fecha Inicio</label>
+                  <label className="block font-semibold text-[#282829] mb-1">Fecha Inicio</label>
                   <input
                     type="date"
                     value={inicio}
                     onChange={e => setInicio(e.target.value)}
-                    className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-[#5B6A62] mb-1">Fecha Fin</label>
+                  <label className="block font-semibold text-[#282829] mb-1">Fecha Fin</label>
                   <input
                     type="date"
                     value={fin}
                     onChange={e => setFin(e.target.value)}
-                    className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                    className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-[#5B6A62] mb-1">Motivo / Justificación *</label>
+                <label className="block font-semibold text-[#282829] mb-1">Motivo / Justificación *</label>
                 <textarea
                   rows={3}
                   required
                   value={motivo}
                   onChange={e => setMotivo(e.target.value)}
                   placeholder="Detalle el motivo del trámite..."
-                  className="w-full p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+                  className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#DCD6C8]">
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#8FA7D6]">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-3.5 py-2 text-[#5B6A62] hover:bg-[#F6F4EF] rounded border border-[#DCD6C8]"
+                  className="px-3.5 py-2 text-[#282829] hover:bg-[#F8FAFC] rounded border border-[#8FA7D6]"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#2F5D50] hover:bg-[#223F37] text-white font-semibold rounded"
+                  className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white font-semibold rounded"
                 >
                   Radicar Solicitud
                 </button>
@@ -326,11 +326,11 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       {/* Decision Modal */}
       {decisionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="bg-white rounded border border-[#DCD6C8] max-w-sm w-full p-6 shadow-xl space-y-4">
-            <h3 className="font-serif-title text-lg font-medium text-[#1E2A24]">
+          <div className="bg-white rounded border border-[#8FA7D6] max-w-sm w-full p-6 shadow-xl space-y-4">
+            <h3 className="font-bold tracking-tight text-lg font-medium text-[#18235C]">
               Confirmar Decisión: {decisionModal.accion}
             </h3>
-            <p className="text-xs text-[#5B6A62]">
+            <p className="text-xs text-[#282829]">
               Ingresa una observación o motivo que quedará registrado en el historial del colaborador.
             </p>
 
@@ -339,20 +339,20 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
               value={decisionComentario}
               onChange={e => setDecisionComentario(e.target.value)}
               placeholder="Observaciones de Gestión Humana..."
-              className="w-full text-xs p-2 rounded border border-[#DCD6C8] bg-[#F6F4EF]"
+              className="w-full text-xs p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
             />
 
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setDecisionModal(null)}
-                className="px-3 py-1.5 text-xs text-[#5B6A62] rounded border border-[#DCD6C8]"
+                className="px-3 py-1.5 text-xs text-[#282829] rounded border border-[#8FA7D6]"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmDecision}
                 className={`px-3 py-1.5 text-xs font-semibold text-white rounded ${
-                  decisionModal.accion === 'Aprobada' ? 'bg-[#2F5D50] hover:bg-[#223F37]' : 'bg-[#A8503E] hover:bg-[#863b2c]'
+                  decisionModal.accion === 'Aprobada' ? 'bg-[#18235C] hover:bg-[#101740]' : 'bg-[#A8503E] hover:bg-[#863b2c]'
                 }`}
               >
                 Confirmar {decisionModal.accion}

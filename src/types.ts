@@ -8,10 +8,27 @@ export type TipoCompetencia = 'Corporativa' | 'Técnica';
 export type TipoSolicitud = 'Vacaciones' | 'Permiso' | 'Licencia' | 'Incapacidad' | 'Cesantías' | 'Certificado';
 export type EstadoSolicitud = 'Pendiente' | 'Aprobada' | 'Rechazada';
 
+export type TipoProceso = 'Estratégico' | 'Misional / Operativo' | 'Apoyo' | 'Control y Evaluación';
+
+export interface ProcesoOrganizacion {
+  id: string;
+  codigo?: string;
+  nombre: string;
+  tipo: TipoProceso;
+  objetivo?: string;
+  liderCargoId?: string;
+  liderNombre?: string;
+}
+
 export interface AreaOrganizacion {
   id: string;
+  codigo?: string;
   nombre: string;
+  procesoId?: string;
+  procesoNombre?: string;
   lider?: string;
+  liderCargoId?: string;
+  descripcion?: string;
 }
 
 // 1. Identificación y estructura de cargo
@@ -37,6 +54,7 @@ export interface IndicadorCargo {
   unidad: string; // '%', 'días', '$', etc.
   frecuencia: 'Mensual' | 'Trimestral' | 'Semestral' | 'Anual';
   pesoSugerido?: number; // p.ej. 15%
+  meta?: string | number;
 }
 
 export interface AutoridadRelaciones {
@@ -156,6 +174,7 @@ export interface ContratoEmpleado {
 
 export interface Empleado {
   id: string;
+  empresaId?: string; // Multi-Tenancy
   nombre: string;
   documento: string;
   email: string;
@@ -163,6 +182,7 @@ export interface Empleado {
   cargoId: string;
   formacion: string;
   experiencia: string;
+  salarioBase?: number;
   contrato: ContratoEmpleado;
   familia: Familiar[];
   activo: boolean;
@@ -170,6 +190,7 @@ export interface Empleado {
 
 export interface Solicitud {
   id: string;
+  empresaId?: string; // Multi-Tenancy
   empleadoId: string;
   tipo: TipoSolicitud;
   inicio: string;
@@ -367,7 +388,14 @@ export interface ParametrosLegalesNomina {
   pctInteresesCesantias: number; // 1.0% mensual / 12% anual
   pctPrimaServicios: number; // 8.33%
   pctVacaciones: number; // 4.17%
+  horasSemanalesJornada?: number; // p.ej. 42h (Ley 2101 de 2021)
   horasMensualesJornada?: number; // Jornada comercial mensual Ley 2101/21 (210 horas en 2026 para 42h/semana)
+  factorRecargoNocturno?: number; // 0.35 (35%)
+  factorExtraDiurna?: number; // 1.25 (125% - recargo 25%)
+  factorExtraNocturna?: number; // 1.75 (175% - recargo 75%)
+  factorDominicalFestivoDiurno?: number; // 1.75 (175% - recargo 75%)
+  factorDominicalFestivoNocturno?: number; // 2.10 (210% - recargo 110%)
+  exoneradoParafiscalesLey1607?: boolean; // Exoneración general si aplica Art 114-1 ET
 }
 
 export interface ReservaProvisionEmpleado {
@@ -607,8 +635,8 @@ export interface EstadisticaSiniestralidadSST {
 // y evaluación de conocimiento previa por el administrador
 // ==========================================
 
-export type TipoCapacitacion = 'SST' | 'Técnica' | 'Habilidades Blandas' | 'Normativa y Cumplimiento';
-export type ModalidadCapacitacion = 'Presencial' | 'Virtual sincrónica' | 'Virtual asincrónica' | 'Mixta';
+export type TipoCapacitacion = 'SST' | 'Técnica' | 'Habilidades Blandas' | 'Normativa y Cumplimiento' | 'Gestión Operativa';
+export type ModalidadCapacitacion = 'Presencial' | 'Virtual sincrónica' | 'Virtual asincrónica' | 'Mixta' | 'Asincrónica';
 
 export interface PreguntaExamenCapacitacion {
   id: string;
@@ -688,13 +716,14 @@ export interface UsuarioSistema {
   documento: string;
   email: string;
   rol: RolSistema;
+  empresaId?: string; // Aislamiento Multi-Tenant (ej. 'empresa-bgroup-001')
   empleadoId?: string; // Vinculación con registro de empleado
   cargoNombre?: string;
   estado: EstadoUsuario;
   ultimoAcceso: string;
   fechaCreacion: string;
   dobleFactorHabilitado: boolean;
-  password?: string;
+  password?: string; // Solo volátil en memoria durante el despacho inicial; NUNCA persistido en Firestore
   permisos: string[]; // IDs de módulos autorizados: 'estructura', 'cargos', 'empleados', 'evaluaciones', 'solicitudes', 'capacitaciones', 'sst', 'nomina', 'usuarios', 'documentos'
 }
 

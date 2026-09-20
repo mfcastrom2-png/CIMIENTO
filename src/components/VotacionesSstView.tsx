@@ -261,36 +261,36 @@ export function VotacionesSstView({
     <div className="space-y-6">
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-[#1E2A24] text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-lg border border-[#DCD6C8]/30 flex items-center gap-2 animate-fade-in">
+        <div className="fixed top-4 right-4 z-50 bg-[#18235C] text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-lg border border-[#8FA7D6]/30 flex items-center gap-2 animate-fade-in">
           <CheckCircle2 className="w-4 h-4 text-[#E2B765]" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Header General de Votaciones SST */}
-      <div className="bg-white rounded-xl border border-[#DCD6C8] p-5 sm:p-6 shadow-xs">
+      <div className="bg-white rounded-xl border border-[#8FA7D6] p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#2F5D50]/10 text-[#2F5D50] border border-[#2F5D50]/20 flex items-center gap-1">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#18235C]/10 text-[#18235C] border border-[#18235C]/20 flex items-center gap-1">
                 <Vote className="w-3.5 h-3.5" />
                 Democracia Laboral & SG-SST
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#F6F4EF] text-[#5B6A62] border border-[#DCD6C8]">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#F8FAFC] text-[#282829] border border-[#8FA7D6]">
                 Res. 2013/86 • Res. 652/12 • Res. 0312/19
               </span>
             </div>
-            <h2 className="text-xl font-bold font-serif text-[#1E2A24]">
+            <h2 className="text-xl font-bold font-serif text-[#18235C]">
               Elecciones Electrónicas COPASST y Comité de Convivencia
             </h2>
-            <p className="text-xs sm:text-sm text-[#5B6A62] mt-0.5 max-w-2xl">
+            <p className="text-xs sm:text-sm text-[#282829] mt-0.5 max-w-2xl">
               Proceso oficial de votación secreta y directa para la elección de los representantes de los trabajadores ante el Comité Paritario de SST y el Comité de Convivencia Laboral (Periodo 2026 - 2028).
             </p>
           </div>
 
           <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
             {/* Selector de Proceso Electoral */}
-            <div className="bg-[#FAF8F5] p-1 rounded-lg border border-[#DCD6C8] flex text-xs font-semibold">
+            <div className="bg-[#FFFFFF] p-1 rounded-lg border border-[#8FA7D6] flex text-xs font-semibold">
               <button
                 onClick={() => {
                   setProcesoIdActivo('elec-copasst-2026');
@@ -298,8 +298,8 @@ export function VotacionesSstView({
                 }}
                 className={`px-3 py-1.5 rounded-md transition-colors ${
                   procesoIdActivo === 'elec-copasst-2026'
-                    ? 'bg-[#2F5D50] text-white shadow-2xs'
-                    : 'text-[#5B6A62] hover:text-[#1E2A24]'
+                    ? 'bg-[#18235C] text-white shadow-2xs'
+                    : 'text-[#282829] hover:text-[#18235C]'
                 }`}
               >
                 Elección COPASST
@@ -311,8 +311,8 @@ export function VotacionesSstView({
                 }}
                 className={`px-3 py-1.5 rounded-md transition-colors ${
                   procesoIdActivo === 'elec-convivencia-2026'
-                    ? 'bg-[#2F5D50] text-white shadow-2xs'
-                    : 'text-[#5B6A62] hover:text-[#1E2A24]'
+                    ? 'bg-[#18235C] text-white shadow-2xs'
+                    : 'text-[#282829] hover:text-[#18235C]'
                 }`}
               >
                 Comité de Convivencia
@@ -322,10 +322,10 @@ export function VotacionesSstView({
         </div>
 
         {/* Simulador rápido de votante para pruebas de usuario */}
-        <div className="mt-5 pt-4 border-t border-[#DCD6C8] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs bg-[#FAF8F5] p-3 rounded-lg">
+        <div className="mt-5 pt-4 border-t border-[#8FA7D6] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs bg-[#FFFFFF] p-3 rounded-lg">
           <div className="flex items-center gap-2">
-            <UserCheck className="w-4 h-4 text-[#2F5D50]" />
-            <span className="font-semibold text-[#1E2A24]">
+            <UserCheck className="w-4 h-4 text-[#18235C]" />
+            <span className="font-semibold text-[#18235C]">
               Simular Votante Activo:
             </span>
             <select
@@ -334,7 +334,7 @@ export function VotacionesSstView({
                 setVoterEmpleadoId(e.target.value);
                 setCandidatoSeleccionadoId(null);
               }}
-              className="bg-white border border-[#DCD6C8] rounded px-2.5 py-1 text-xs text-[#1E2A24] font-medium"
+              className="bg-white border border-[#8FA7D6] rounded px-2.5 py-1 text-xs text-[#18235C] font-medium"
             >
               {empleados.map(emp => {
                 const yaVoto = procesoActual.votantesRegistrados.some(v => v.empleadoId === emp.id);
@@ -347,7 +347,7 @@ export function VotacionesSstView({
             </select>
           </div>
 
-          <div className="text-[11px] text-[#5B6A62]">
+          <div className="text-[11px] text-[#282829]">
             {votoRegistrado ? (
               <span className="inline-flex items-center gap-1 text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 <CheckCircle2 className="w-3 h-3 text-emerald-700" />
@@ -364,18 +364,18 @@ export function VotacionesSstView({
       </div>
 
       {/* SECCIÓN 1: VISTA DE VOTACIÓN DEL EMPLEADO (TARJETÓN ELECTORAL) */}
-      <div className="bg-white rounded-xl border border-[#DCD6C8] p-5 sm:p-6 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#DCD6C8] pb-4">
+      <div className="bg-white rounded-xl border border-[#8FA7D6] p-5 sm:p-6 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#8FA7D6] pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold px-2 py-0.5 rounded bg-[#1E2A24] text-white">
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-[#18235C] text-white">
                 Tarjetón Electoral Oficial
               </span>
-              <span className="text-xs font-semibold text-[#2F5D50]">
+              <span className="text-xs font-semibold text-[#18235C]">
                 {procesoActual.titulo}
               </span>
             </div>
-            <div className="text-xs text-[#5B6A62] mt-1">
+            <div className="text-xs text-[#282829] mt-1">
               Votante: <strong>{empleadoVotante.nombre}</strong> • CC: {empleadoVotante.documento} • Periodo {procesoActual.periodo}
             </div>
           </div>
@@ -427,7 +427,7 @@ export function VotacionesSstView({
                   mesaVotacion: 'Mesa Digital Única - B GROUP INGENIERIA S.A.S.'
                 });
               }}
-              className="px-4 py-2 bg-[#2F5D50] hover:bg-[#24493F] text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-2xs"
+              className="px-4 py-2 bg-[#18235C] hover:bg-[#24493F] text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-2xs"
             >
               <FileCheck className="w-4 h-4" />
               <span>Ver e Imprimir Certificado Electoral</span>
@@ -444,16 +444,16 @@ export function VotacionesSstView({
         ) : (
           /* FORMULARIO DE VOTACIÓN ACTIVA (TARJETÓN) */
           <form onSubmit={handleEmitirVoto} className="space-y-4">
-            <div className="text-xs text-[#5B6A62] bg-[#FAF8F5] p-3 rounded-lg border border-[#DCD6C8]">
+            <div className="text-xs text-[#282829] bg-[#FFFFFF] p-3 rounded-lg border border-[#8FA7D6]">
               <strong>Instrucciones:</strong> Seleccione únicamente <strong>un (1) candidato</strong> o la opción de <strong>Voto en Blanco</strong> marcando la casilla correspondiente. Su voto es completamente confidencial y anónimo conforme a la ley colombiana.
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {procesoActual.candidatos.length === 0 && (
-                <div className="col-span-full p-6 bg-[#FAF8F5] border border-dashed border-[#DCD6C8] rounded-xl text-center">
-                  <Vote className="w-8 h-8 text-[#2F5D50] mx-auto mb-2 opacity-70" />
-                  <h4 className="font-bold text-sm text-[#1E2A24]">Urna de Producción Abierta</h4>
-                  <p className="text-xs text-[#5B6A62] max-w-md mx-auto mt-1">
+                <div className="col-span-full p-6 bg-[#FFFFFF] border border-dashed border-[#8FA7D6] rounded-xl text-center">
+                  <Vote className="w-8 h-8 text-[#18235C] mx-auto mb-2 opacity-70" />
+                  <h4 className="font-bold text-sm text-[#18235C]">Urna de Producción Abierta</h4>
+                  <p className="text-xs text-[#282829] max-w-md mx-auto mt-1">
                     Los datos de prueba han sido limpiados. En cuanto se inscriban las planchas o candidatos oficiales de los trabajadores, aparecerán en este tarjetón.
                   </p>
                 </div>
@@ -466,31 +466,31 @@ export function VotacionesSstView({
                     onClick={() => setCandidatoSeleccionadoId(cand.id)}
                     className={`p-4 rounded-xl border cursor-pointer transition-all relative ${
                       isSelected
-                        ? 'border-[#2F5D50] bg-[#2F5D50]/5 ring-2 ring-[#2F5D50]/20 shadow-xs'
-                        : 'border-[#DCD6C8] bg-white hover:border-[#2F5D50]/50 hover:bg-[#FAF8F5]'
+                        ? 'border-[#18235C] bg-[#18235C]/5 ring-2 ring-[#18235C]/20 shadow-xs'
+                        : 'border-[#8FA7D6] bg-white hover:border-[#18235C]/50 hover:bg-[#FFFFFF]'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-full bg-[#1E2A24] text-white text-xs font-bold flex items-center justify-center">
+                        <span className="w-7 h-7 rounded-full bg-[#18235C] text-white text-xs font-bold flex items-center justify-center">
                           {cand.numeroTarjeton}
                         </span>
                         <div>
-                          <div className="font-bold text-xs text-[#1E2A24]">{cand.nombre}</div>
-                          <div className="text-[10px] text-[#5B6A62]">{cand.cargo}</div>
+                          <div className="font-bold text-xs text-[#18235C]">{cand.nombre}</div>
+                          <div className="text-[10px] text-[#282829]">{cand.cargo}</div>
                         </div>
                       </div>
 
                       <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
                         isSelected
-                          ? 'border-[#2F5D50] bg-[#2F5D50] text-white'
-                          : 'border-[#DCD6C8] bg-white'
+                          ? 'border-[#18235C] bg-[#18235C] text-white'
+                          : 'border-[#8FA7D6] bg-white'
                       }`}>
                         {isSelected && <Check className="w-3.5 h-3.5" />}
                       </div>
                     </div>
 
-                    <div className="text-[11px] text-[#5B6A62] bg-[#FAF8F5] p-2.5 rounded border border-[#DCD6C8]/60 mt-2 leading-relaxed">
+                    <div className="text-[11px] text-[#282829] bg-[#FFFFFF] p-2.5 rounded border border-[#8FA7D6]/60 mt-2 leading-relaxed">
                       <strong>Propuesta:</strong> {cand.propuesta}
                     </div>
                   </div>
@@ -502,32 +502,32 @@ export function VotacionesSstView({
                 onClick={() => setCandidatoSeleccionadoId('BLANCO')}
                 className={`p-4 rounded-xl border cursor-pointer transition-all relative flex flex-col justify-between ${
                   candidatoSeleccionadoId === 'BLANCO'
-                    ? 'border-[#2F5D50] bg-[#2F5D50]/5 ring-2 ring-[#2F5D50]/20 shadow-xs'
-                    : 'border-[#DCD6C8] bg-white hover:border-[#2F5D50]/50 hover:bg-[#FAF8F5]'
+                    ? 'border-[#18235C] bg-[#18235C]/5 ring-2 ring-[#18235C]/20 shadow-xs'
+                    : 'border-[#8FA7D6] bg-white hover:border-[#18235C]/50 hover:bg-[#FFFFFF]'
                 }`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="w-7 h-7 rounded-full bg-[#FAF8F5] border border-[#DCD6C8] text-[#1E2A24] text-xs font-bold flex items-center justify-center">
+                      <span className="w-7 h-7 rounded-full bg-[#FFFFFF] border border-[#8FA7D6] text-[#18235C] text-xs font-bold flex items-center justify-center">
                         VB
                       </span>
                       <div>
-                        <div className="font-bold text-xs text-[#1E2A24]">VOTO EN BLANCO</div>
-                        <div className="text-[10px] text-[#5B6A62]">Opción legal reglamentaria</div>
+                        <div className="font-bold text-xs text-[#18235C]">VOTO EN BLANCO</div>
+                        <div className="text-[10px] text-[#282829]">Opción legal reglamentaria</div>
                       </div>
                     </div>
 
                     <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
                       candidatoSeleccionadoId === 'BLANCO'
-                        ? 'border-[#2F5D50] bg-[#2F5D50] text-white'
-                        : 'border-[#DCD6C8] bg-white'
+                        ? 'border-[#18235C] bg-[#18235C] text-white'
+                        : 'border-[#8FA7D6] bg-white'
                     }`}>
                       {candidatoSeleccionadoId === 'BLANCO' && <Check className="w-3.5 h-3.5" />}
                     </div>
                   </div>
 
-                  <div className="text-[11px] text-[#5B6A62] bg-[#FAF8F5] p-2.5 rounded border border-[#DCD6C8]/60 mt-2 leading-relaxed">
+                  <div className="text-[11px] text-[#282829] bg-[#FFFFFF] p-2.5 rounded border border-[#8FA7D6]/60 mt-2 leading-relaxed">
                     Opción de desacuerdo o abstención con los candidatos postulados. Computa para quórum legal.
                   </div>
                 </div>
@@ -538,14 +538,14 @@ export function VotacionesSstView({
               </div>
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-[#DCD6C8]">
+            <div className="flex justify-end pt-3 border-t border-[#8FA7D6]">
               <button
                 type="submit"
                 disabled={!candidatoSeleccionadoId}
                 className={`px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
                   candidatoSeleccionadoId
-                    ? 'bg-[#2F5D50] hover:bg-[#24493F] text-white shadow-xs cursor-pointer'
-                    : 'bg-[#DCD6C8] text-[#8DA096] cursor-not-allowed'
+                    ? 'bg-[#18235C] hover:bg-[#24493F] text-white shadow-xs cursor-pointer'
+                    : 'bg-[#8FA7D6] text-[#8DA096] cursor-not-allowed'
                 }`}
               >
                 <Vote className="w-4 h-4" />
@@ -557,14 +557,14 @@ export function VotacionesSstView({
       </div>
 
       {/* SECCIÓN 2: PANEL DE CONTROL Y ESCRUTINIO ADMINISTRATIVO */}
-      <div className="bg-white rounded-xl border border-[#DCD6C8] p-5 sm:p-6 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#DCD6C8] pb-4">
+      <div className="bg-white rounded-xl border border-[#8FA7D6] p-5 sm:p-6 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#8FA7D6] pb-4">
           <div>
-            <h3 className="font-bold text-base font-serif text-[#1E2A24] flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-[#2F5D50]" />
+            <h3 className="font-bold text-base font-serif text-[#18235C] flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-[#18235C]" />
               Escrutinio Oficial & Censo de Participación
             </h3>
-            <p className="text-xs text-[#5B6A62] mt-0.5">
+            <p className="text-xs text-[#282829] mt-0.5">
               Resultados en tiempo real, validación de quórum y actas oficiales de apertura y cierre para el MinTrabajo / ARL.
             </p>
           </div>
@@ -572,15 +572,15 @@ export function VotacionesSstView({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setModalActaAperturaOpen(true)}
-              className="px-3 py-1.5 rounded-lg border border-[#DCD6C8] text-xs font-semibold text-[#1E2A24] hover:bg-[#FAF8F5] flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg border border-[#8FA7D6] text-xs font-semibold text-[#18235C] hover:bg-[#FFFFFF] flex items-center gap-1.5"
             >
-              <FileText className="w-3.5 h-3.5 text-[#2F5D50]" />
+              <FileText className="w-3.5 h-3.5 text-[#18235C]" />
               <span>Acta de Apertura</span>
             </button>
 
             <button
               onClick={() => setModalActaCierreOpen(true)}
-              className="px-3 py-1.5 rounded-lg border border-[#DCD6C8] text-xs font-semibold text-[#1E2A24] hover:bg-[#FAF8F5] flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg border border-[#8FA7D6] text-xs font-semibold text-[#18235C] hover:bg-[#FFFFFF] flex items-center gap-1.5"
             >
               <Award className="w-3.5 h-3.5 text-[#B5842A]" />
               <span>Acta de Escrutinio y Cierre</span>
@@ -602,43 +602,43 @@ export function VotacionesSstView({
 
         {/* Tarjetas de Métricas de Escrutinio */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-          <div className="p-3.5 bg-[#FAF8F5] rounded-lg border border-[#DCD6C8]/70">
-            <div className="text-[10px] font-semibold text-[#5B6A62] uppercase tracking-wider flex items-center justify-between">
+          <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
+            <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
               Censo Habilitado
-              <Users className="w-3.5 h-3.5 text-[#2F5D50]" />
+              <Users className="w-3.5 h-3.5 text-[#18235C]" />
             </div>
-            <div className="text-xl font-bold text-[#1E2A24] mt-0.5">
-              {procesoActual.censoElectoralTotal} <span className="text-xs font-normal text-[#5B6A62]">votantes</span>
+            <div className="text-xl font-bold text-[#18235C] mt-0.5">
+              {procesoActual.censoElectoralTotal} <span className="text-xs font-normal text-[#282829]">votantes</span>
             </div>
-            <div className="text-[10px] text-[#5B6A62]">Trabajadores con contrato vigente</div>
+            <div className="text-[10px] text-[#282829]">Trabajadores con contrato vigente</div>
           </div>
 
-          <div className="p-3.5 bg-[#FAF8F5] rounded-lg border border-[#DCD6C8]/70">
-            <div className="text-[10px] font-semibold text-[#5B6A62] uppercase tracking-wider flex items-center justify-between">
+          <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
+            <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
               Votos Emitidos
-              <Vote className="w-3.5 h-3.5 text-[#2F5D50]" />
+              <Vote className="w-3.5 h-3.5 text-[#18235C]" />
             </div>
-            <div className="text-xl font-bold text-[#2F5D50] mt-0.5">
+            <div className="text-xl font-bold text-[#18235C] mt-0.5">
               {procesoActual.totalVotosEmitidos}
             </div>
-            <div className="text-[10px] text-[#5B6A62]">Sufragios depositados</div>
+            <div className="text-[10px] text-[#282829]">Sufragios depositados</div>
           </div>
 
-          <div className="p-3.5 bg-[#FAF8F5] rounded-lg border border-[#DCD6C8]/70">
-            <div className="text-[10px] font-semibold text-[#5B6A62] uppercase tracking-wider flex items-center justify-between">
+          <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
+            <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
               Participación
               <BarChart3 className="w-3.5 h-3.5 text-[#B5842A]" />
             </div>
-            <div className="text-xl font-bold text-[#1E2A24] mt-0.5">
+            <div className="text-xl font-bold text-[#18235C] mt-0.5">
               {escrutinio.participacionPorcentaje}%
             </div>
-            <div className="text-[10px] text-[#5B6A62]">Del total de la planta</div>
+            <div className="text-[10px] text-[#282829]">Del total de la planta</div>
           </div>
 
-          <div className="p-3.5 bg-[#FAF8F5] rounded-lg border border-[#DCD6C8]/70">
-            <div className="text-[10px] font-semibold text-[#5B6A62] uppercase tracking-wider flex items-center justify-between">
+          <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
+            <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
               Quórum Legal
-              <ShieldCheck className="w-3.5 h-3.5 text-[#2F5D50]" />
+              <ShieldCheck className="w-3.5 h-3.5 text-[#18235C]" />
             </div>
             <div className="text-sm font-bold mt-1">
               {escrutinio.quorumValido ? (
@@ -651,13 +651,13 @@ export function VotacionesSstView({
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-[#5B6A62]">Requisito de validez electoral</div>
+            <div className="text-[10px] text-[#282829]">Requisito de validez electoral</div>
           </div>
         </div>
 
         {/* Gráfico de Barras / Resultados por Candidato */}
         <div className="space-y-3 pt-2">
-          <h4 className="text-xs font-bold text-[#1E2A24] uppercase tracking-wider">
+          <h4 className="text-xs font-bold text-[#18235C] uppercase tracking-wider">
             Votos Computados por Plancha / Candidato:
           </h4>
 
@@ -669,13 +669,13 @@ export function VotacionesSstView({
                   : 0;
 
               return (
-                <div key={cand.id} className="p-3 bg-[#FAF8F5] rounded-lg border border-[#DCD6C8]/80 text-xs">
+                <div key={cand.id} className="p-3 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/80 text-xs">
                   <div className="flex items-center justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-[#1E2A24]">
+                      <span className="font-bold text-[#18235C]">
                         #{cand.numeroTarjeton} {cand.nombre}
                       </span>
-                      <span className="text-[10px] text-[#5B6A62]">({cand.cargo})</span>
+                      <span className="text-[10px] text-[#282829]">({cand.cargo})</span>
                       {idx === 0 && cand.votosObtenidos > 0 && (
                         <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
                           Principal Electo
@@ -688,15 +688,15 @@ export function VotacionesSstView({
                       )}
                     </div>
 
-                    <div className="font-bold text-[#1E2A24]">
-                      {cand.votosObtenidos} votos <span className="text-[#5B6A62] font-normal">({pct}%)</span>
+                    <div className="font-bold text-[#18235C]">
+                      {cand.votosObtenidos} votos <span className="text-[#282829] font-normal">({pct}%)</span>
                     </div>
                   </div>
 
                   {/* Barra de progreso */}
-                  <div className="w-full h-2 bg-[#DCD6C8]/60 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-[#8FA7D6]/60 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#2F5D50] rounded-full transition-all duration-500"
+                      className="h-full bg-[#18235C] rounded-full transition-all duration-500"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -705,10 +705,10 @@ export function VotacionesSstView({
             })}
 
             {/* Votos en blanco */}
-            <div className="p-3 bg-[#FAF8F5] rounded-lg border border-[#DCD6C8]/80 text-xs">
+            <div className="p-3 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/80 text-xs">
               <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="font-bold text-[#5B6A62]">Voto en Blanco</span>
-                <div className="font-bold text-[#5B6A62]">
+                <span className="font-bold text-[#282829]">Voto en Blanco</span>
+                <div className="font-bold text-[#282829]">
                   {procesoActual.votosEnBlanco} votos (
                   {procesoActual.totalVotosEmitidos > 0
                     ? Math.round((procesoActual.votosEnBlanco / procesoActual.totalVotosEmitidos) * 100)
@@ -716,7 +716,7 @@ export function VotacionesSstView({
                   %)
                 </div>
               </div>
-              <div className="w-full h-2 bg-[#DCD6C8]/60 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-[#8FA7D6]/60 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#8DA096] rounded-full"
                   style={{
@@ -734,14 +734,14 @@ export function VotacionesSstView({
 
         {/* Tabla del Censo Electoral de Trabajadores */}
         <div className="pt-3">
-          <h4 className="text-xs font-bold text-[#1E2A24] uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-bold text-[#18235C] uppercase tracking-wider mb-2">
             Registro del Censo Electoral y Constancias de Sufragio:
           </h4>
 
-          <div className="overflow-x-auto border border-[#DCD6C8] rounded-lg">
+          <div className="overflow-x-auto border border-[#8FA7D6] rounded-lg">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="bg-[#FAF8F5] text-[#5B6A62] border-b border-[#DCD6C8] text-[10px] font-semibold uppercase">
+                <tr className="bg-[#FFFFFF] text-[#282829] border-b border-[#8FA7D6] text-[10px] font-semibold uppercase">
                   <th className="p-2.5">Trabajador Habilitado</th>
                   <th className="p-2.5">Documento</th>
                   <th className="p-2.5 text-center">Estado de Voto</th>
@@ -749,13 +749,13 @@ export function VotacionesSstView({
                   <th className="p-2.5 text-right">Código Certificado</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#DCD6C8]/60">
+              <tbody className="divide-y divide-[#8FA7D6]/60">
                 {empleados.map(emp => {
                   const reg = procesoActual.votantesRegistrados.find(v => v.empleadoId === emp.id);
                   return (
-                    <tr key={emp.id} className="hover:bg-[#FAF8F5]/50">
-                      <td className="p-2.5 font-medium text-[#1E2A24]">{emp.nombre}</td>
-                      <td className="p-2.5 text-[#5B6A62]">{emp.documento}</td>
+                    <tr key={emp.id} className="hover:bg-[#FFFFFF]/50">
+                      <td className="p-2.5 font-medium text-[#18235C]">{emp.nombre}</td>
+                      <td className="p-2.5 text-[#282829]">{emp.documento}</td>
                       <td className="p-2.5 text-center">
                         {reg ? (
                           <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold text-[10px] border border-emerald-200">
@@ -767,10 +767,10 @@ export function VotacionesSstView({
                           </span>
                         )}
                       </td>
-                      <td className="p-2.5 text-[#5B6A62]">
+                      <td className="p-2.5 text-[#282829]">
                         {reg ? reg.fechaHoraVoto : '—'}
                       </td>
-                      <td className="p-2.5 text-right font-mono text-[10px] text-[#2F5D50]">
+                      <td className="p-2.5 text-right font-mono text-[10px] text-[#18235C]">
                         {reg ? reg.codigoCertificado : '—'}
                       </td>
                     </tr>
@@ -778,12 +778,12 @@ export function VotacionesSstView({
                 })}
                 {empleados.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-[#5B6A62]">
-                      <Users className="w-8 h-8 text-[#2F5D50] mx-auto mb-2 opacity-50" />
-                      <p className="font-semibold text-sm text-[#1E2A24]">
+                    <td colSpan={5} className="p-8 text-center text-[#282829]">
+                      <Users className="w-8 h-8 text-[#18235C] mx-auto mb-2 opacity-50" />
+                      <p className="font-semibold text-sm text-[#18235C]">
                         No hay colaboradores en el censo electoral
                       </p>
-                      <p className="text-xs text-[#5B6A62] max-w-md mx-auto mt-1">
+                      <p className="text-xs text-[#282829] max-w-md mx-auto mt-1">
                         La base de datos de producción está limpia. Registre o importe los colaboradores en el módulo de Empleados para habilitar el censo electoral con derecho a sufragio.
                       </p>
                     </td>
@@ -798,56 +798,56 @@ export function VotacionesSstView({
       {/* MODAL CERTIFICADO DE VOTACIÓN */}
       {certificadoActivo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl border border-[#DCD6C8] max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#DCD6C8] pb-3">
+          <div className="bg-white rounded-xl border border-[#8FA7D6] max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#8FA7D6] pb-3">
               <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-[#2F5D50]" />
-                <h3 className="font-bold text-base text-[#1E2A24]">
+                <Award className="w-5 h-5 text-[#18235C]" />
+                <h3 className="font-bold text-base text-[#18235C]">
                   Certificado Electoral de Votación SST
                 </h3>
               </div>
               <button
                 onClick={() => setCertificadoActivo(null)}
-                className="text-[#5B6A62] hover:text-[#1E2A24]"
+                className="text-[#282829] hover:text-[#18235C]"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Certificado con formato oficial imprimible */}
-            <div className="p-5 border-2 border-[#2F5D50]/30 rounded-xl bg-[#FAF8F5] text-center space-y-3">
-              <div className="text-xs font-bold tracking-widest text-[#2F5D50] uppercase">
+            <div className="p-5 border-2 border-[#18235C]/30 rounded-xl bg-[#FFFFFF] text-center space-y-3">
+              <div className="text-xs font-bold tracking-widest text-[#18235C] uppercase">
                 B GROUP INGENIERIA S.A.S. • SISTEMA DE GESTIÓN SST
               </div>
 
-              <h4 className="text-base font-bold font-serif text-[#1E2A24]">
+              <h4 className="text-base font-bold font-serif text-[#18235C]">
                 CONSTANCIA DE SUFRAGIO ELECTORAL
               </h4>
 
-              <div className="text-xs text-[#5B6A62] leading-relaxed max-w-md mx-auto">
+              <div className="text-xs text-[#282829] leading-relaxed max-w-md mx-auto">
                 Se certifica formalmente que el(la) colaborador(a):
               </div>
 
-              <div className="text-sm font-bold text-[#1E2A24]">
+              <div className="text-sm font-bold text-[#18235C]">
                 {certificadoActivo.empleadoNombre}
               </div>
-              <div className="text-xs text-[#5B6A62]">
+              <div className="text-xs text-[#282829]">
                 Cédula de Ciudadanía: <strong>{certificadoActivo.empleadoDocumento}</strong>
               </div>
 
-              <p className="text-[11px] text-[#5B6A62] leading-relaxed pt-1">
+              <p className="text-[11px] text-[#282829] leading-relaxed pt-1">
                 Ha ejercido su derecho y deber de votación libre, secreta y democrática para el{' '}
                 <strong>{certificadoActivo.tipoProceso}</strong> correspondiente al periodo estatutario{' '}
                 <strong>{certificadoActivo.periodo}</strong>, en cumplimiento de las Resoluciones 2013 de 1986, 652 de 2012 y 0312 de 2019.
               </p>
 
-              <div className="pt-2 border-t border-[#DCD6C8] flex items-center justify-between text-left text-[10px] text-[#5B6A62]">
+              <div className="pt-2 border-t border-[#8FA7D6] flex items-center justify-between text-left text-[10px] text-[#282829]">
                 <div>
                   <div><strong>Mesa:</strong> {certificadoActivo.mesaVotacion}</div>
                   <div><strong>Fecha/Hora:</strong> {certificadoActivo.fechaHoraVoto}</div>
                   <div><strong>Radicado:</strong> {certificadoActivo.codigoCertificado}</div>
                 </div>
-                <div className="w-12 h-12 bg-white border border-[#DCD6C8] rounded flex items-center justify-center text-[#2F5D50]">
+                <div className="w-12 h-12 bg-white border border-[#8FA7D6] rounded flex items-center justify-center text-[#18235C]">
                   <QrCode className="w-8 h-8" />
                 </div>
               </div>
@@ -856,14 +856,14 @@ export function VotacionesSstView({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => window.print()}
-                className="px-4 py-2 bg-[#2F5D50] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                className="px-4 py-2 bg-[#18235C] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
               >
                 <Printer className="w-3.5 h-3.5" />
                 Imprimir Certificado
               </button>
               <button
                 onClick={() => setCertificadoActivo(null)}
-                className="px-3.5 py-2 border border-[#DCD6C8] text-[#5B6A62] rounded-lg text-xs"
+                className="px-3.5 py-2 border border-[#8FA7D6] text-[#282829] rounded-lg text-xs"
               >
                 Cerrar
               </button>
@@ -875,18 +875,18 @@ export function VotacionesSstView({
       {/* MODAL ACTA DE APERTURA */}
       {modalActaAperturaOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl border border-[#DCD6C8] max-w-xl w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-white rounded-xl border border-[#8FA7D6] max-w-xl w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-base text-[#1E2A24]">
+              <h3 className="font-bold text-base text-[#18235C]">
                 Acta Oficial de Apertura del Proceso Electoral
               </h3>
               <button onClick={() => setModalActaAperturaOpen(false)}>
-                <X className="w-5 h-5 text-[#5B6A62]" />
+                <X className="w-5 h-5 text-[#282829]" />
               </button>
             </div>
 
-            <div className="text-xs space-y-3 text-[#5B6A62] leading-relaxed p-4 bg-[#FAF8F5] rounded-lg border">
-              <div className="font-bold text-[#1E2A24] text-center border-b pb-2">
+            <div className="text-xs space-y-3 text-[#282829] leading-relaxed p-4 bg-[#FFFFFF] rounded-lg border">
+              <div className="font-bold text-[#18235C] text-center border-b pb-2">
                 ACTA DE APERTURA DE VOTACIONES - B GROUP INGENIERIA S.A.S.
               </div>
               <p>
@@ -895,7 +895,7 @@ export function VotacionesSstView({
               <p>
                 Los jurados verificaron la urna digital electrónica encontrándola con contador en cero (0) votos y procedieron a validar el censo laboral compuesto por <strong>{procesoActual.censoElectoralTotal} trabajadores habilitados</strong>.
               </p>
-              <div className="pt-2 font-semibold text-[#1E2A24]">
+              <div className="pt-2 font-semibold text-[#18235C]">
                 Jurados Electorales Firmantes:
               </div>
               <ul className="list-disc pl-5">
@@ -908,14 +908,14 @@ export function VotacionesSstView({
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => window.print()}
-                className="px-3.5 py-1.5 bg-[#2F5D50] text-white rounded text-xs font-semibold flex items-center gap-1"
+                className="px-3.5 py-1.5 bg-[#18235C] text-white rounded text-xs font-semibold flex items-center gap-1"
               >
                 <Printer className="w-3.5 h-3.5" />
                 Imprimir Acta
               </button>
               <button
                 onClick={() => setModalActaAperturaOpen(false)}
-                className="px-3 py-1.5 border rounded text-xs text-[#5B6A62]"
+                className="px-3 py-1.5 border rounded text-xs text-[#282829]"
               >
                 Cerrar
               </button>
@@ -927,18 +927,18 @@ export function VotacionesSstView({
       {/* MODAL ACTA DE CIERRE Y ESCRUTINIO */}
       {modalActaCierreOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl border border-[#DCD6C8] max-w-xl w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-white rounded-xl border border-[#8FA7D6] max-w-xl w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-base text-[#1E2A24]">
+              <h3 className="font-bold text-base text-[#18235C]">
                 Acta de Escrutinio y Declaración de Representantes Electos
               </h3>
               <button onClick={() => setModalActaCierreOpen(false)}>
-                <X className="w-5 h-5 text-[#5B6A62]" />
+                <X className="w-5 h-5 text-[#282829]" />
               </button>
             </div>
 
-            <div className="text-xs space-y-3 text-[#5B6A62] leading-relaxed p-4 bg-[#FAF8F5] rounded-lg border">
-              <div className="font-bold text-[#1E2A24] text-center border-b pb-2">
+            <div className="text-xs space-y-3 text-[#282829] leading-relaxed p-4 bg-[#FFFFFF] rounded-lg border">
+              <div className="font-bold text-[#18235C] text-center border-b pb-2">
                 ACTA DE ESCRUTINIO FINAL - {procesoActual.tipo.toUpperCase()} 2026-2028
               </div>
               <p>
@@ -951,7 +951,7 @@ export function VotacionesSstView({
                 <div>• Votos en blanco: <strong>{procesoActual.votosEnBlanco}</strong></div>
               </div>
 
-              <div className="pt-2 font-bold text-[#1E2A24]">
+              <div className="pt-2 font-bold text-[#18235C]">
                 Declaración Oficial de Ganadores:
               </div>
 
@@ -975,14 +975,14 @@ export function VotacionesSstView({
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => window.print()}
-                className="px-3.5 py-1.5 bg-[#2F5D50] text-white rounded text-xs font-semibold flex items-center gap-1"
+                className="px-3.5 py-1.5 bg-[#18235C] text-white rounded text-xs font-semibold flex items-center gap-1"
               >
                 <Printer className="w-3.5 h-3.5" />
                 Imprimir Acta Final
               </button>
               <button
                 onClick={() => setModalActaCierreOpen(false)}
-                className="px-3 py-1.5 border rounded text-xs text-[#5B6A62]"
+                className="px-3 py-1.5 border rounded text-xs text-[#282829]"
               >
                 Cerrar
               </button>

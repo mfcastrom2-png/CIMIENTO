@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   LogAuditoriaUsuario,
   Role,
@@ -15,6 +15,14 @@ import {
   eliminarUsuarioFB,
   enviarNotificacionCorreoNuevoUsuario
 } from '../lib/firebase';
+import {
+  ComprobanteNotificacionModal,
+  ComprobanteNotificacionData
+} from './ComprobanteNotificacionModal';
+import {
+  generarCartaBienvenida,
+  generarAsuntoBienvenida
+} from '../utils/notificacionesCorreo';
 import {
   AlertCircle,
   Check,
@@ -51,6 +59,9 @@ interface UsuariosViewProps {
   onRoleChange?: (newRole: Role) => void;
   empleados?: any[];
   cargos?: any[];
+  isSuperAdmin?: boolean;
+  usuarios?: UsuarioSistema[];
+  onActualizarUsuarios?: (nuevos: UsuarioSistema[]) => void;
 }
 
 export function UsuariosView({
@@ -58,12 +69,21 @@ export function UsuariosView({
   userRole,
   onRoleChange,
   empleados = [],
-  cargos = []
+  cargos = [],
+  isSuperAdmin = false,
+  usuarios: propsUsuarios,
+  onActualizarUsuarios
 }: UsuariosViewProps) {
   const activeUserRole = userRole || currentRole || 'admin';
-  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>(INITIAL_USUARIOS_SISTEMA);
+  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>(propsUsuarios || INITIAL_USUARIOS_SISTEMA);
   const [logs, setLogs] = useState<LogAuditoriaUsuario[]>(INITIAL_LOGS_AUDITORIA);
   const [activeTab, setActiveTab] = useState<'usuarios' | 'rolesMatriz' | 'auditoria'>('usuarios');
+
+  useEffect(() => {
+    if (propsUsuarios && propsUsuarios.length > 0) {
+      setUsuarios(propsUsuarios);
+    }
+  }, [propsUsuarios]);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -92,15 +112,7 @@ export function UsuariosView({
   const [notificacionReenviando, setNotificacionReenviando] = useState<boolean>(false);
 
   // Modal comprobante de notificación por correo
-  const [notificacionModalData, setNotificacionModalData] = useState<{
-    usuario: UsuarioSistema;
-    passwordTemporal: string;
-    canalEnvio: string;
-    asunto: string;
-    cuerpo: string;
-    fechaEnvio: string;
-    status: 'enviado' | 'procesando';
-  } | null>(null);
+  const [notificacionModalData, setNotificacionModalData] = useState<ComprobanteNotificacionData | null>(null);
 
   const [notificacion, setNotificacion] = useState<string | null>(null);
 
@@ -179,12 +191,12 @@ export function UsuariosView({
 
     // 2. Guardar en estado local
     setUsuarios(prev => [nuevo, ...prev]);
+    onActualizarUsuarios?.([nuevo, ...usuarios]);
 
     // 3. Despachar notificación al correo creado
-    let resultadoEnvio: { success: boolean; message: string; method: 'firebase_auth' | 'sistema_corporativo' } = {
+    let resultadoEnvio: { success: boolean; message: string; method?: string; errorDetalle?: string } = {
       success: true,
-      message: '',
-      method: 'sistema_corporativo'
+      message: 'Notificación procesada localmente'
     };
     if (enviarNotificacionEmail) {
       resultadoEnvio = await enviarNotificacionCorreoNuevoUsuario(
@@ -212,39 +224,13 @@ export function UsuariosView({
 
     // 5. Presentar comprobante de notificación al correo
     if (enviarNotificacionEmail) {
-      const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://bgroup-gh.web.app';
-      const cuerpoTexto = `Apreciado(a) ${nuevo.nombre},
-
-Le damos una cordial bienvenida a B GROUP INGENIERIA S.A.S. Se ha configurado y activado exitosamente su cuenta de acceso institucional al Sistema Integral de Gestión Humana y SG-SST.
-
-DATOS Y CREDENCIALES DE ACCESO:
-• Enlace de Ingreso: ${originUrl}
-• Correo Electrónico: ${nuevo.email}
-• Documento de Identidad: ${nuevo.documento}
-• Contraseña Provisoria: ${claveAsignada}
-• Rol Asignado: ${nuevo.rol}
-• Cargo / Función: ${nuevo.cargoNombre}
-
-INSTRUCCIONES DE ACCESO Y SEGURIDAD:
-1. Ingrese a la plataforma e inicie sesión utilizando su correo institucional y su contraseña provisoria.
-2. Al ingresar por primera vez, el sistema le solicitará cambiar su contraseña por una clave personal y segura.
-3. De conformidad con el Artículo 58 del Código Sustantivo del Trabajo (CST) y las políticas de seguridad de la información de B GROUP INGENIERIA S.A.S., las credenciales de acceso son de uso estrictamente confidencial, personal e intransferible.
-
-Si requiere asistencia técnica o presenta inconvenientes al ingresar, comuníquese de inmediato con la Dirección de Gestión Humana.
-
-Atentamente,
-DIRECCIÓN DE GESTIÓN HUMANA
-B GROUP INGENIERIA S.A.S.
-NIT: 900.995.99-2`;
-
       setNotificacionModalData({
         usuario: nuevo,
         passwordTemporal: claveAsignada,
-        canalEnvio: resultadoEnvio.method === 'firebase_auth' ? 'Firebase Cloud Auth' : 'Despacho Institucional SMTP B GROUP',
-        asunto: `Bienvenido a B GROUP INGENIERIA S.A.S. — Activación de Cuenta y Credenciales`,
-        cuerpo: cuerpoTexto,
+        asunto: generarAsuntoBienvenida(nuevo),
+        cuerpo: generarCartaBienvenida(nuevo, claveAsignada),
         fechaEnvio: new Date().toLocaleString('es-CO'),
-        status: 'enviado'
+        resultadoFirebase: resultadoEnvio
       });
     }
 
@@ -324,6 +310,7 @@ NIT: 900.995.99-2`;
     if (usr) {
       const actualizado = { ...usr, password: tempPass };
       setUsuarios(prev => prev.map(u => (u.id === usr.id ? actualizado : u)));
+      onActualizarUsuarios?.(usuarios.map(u => (u.id === usr.id ? actualizado : u)));
       guardarUsuarioFB(actualizado).catch(() => {});
     }
 
@@ -341,42 +328,27 @@ NIT: 900.995.99-2`;
     };
     setLogs(prev => [nuevoLog, ...prev]);
 
-    const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://bgroup-gh.web.app';
-    const cuerpoTexto = `Apreciado(a) ${nombre},
-
-Se ha generado una solicitud de restablecimiento de credenciales de acceso para su cuenta en el Sistema de Gestión Humana de B GROUP INGENIERIA S.A.S.
-
-DATOS Y CREDENCIALES DE ACCESO:
-• Enlace de Acceso: ${originUrl}
-• Usuario / Correo: ${email}
-• Nueva Contraseña Provisoria: ${tempPass}
-
-Por favor ingrese a la plataforma con su contraseña provisoria y realice el cambio respectivo.
-
-Atentamente,
-DIRECCIÓN DE GESTIÓN HUMANA
-B GROUP INGENIERIA S.A.S.`;
+    const usuarioParaModal = usr || {
+      id: 'usr-temp',
+      nombre,
+      email,
+      documento: '—',
+      rol: 'empleado',
+      cargoNombre: 'Colaborador',
+      estado: 'activo',
+      ultimoAcceso: '—',
+      fechaCreacion: new Date().toISOString().split('T')[0],
+      dobleFactorHabilitado: false,
+      permisos: ['dashboard']
+    };
 
     setNotificacionModalData({
-      usuario: usr || {
-        id: 'usr-temp',
-        nombre,
-        email,
-        documento: '—',
-        rol: 'empleado',
-        cargoNombre: 'Colaborador',
-        estado: 'activo',
-        ultimoAcceso: '—',
-        fechaCreacion: new Date().toISOString().split('T')[0],
-        dobleFactorHabilitado: false,
-        permisos: ['dashboard']
-      },
+      usuario: usuarioParaModal,
       passwordTemporal: tempPass,
-      canalEnvio: resultado.method === 'firebase_auth' ? 'Firebase Cloud Auth' : 'Despacho Institucional SMTP B GROUP',
       asunto: `Restablecimiento de Credenciales de Acceso — B GROUP INGENIERIA S.A.S.`,
-      cuerpo: cuerpoTexto,
+      cuerpo: generarCartaBienvenida(usuarioParaModal, tempPass),
       fechaEnvio: new Date().toLocaleString('es-CO'),
-      status: 'enviado'
+      resultadoFirebase: resultado
     });
 
     mostrarNotificacion(`Notificación y credenciales enviadas a ${email}.`);
@@ -545,14 +517,16 @@ B GROUP INGENIERIA S.A.S.`;
           </div>
 
           <div className="flex items-center gap-2 self-start md:self-auto">
-            <button
-              onClick={handleDepurarUsuariosPrueba}
-              className="px-3 py-2 text-xs font-bold bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
-              title="Eliminar todos los usuarios de prueba"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              <span>Depurar Usuarios de Prueba</span>
-            </button>
+            {isSuperAdmin && (
+              <button
+                onClick={handleDepurarUsuariosPrueba}
+                className="px-3 py-2 text-xs font-bold bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
+                title="Eliminar todos los usuarios de prueba (Exclusivo Superadministrador)"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Depurar Usuarios de Prueba</span>
+              </button>
+            )}
             <button
               onClick={() => setModalCrearOpen(true)}
               className="px-4 py-2 text-xs font-bold bg-[#18235C] hover:bg-[#101740] text-white rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
@@ -1431,151 +1405,10 @@ B GROUP INGENIERIA S.A.S.`;
 
       {/* MODAL COMPROBANTE DE NOTIFICACIÓN POR CORREO */}
       {notificacionModalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#18235C]/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-[#FFFFFF] rounded-2xl border border-[#8FA7D6] max-w-xl w-full shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
-            {/* Header del modal */}
-            <div className="bg-[#18235C] px-6 py-4 flex items-center justify-between border-b border-[#101740]">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#00FF00]/20 border border-[#00FF00]/40 text-[#00FF00] flex items-center justify-center font-bold">
-                  <Mail className="w-4 h-4 text-[#00FF00]" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-white">
-                    Notificación Institucional de Cuenta Despachada
-                  </h3>
-                  <p className="text-[11px] text-[#8FA7D6]">
-                    Entrega de credenciales de acceso al correo del colaborador
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setNotificacionModalData(null)}
-                className="p-1 rounded-lg text-[#8FA7D6] hover:text-white hover:bg-white/10 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 text-xs overflow-y-auto flex-1 bg-[#FFFFFF]">
-              {/* Badge de confirmación de envío */}
-              <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-300 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <div className="text-xs font-bold text-emerald-900 flex items-center justify-between">
-                    <span>Notificación Generada Exitosamente</span>
-                    <span className="text-[10px] bg-emerald-200 text-emerald-900 font-bold px-2 py-0.5 rounded-full">
-                      {notificacionModalData.canalEnvio}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-emerald-800 mt-0.5">
-                    Se procesó el envío al correo destinatario:{' '}
-                    <strong className="underline">{notificacionModalData.usuario.email}</strong>
-                  </p>
-                  <p className="text-[10px] text-emerald-700/80 mt-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    Fecha y hora de registro: {notificacionModalData.fechaEnvio}
-                  </p>
-                </div>
-              </div>
-
-              {/* Vista previa del correo formal */}
-              <div className="rounded-xl border border-[#8FA7D6] bg-slate-50 overflow-hidden shadow-2xs">
-                <div className="bg-[#18235C]/5 px-4 py-2.5 border-b border-[#8FA7D6]/40 flex flex-col gap-1 text-[11px]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#282829]/70">De:</span>
-                    <span className="font-semibold text-[#18235C]">
-                      B GROUP INGENIERIA S.A.S. &lt;notificaciones-gh@bgroupingenieria.com&gt;
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#282829]/70">Para:</span>
-                    <span className="font-semibold text-[#18235C]">
-                      {notificacionModalData.usuario.nombre} &lt;{notificacionModalData.usuario.email}&gt;
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#282829]/70">Asunto:</span>
-                    <span className="font-bold text-[#18235C]">{notificacionModalData.asunto}</span>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-white">
-                  <div className="p-3 bg-[#F8FAFC] rounded-lg border border-slate-200 font-mono text-[11px] text-slate-800 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
-                    {notificacionModalData.cuerpo}
-                  </div>
-                </div>
-              </div>
-
-              {/* Resumen de credenciales de acceso */}
-              <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50 rounded-xl border border-blue-200">
-                <div>
-                  <span className="text-[10px] font-bold text-blue-900 uppercase">Usuario / Correo:</span>
-                  <p className="text-xs font-bold text-[#18235C] break-all">{notificacionModalData.usuario.email}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-blue-900 uppercase">Contraseña Provisoria:</span>
-                  <p className="text-xs font-bold font-mono text-[#18235C] bg-white px-2 py-0.5 rounded border border-blue-300 w-fit">
-                    {notificacionModalData.passwordTemporal}
-                  </p>
-                </div>
-              </div>
-
-              {/* Acciones de entrega directa */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-[#8FA7D6]/30">
-                <a
-                  href={`mailto:${encodeURIComponent(notificacionModalData.usuario.email)}?subject=${encodeURIComponent(notificacionModalData.asunto)}&body=${encodeURIComponent(notificacionModalData.cuerpo)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
-                  title="Abrir mensaje en su cliente de correo predeterminado (Outlook, Gmail, etc.)"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Abrir en Cliente de Correo</span>
-                </a>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCopiarCredenciales}
-                    className="px-3 py-2 rounded-lg border border-[#8FA7D6] hover:bg-[#8FA7D6]/15 text-[#18235C] font-bold transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    {copiadoFeedback ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-emerald-700">¡Copiado!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copiar Mensaje</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleReenviarNotificacion}
-                    disabled={notificacionReenviando}
-                    className="px-3 py-2 rounded-lg bg-[#18235C] hover:bg-[#101740] text-white font-bold transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <Send className={`w-3.5 h-3.5 ${notificacionReenviando ? 'animate-spin' : ''}`} />
-                    <span>{notificacionReenviando ? 'Reenviando...' : 'Reenviar'}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-100 px-6 py-3 flex justify-end border-t border-[#8FA7D6]/30">
-              <button
-                type="button"
-                onClick={() => setNotificacionModalData(null)}
-                className="px-5 py-1.5 rounded-lg bg-[#18235C] text-white font-bold hover:bg-[#101740] transition-colors"
-              >
-                Entendido y Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <ComprobanteNotificacionModal
+          data={notificacionModalData}
+          onClose={() => setNotificacionModalData(null)}
+        />
       )}
     </div>
   );

@@ -77,25 +77,25 @@ export const EntregarEppModal: React.FC<EntregarEppModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl border border-[#DCD6C8] max-w-lg w-full overflow-hidden">
+      <div className="bg-white rounded-xl shadow-xl border border-[#8FA7D6] max-w-lg w-full overflow-hidden">
         {/* Header */}
-        <div className="bg-[#FAF8F5] border-b border-[#DCD6C8] px-6 py-4 flex items-center justify-between">
+        <div className="bg-[#FFFFFF] border-b border-[#8FA7D6] px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#2F5D50] text-white flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#18235C] text-white flex items-center justify-center">
               <PackageCheck className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-serif-title font-bold text-sm text-[#1E2A24]">
+              <h3 className="font-bold tracking-tight font-bold text-sm text-[#18235C]">
                 Efectuar Entrega Oficial de EPP
               </h3>
-              <p className="text-[10px] text-[#5B6A62]">
+              <p className="text-[10px] text-[#282829]">
                 Registro conforme a Resolución 2400 de 1979 y Decreto 1072 de 2015
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-[#5B6A62] hover:text-[#1E2A24] rounded-lg hover:bg-white transition-colors"
+            className="p-1.5 text-[#282829] hover:text-[#18235C] rounded-lg hover:bg-white transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -111,33 +111,33 @@ export const EntregarEppModal: React.FC<EntregarEppModalProps> = ({
           )}
 
           {/* Solicitud Summary Banner */}
-          <div className="p-3 bg-[#FAF8F5] rounded-lg border border-[#DCD6C8] space-y-2">
+          <div className="p-3 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6] space-y-2">
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-[#5B6A62] block font-semibold">
+                <span className="text-[10px] uppercase tracking-wider text-[#282829] block font-semibold">
                   Colaborador Beneficiario
                 </span>
-                <span className="font-bold text-[#1E2A24] text-xs">
+                <span className="font-bold text-[#18235C] text-xs">
                   {solicitud.empleadoNombre}
                 </span>
-                <div className="text-[11px] text-[#5B6A62]">{solicitud.cargoNombre}</div>
+                <div className="text-[11px] text-[#282829]">{solicitud.cargoNombre}</div>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-[#5B6A62] block">Fecha de Solicitud</span>
-                <span className="font-bold text-[#1E2A24]">{solicitud.fechaSolicitud}</span>
+                <span className="text-[10px] text-[#282829] block">Fecha de Solicitud</span>
+                <span className="font-bold text-[#18235C]">{solicitud.fechaSolicitud}</span>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-[#DCD6C8] flex justify-between items-center text-[11px]">
+            <div className="pt-2 border-t border-[#8FA7D6] flex justify-between items-center text-[11px]">
               <div>
-                <span className="font-semibold text-[#1E2A24]">[{solicitud.eppCodigo}] {solicitud.eppNombre}</span>
-                <div className="text-[#5B6A62]">
+                <span className="font-semibold text-[#18235C]">[{solicitud.eppCodigo}] {solicitud.eppNombre}</span>
+                <div className="text-[#282829]">
                   Talla: <strong>{solicitud.talla}</strong> • Cantidad: <strong>{solicitud.cantidad}</strong>
                 </div>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-[#5B6A62] block">Stock Almacén</span>
-                <span className="font-bold text-[#2F5D50]">
+                <span className="text-[10px] text-[#282829] block">Stock Almacén</span>
+                <span className="font-bold text-[#18235C]">
                   {itemInventario ? `${itemInventario.stockActual} ${itemInventario.unidad}` : 'Disponible'}
                 </span>
               </div>
@@ -147,18 +147,18 @@ export const EntregarEppModal: React.FC<EntregarEppModalProps> = ({
           {/* Form Fields for Delivery */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-[#1E2A24] mb-1">
+              <label className="block font-semibold text-[#18235C] mb-1">
                 Fecha Efectiva de Entrega *
               </label>
               <input
                 type="date"
                 value={fechaEntrega}
                 onChange={e => setFechaEntrega(e.target.value)}
-                className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs text-[#1E2A24] focus:ring-2 focus:ring-[#2F5D50]"
+                className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs text-[#18235C] focus:ring-2 focus:ring-[#18235C]"
               />
             </div>
             <div>
-              <label className="block font-semibold text-[#1E2A24] mb-1">
+              <label className="block font-semibold text-[#18235C] mb-1">
                 Lote o Serie del Fabricante *
               </label>
               <input
@@ -166,59 +166,59 @@ export const EntregarEppModal: React.FC<EntregarEppModalProps> = ({
                 value={loteOSerie}
                 onChange={e => setLoteOSerie(e.target.value)}
                 placeholder="ej. LT-2026-902 o SN-33821"
-                className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs font-mono text-[#1E2A24] focus:ring-2 focus:ring-[#2F5D50]"
+                className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs font-mono text-[#18235C] focus:ring-2 focus:ring-[#18235C]"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-[#1E2A24] mb-1">
+              <label className="block font-semibold text-[#18235C] mb-1">
                 Responsable de Entrega (SST) *
               </label>
               <input
                 type="text"
                 value={responsableEntrega}
                 onChange={e => setResponsableEntrega(e.target.value)}
-                className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs text-[#1E2A24]"
+                className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs text-[#18235C]"
               />
             </div>
             <div>
-              <label className="block font-semibold text-[#1E2A24] mb-1">
+              <label className="block font-semibold text-[#18235C] mb-1">
                 N° de Acta Oficial Generada
               </label>
               <input
                 type="text"
                 value={actaNumero}
                 onChange={e => setActaNumero(e.target.value)}
-                className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs font-mono text-[#1E2A24]"
+                className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs font-mono text-[#18235C]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block font-semibold text-[#1E2A24] mb-1">
+            <label className="block font-semibold text-[#18235C] mb-1">
               Observaciones de Almacén / Instrucciones Dadas
             </label>
             <textarea
               rows={2}
               value={observacionesEntrega}
               onChange={e => setObservacionesEntrega(e.target.value)}
-              className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs text-[#1E2A24]"
+              className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs text-[#18235C]"
             />
           </div>
 
           {/* Worker Acceptance Confirmation Checkbox */}
-          <div className="p-3 bg-[#E4EDE9]/50 border border-[#2F5D50]/30 rounded-lg">
+          <div className="p-3 bg-[#8FA7D6/20]/50 border border-[#18235C]/30 rounded-lg">
             <label className="flex items-start gap-2.5 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={confirmoFirma}
                 onChange={e => setConfirmoFirma(e.target.checked)}
-                className="w-4 h-4 text-[#2F5D50] rounded border-[#DCD6C8] focus:ring-[#2F5D50] mt-0.5"
+                className="w-4 h-4 text-[#18235C] rounded border-[#8FA7D6] focus:ring-[#18235C] mt-0.5"
               />
-              <div className="text-[11px] text-[#1E2A24]">
-                <strong className="block text-[#2F5D50]">
+              <div className="text-[11px] text-[#18235C]">
+                <strong className="block text-[#18235C]">
                   Confirmación de Entrega y Firma de Conformidad
                 </strong>
                 El colaborador recibió el elemento en perfecto estado, conoció sus especificaciones técnicas y firmó el acta oficial conforme a la Resolución 2400/1979.
@@ -227,17 +227,17 @@ export const EntregarEppModal: React.FC<EntregarEppModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#DCD6C8]">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#8FA7D6]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-white border border-[#DCD6C8] rounded-lg text-xs font-semibold text-[#5B6A62] hover:bg-[#FAF8F5]"
+              className="px-4 py-2 bg-white border border-[#8FA7D6] rounded-lg text-xs font-semibold text-[#282829] hover:bg-[#FFFFFF]"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-[#2F5D50] hover:bg-[#223F37] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs"
+              className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs"
             >
               <FileCheck className="w-4 h-4" />
               <span>Registrar Entrega Oficial y Descontar Stock</span>

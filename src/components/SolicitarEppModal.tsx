@@ -74,25 +74,25 @@ export const SolicitarEppModal: React.FC<SolicitarEppModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl border border-[#DCD6C8] max-w-lg w-full overflow-hidden">
+      <div className="bg-white rounded-xl shadow-xl border border-[#8FA7D6] max-w-lg w-full overflow-hidden">
         {/* Header */}
-        <div className="bg-[#FAF8F5] border-b border-[#DCD6C8] px-6 py-4 flex items-center justify-between">
+        <div className="bg-[#FFFFFF] border-b border-[#8FA7D6] px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#2F5D50] text-white flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#18235C] text-white flex items-center justify-center">
               <HardHat className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-serif-title font-bold text-sm text-[#1E2A24]">
+              <h3 className="font-bold tracking-tight font-bold text-sm text-[#18235C]">
                 Solicitar Elemento de Protección Personal (EPP)
               </h3>
-              <p className="text-[10px] text-[#5B6A62]">
+              <p className="text-[10px] text-[#282829]">
                 Colaborador: {empleado.nombre} • C.C. {empleado.documento}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-[#5B6A62] hover:text-[#1E2A24] rounded-lg hover:bg-white transition-colors"
+            className="p-1.5 text-[#282829] hover:text-[#18235C] rounded-lg hover:bg-white transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -109,13 +109,13 @@ export const SolicitarEppModal: React.FC<SolicitarEppModalProps> = ({
 
           {/* Select EPP */}
           <div>
-            <label className="block font-semibold text-[#1E2A24] mb-1">
+            <label className="block font-semibold text-[#18235C] mb-1">
               Elemento Requerido (Catálogo de Inventario SST) *
             </label>
             <select
               value={selectedEppId}
               onChange={e => handleEppChange(e.target.value)}
-              className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs text-[#1E2A24] focus:outline-none focus:ring-2 focus:ring-[#2F5D50]"
+              className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs text-[#18235C] focus:outline-none focus:ring-2 focus:ring-[#18235C]"
             >
               {inventarioEpp.map(item => (
                 <option key={item.id} value={item.id}>
@@ -127,20 +127,20 @@ export const SolicitarEppModal: React.FC<SolicitarEppModalProps> = ({
 
           {/* Selected EPP Card Info */}
           {selectedEpp && (
-            <div className="p-3 bg-[#FAF8F5] rounded-lg border border-[#DCD6C8] space-y-1.5 text-[11px]">
+            <div className="p-3 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6] space-y-1.5 text-[11px]">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[#2F5D50]">{selectedEpp.categoria}</span>
+                <span className="font-semibold text-[#18235C]">{selectedEpp.categoria}</span>
                 <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
                   selectedEpp.stockActual > selectedEpp.stockMinimo
-                    ? 'bg-[#E4EDE9] text-[#2F5D50]'
+                    ? 'bg-[#8FA7D6/20] text-[#18235C]'
                     : 'bg-[#F5EAD4] text-[#B5842A]'
                 }`}>
                   Disponibles en Almacén: {selectedEpp.stockActual} {selectedEpp.unidad}
                 </span>
               </div>
-              <p className="text-[#5B6A62]">{selectedEpp.descripcion}</p>
+              <p className="text-[#282829]">{selectedEpp.descripcion}</p>
               <div className="text-[10px] text-[#8DA096]">
-                Normativa técnica: <span className="font-mono text-[#1E2A24]">{selectedEpp.normaTecnica}</span>
+                Normativa técnica: <span className="font-mono text-[#18235C]">{selectedEpp.normaTecnica}</span>
               </div>
             </div>
           )}
@@ -148,14 +148,14 @@ export const SolicitarEppModal: React.FC<SolicitarEppModalProps> = ({
           {/* Talla y Cantidad */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-[#1E2A24] mb-1">
+              <label className="block font-semibold text-[#18235C] mb-1">
                 Talla o Especificación *
               </label>
               {selectedEpp && selectedEpp.tallasDisponibles && selectedEpp.tallasDisponibles.length > 1 ? (
                 <select
                   value={talla || selectedEpp.tallasDisponibles[0]}
                   onChange={e => setTalla(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs text-[#1E2A24] focus:outline-none focus:ring-2 focus:ring-[#2F5D50]"
+                  className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs text-[#18235C] focus:outline-none focus:ring-2 focus:ring-[#18235C]"
                 >
                   {selectedEpp.tallasDisponibles.map(t => (
                     <option key={t} value={t}>
@@ -168,13 +168,13 @@ export const SolicitarEppModal: React.FC<SolicitarEppModalProps> = ({
                   type="text"
                   value={talla || selectedEpp?.tallasDisponibles?.[0] || 'Ajustable'}
                   onChange={e => setTalla(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs text-[#1E2A24]"
+                  className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs text-[#18235C]"
                 />
               )}
             </div>
 
             <div>
-              <label className="block font-semibold text-[#1E2A24] mb-1">
+              <label className="block font-semibold text-[#18235C] mb-1">
                 Cantidad Solicitada *
               </label>
               <input
@@ -183,20 +183,20 @@ export const SolicitarEppModal: React.FC<SolicitarEppModalProps> = ({
                 max="5"
                 value={cantidad}
                 onChange={e => setCantidad(parseInt(e.target.value) || 1)}
-                className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs text-[#1E2A24] focus:outline-none focus:ring-2 focus:ring-[#2F5D50]"
+                className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs text-[#18235C] focus:outline-none focus:ring-2 focus:ring-[#18235C]"
               />
             </div>
           </div>
 
           {/* Motivo de la Solicitud */}
           <div>
-            <label className="block font-semibold text-[#1E2A24] mb-1">
+            <label className="block font-semibold text-[#18235C] mb-1">
               Motivo de la Solicitud *
             </label>
             <select
               value={motivo}
               onChange={e => setMotivo(e.target.value as any)}
-              className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs text-[#1E2A24] focus:outline-none focus:ring-2 focus:ring-[#2F5D50]"
+              className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs text-[#18235C] focus:outline-none focus:ring-2 focus:ring-[#18235C]"
             >
               <option value="Dotación Periódica Obligatoria">Dotación Periódica Obligatoria (CST Art. 230)</option>
               <option value="Desgaste Normal / Fin Vida Útil">Desgaste Normal / Fin de Vida Útil Recomendada</option>
@@ -208,7 +208,7 @@ export const SolicitarEppModal: React.FC<SolicitarEppModalProps> = ({
 
           {/* Observaciones */}
           <div>
-            <label className="block font-semibold text-[#1E2A24] mb-1">
+            <label className="block font-semibold text-[#18235C] mb-1">
               Observaciones o Justificación Detallada
             </label>
             <textarea
@@ -216,30 +216,30 @@ export const SolicitarEppModal: React.FC<SolicitarEppModalProps> = ({
               value={observaciones}
               onChange={e => setObservaciones(e.target.value)}
               placeholder="Describa el estado actual del equipo anterior o la necesidad específica de campo..."
-              className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD6C8] rounded-lg text-xs text-[#1E2A24] focus:outline-none focus:ring-2 focus:ring-[#2F5D50]"
+              className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg text-xs text-[#18235C] focus:outline-none focus:ring-2 focus:ring-[#18235C]"
             />
           </div>
 
           {/* Compliance Notice */}
-          <div className="flex items-start gap-2 p-2.5 bg-[#FAF8F5] rounded-lg border border-[#DCD6C8] text-[11px] text-[#5B6A62]">
-            <Info className="w-3.5 h-3.5 text-[#2F5D50] shrink-0 mt-0.5" />
+          <div className="flex items-start gap-2 p-2.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6] text-[11px] text-[#282829]">
+            <Info className="w-3.5 h-3.5 text-[#18235C] shrink-0 mt-0.5" />
             <span>
               Su solicitud será radicada en el módulo de SG-SST para alistamiento en almacén y citación para entrega oficial.
             </span>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#DCD6C8]">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#8FA7D6]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-white border border-[#DCD6C8] rounded-lg text-xs font-semibold text-[#5B6A62] hover:bg-[#FAF8F5]"
+              className="px-4 py-2 bg-white border border-[#8FA7D6] rounded-lg text-xs font-semibold text-[#282829] hover:bg-[#FFFFFF]"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-[#2F5D50] hover:bg-[#223F37] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs"
+              className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Radicar Solicitud de EPP</span>

@@ -49,7 +49,14 @@ export const PARAMETROS_COLOMBIA_2026: ParametrosLegalesNomina = {
   pctInteresesCesantias: 0.01, // 1% mensual sobre cesantías (12% anual)
   pctPrimaServicios: 0.0833, // 8.33% (1 mes por año: 1er semestre en junio y 2do semestre en diciembre)
   pctVacaciones: 0.0417, // 4.17% (15 días hábiles remunerados por año = 15/360)
-  horasMensualesJornada: 210 // Ley 2101/2021: 42 horas semanales vigentes en 2026
+  horasSemanalesJornada: 42, // Ley 2101/2021: 42 horas semanales vigentes
+  horasMensualesJornada: 210, // Ley 2101/2021: 42 horas semanales vigentes en 2026
+  factorRecargoNocturno: 0.35, // 35% recargo nocturno
+  factorExtraDiurna: 1.25, // 25% recargo (factor 1.25)
+  factorExtraNocturna: 1.75, // 75% recargo (factor 1.75)
+  factorDominicalFestivoDiurno: 1.75, // 75% recargo (factor 1.75)
+  factorDominicalFestivoNocturno: 2.10, // 110% recargo (factor 2.10)
+  exoneradoParafiscalesLey1607: true
 };
 
 export const MESES_COLOMBIA = [
@@ -123,17 +130,18 @@ export function calcularLiquidacionEmpleado(
   const horasMensuales = parametros.horasMensualesJornada || 210;
   const valorHoraOrdinaria = salarioBasicoPactado / horasMensuales;
 
-  // Horas extras y recargos según Código Sustantivo del Trabajo (CST):
-  // Hora extra diurna: 25% recargo (factor 1.25)
-  // Hora extra nocturna: 75% recargo (factor 1.75)
-  // Hora festiva/dominical diurna: 75% recargo (factor 1.75)
-  // Hora festiva nocturna: 110% recargo (factor 2.10)
-  // Recargo nocturno ordinario: 35% de la hora ordinaria (factor 0.35)
-  const valorHED = Math.round(valorHoraOrdinaria * 1.25 * (novedades.horasExtrasDiurnas || 0));
-  const valorHEN = Math.round(valorHoraOrdinaria * 1.75 * (novedades.horasExtrasNocturnas || 0));
-  const valorHFD = Math.round(valorHoraOrdinaria * 1.75 * (novedades.horasFestivasDiurnas || 0));
-  const valorHFN = Math.round(valorHoraOrdinaria * 2.10 * (novedades.horasFestivasNocturnas || 0));
-  const valorRecargoNocturno = Math.round(valorHoraOrdinaria * 0.35 * (novedades.recargoNocturnoOrdinario || 0));
+  // Horas extras y recargos según Código Sustantivo del Trabajo (CST) parametrizables:
+  const factorHED = parametros.factorExtraDiurna ?? 1.25;
+  const factorHEN = parametros.factorExtraNocturna ?? 1.75;
+  const factorHFD = parametros.factorDominicalFestivoDiurno ?? 1.75;
+  const factorHFN = parametros.factorDominicalFestivoNocturno ?? 2.10;
+  const factorRN = parametros.factorRecargoNocturno ?? 0.35;
+
+  const valorHED = Math.round(valorHoraOrdinaria * factorHED * (novedades.horasExtrasDiurnas || 0));
+  const valorHEN = Math.round(valorHoraOrdinaria * factorHEN * (novedades.horasExtrasNocturnas || 0));
+  const valorHFD = Math.round(valorHoraOrdinaria * factorHFD * (novedades.horasFestivasDiurnas || 0));
+  const valorHFN = Math.round(valorHoraOrdinaria * factorHFN * (novedades.horasFestivasNocturnas || 0));
+  const valorRecargoNocturno = Math.round(valorHoraOrdinaria * factorRN * (novedades.recargoNocturnoOrdinario || 0));
 
   const valorHorasExtrasYRecargos = valorHED + valorHEN + valorHFD + valorHFN + valorRecargoNocturno;
   const bonificacionesYComisiones = (novedades.bonificacionesSalariales || 0) + (novedades.comisiones || 0);

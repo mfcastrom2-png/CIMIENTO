@@ -7,83 +7,144 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isSuperAdminEmail() {
+      return isAuthenticated() && request.auth.token.email in [
+        'mf.castrom2@gmail.com'
+      ];
+    }
+
     function getUserData() {
       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
       return isAuthenticated() && (
-        getUserData().rol == 'admin_gh' || 
-        getUserData().rol == 'superadmin' || 
-        request.auth.token.email == 'mf.castrom2@gmail.com' ||
-        request.auth.token.email.matches('.*@empresa\\.com')
+        isSuperAdminEmail() ||
+        (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+         getUserData().rol in ['superadmin', 'admin_gh', 'admin'])
       );
     }
 
-    // Colección de Usuarios del Sistema
+    function isSSTorAdmin() {
+      return isAuthenticated() && (
+        isSuperAdminEmail() ||
+        (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+         getUserData().rol in ['superadmin', 'admin_gh', 'admin', 'responsable_sst'])
+      );
+    }
+
+    // 0. Conectividad y salud del servicio (SKILL.md)
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // 1. Configuración general de la empresa
+    match /configuracion_empresa/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // 1.1 Configuración legal y parámetros de nómina
+    match /configuracion_nomina/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // 2. Colección de Usuarios del Sistema (Cuentas y Roles)
     match /usuarios/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow update: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow delete: if isAdmin();
+    }
+
+    // 3. Colección de Empleados
+    match /empleados/{empleadoId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isSSTorAdmin();
+    }
+
+    // 4. Colección de Cargos, Áreas y Procesos Organizacionales
+    match /cargos/{cargoId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /areas/{areaId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /procesos/{procesoId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // 5. Colección de Inventario EPP
+    match /inventario_epp/{eppId} {
+      allow read: if isAuthenticated();
+      allow write: if isSSTorAdmin();
+    }
+
+    // 6. Colección de Solicitudes y Entregas de EPP
+    match /solicitudes_epp/{solicitudId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // 7. Colección de Solicitudes (Vacaciones, Permisos, Incapacidades)
+    match /solicitudes/{solicitudId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 
-    // Colección de Empleados
-    match /empleados/{empleadoId} {
+    // 7.1 Control de Vacaciones
+    match /vacaciones/{vacacionId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
-    // Colección de Cargos y Estructura
-    match /cargos/{cargoId} {
+    // 7.2 Procesos de Votación SST
+    match /votaciones_sst/{votacionId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow write: if isSSTorAdmin();
     }
 
-    match /areas/{areaId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Colección de Inventario EPP
-    match /inventario_epp/{eppId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Colección de Solicitudes y Entregas de EPP
-    match /solicitudes_epp/{solicitudId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Colección de Solicitudes (Vacaciones, Permisos, Incapacidades)
-    match /solicitudes/{solicitudId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
-    // Colección de Evaluaciones de Desempeño
+    // 8. Colección de Evaluaciones de Desempeño
     match /evaluaciones/{evaluacionId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow write: if isSSTorAdmin();
     }
 
-    // Colección de Nómina y Pagos
+    // 9. Colección de Nómina y Pagos (DATOS SENSIBLES CST)
     match /nominas/{nominaId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAdmin() || (isAuthenticated() && (
+        resource.data.empleadoEmail == request.auth.token.email ||
+        resource.data.email == request.auth.token.email
+      ));
+      allow write: if isAdmin();
     }
 
-    // Configuración general de la empresa
-    match /configuracion_empresa/{docId} {
+    // 10. Colección de Capacitaciones y Exámenes
+    match /capacitaciones/{capId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow write: if isSSTorAdmin();
     }
 
-    // Permitir operaciones de inicialización y primeros registros
+    // 11. Logs de Auditoría Inmutables
+    match /logs_auditoria/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Inmutabilidad legal estricta
+    }
+
+    // Default deny catch-all para cualquier otra colección no explícita
     match /{document=**} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if false;
     }
   }
 }
+
