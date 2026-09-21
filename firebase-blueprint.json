@@ -64,6 +64,21 @@
         "rol": { "type": "string", "description": "superadmin, admin_gh, responsable_sst, empleado" },
         "estado": { "type": "string", "description": "activo o inactivo" }
       }
+    },
+    "AuditoriaSistema": {
+      "collection": "auditoria_sistema",
+      "fields": {
+        "id": { "type": "string", "description": "ID único del evento de auditoría" },
+        "timestamp": { "type": "string", "description": "Marca de tiempo ISO del evento" },
+        "accion": { "type": "string", "description": "CREACION, ACTUALIZACION, ELIMINACION, EXPORTACION, CIERRE_PERIODO" },
+        "entidad": { "type": "string", "description": "empleados, cargos, nominas, usuarios, epp, etc." },
+        "entidadId": { "type": "string", "description": "Identificador del registro afectado" },
+        "detalle": { "type": "string", "description": "Descripción humana detallada del cambio" },
+        "datosAnteriores": { "type": "object", "description": "Snapshot opcional previo al cambio" },
+        "datosNuevos": { "type": "object", "description": "Snapshot opcional con los nuevos valores" },
+        "usuario": { "type": "object", "description": "Detalles del usuario que ejecutó la acción: uid, email, nombre, rol" },
+        "empresaId": { "type": "string", "description": "Identificador de la empresa para segregación multi-tenant" }
+      }
     }
   }
 }

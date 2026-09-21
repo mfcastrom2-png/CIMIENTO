@@ -53,12 +53,18 @@ import {
   User,
   Users,
   Palmtree,
-  X
+  Database,
+  X,
+  Search,
+  ChevronDown
 } from 'lucide-react';
+import { guardarPeriodoNominaLoteFB } from '../lib/firebase';
 import { GestionNovedadesView } from './GestionNovedadesView';
 import { ControlVacacionesView } from './ControlVacacionesView';
 import { ReservasProvisionesView } from './ReservasProvisionesView';
 import { ParametrosNominaView } from './ParametrosNominaView';
+import { NominaAperturaPeriodoModal } from './NominaAperturaPeriodoModal';
+import { SimuladorLiquidacionContratoView } from './SimuladorLiquidacionContratoView';
 
 interface NominaViewProps {
   empleados: Empleado[];
@@ -205,18 +211,9 @@ export function NominaView({
   // Empleado seleccionado para ver desprendible
   const [empleadoDesprendibleId, setEmpleadoDesprendibleId] = useState<string>(empleados[0]?.id || 'e1');
 
-  // Estado para el simulador de liquidación definitiva
-  const [simulacionParams, setSimulacionParams] = useState<{
-    empleadoId: string;
-    motivo: 'Renuncia voluntaria' | 'Despido con justa causa' | 'Despido sin justa causa' | 'Terminación contrato término fijo' | 'Mutuo acuerdo';
-    fechaRetiro: string;
-    diasVacacionesPendientes: number;
-  }>({
-    empleadoId: empleados[3]?.id || 'e4',
-    motivo: 'Despido sin justa causa',
-    fechaRetiro: new Date().toISOString().slice(0, 10),
-    diasVacacionesPendientes: 12
-  });
+  // Paginación y búsqueda para planilla de nómina (lotes de 25 colaboradores)
+  const [filtroLiquidaciones, setFiltroLiquidaciones] = useState('');
+  const [limiteLiquidaciones, setLimiteLiquidaciones] = useState(25);
 
   // Handler para crear/aperturar un nuevo período
   const handleAperturarPeriodo = (e?: React.FormEvent) => {
@@ -271,18 +268,6 @@ export function NominaView({
     setModalAperturaPeriodoAbierto(false);
   };
 
-  // Handler para cambiar de estado el período actual (Borrador -> Liquidada -> Pagada)
-  const handleCambiarEstadoPeriodo = (nuevoEstado: 'Borrador' | 'Liquidada' | 'Pagada') => {
-    setPeriodos(prev =>
-      prev.map(p => {
-        if (p.codigoPeriodo === selectedPeriodoCodigo) {
-          return { ...p, estado: nuevoEstado };
-        }
-        return p;
-      })
-    );
-  };
-
   // Navegar al mes anterior o siguiente
   const handleNavegarPeriodo = (direccion: 'anterior' | 'siguiente') => {
     const indexActual = periodos.findIndex(p => p.codigoPeriodo === selectedPeriodoCodigo);
@@ -294,6 +279,9 @@ export function NominaView({
       setSelectedPeriodoCodigo(periodos[indexActual + 1].codigoPeriodo);
     }
   };
+
+  const [sincronizandoLote, setSincronizandoLote] = useState(false);
+  const [mensajeSincronizacion, setMensajeSincronizacion] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
 
   // 1. Liquidaciones automáticas calculadas de todos los empleados
   const liquidaciones = useMemo(() => {
@@ -319,6 +307,53 @@ export function NominaView({
       return calcularLiquidacionEmpleado(emp, cargoNombre, cargoCodigo, novedades, parametrosLegales);
     });
   }, [empleados, cargos, novedadesMap, parametrosLegales]);
+
+  // Persistencia atómica de nómina mediante writeBatch en Firestore
+  const ejecutarGuardadoNominaLoteAtómico = async (estadoPeriodo?: 'Borrador' | 'Liquidada' | 'Pagada') => {
+    if (!periodoActivo) return;
+    setSincronizandoLote(true);
+    setMensajeSincronizacion(null);
+    try {
+      const periodoFinal: PeriodoNomina = {
+        ...periodoActivo,
+        estado: estadoPeriodo || periodoActivo.estado,
+        liquidaciones
+      };
+      const res = await guardarPeriodoNominaLoteFB(periodoFinal, liquidaciones);
+      if (res.success) {
+        setMensajeSincronizacion({
+          tipo: 'success',
+          texto: `Lote atómico consolidado (writeBatch): ${res.guardadosCount} colillas individuales y período ${periodoActivo.codigoPeriodo} sellados en Firestore sin inconsistencias.`
+        });
+        setTimeout(() => setMensajeSincronizacion(null), 6000);
+      } else {
+        setMensajeSincronizacion({
+          tipo: 'error',
+          texto: res.error || 'Error al persistir lote atómico en Firestore.'
+        });
+      }
+    } catch (err: any) {
+      setMensajeSincronizacion({
+        tipo: 'error',
+        texto: err?.message || 'Error de conexión al persistir nómina.'
+      });
+    } finally {
+      setSincronizandoLote(false);
+    }
+  };
+
+  // Handler para cambiar de estado el período actual (Borrador -> Liquidada -> Pagada) con commit atómico
+  const handleCambiarEstadoPeriodo = async (nuevoEstado: 'Borrador' | 'Liquidada' | 'Pagada') => {
+    setPeriodos(prev =>
+      prev.map(p => {
+        if (p.codigoPeriodo === selectedPeriodoCodigo) {
+          return { ...p, estado: nuevoEstado };
+        }
+        return p;
+      })
+    );
+    await ejecutarGuardadoNominaLoteAtómico(nuevoEstado);
+  };
 
   // VISTA ESPECIALIZADA PARA EL ROL EMPLEADO: Consulta y descarga exclusiva de su propio desprendible
   if (userRole === 'empleado') {
@@ -640,17 +675,20 @@ export function NominaView({
   // Liquidación del empleado seleccionado para desprendible
   const liquidacionDesprendible = liquidaciones.find(l => l.empleadoId === empleadoDesprendibleId) || liquidaciones[0];
 
-  // Cálculo de liquidación definitiva para el simulador
-  const simulacionLiquidacion = useMemo(() => {
-    const emp = empleados.find(e => e.id === simulacionParams.empleadoId);
-    if (!emp) return null;
-    return simularLiquidacionDefinitiva(
-      emp,
-      simulacionParams.motivo,
-      simulacionParams.fechaRetiro,
-      simulacionParams.diasVacacionesPendientes
+  // Filtrado y paginación para la planilla de liquidaciones (bloques de 25)
+  const liquidacionesFiltradas = useMemo(() => {
+    if (!filtroLiquidaciones.trim()) return liquidaciones;
+    const term = filtroLiquidaciones.toLowerCase();
+    return liquidaciones.filter(l =>
+      l.empleadoNombre.toLowerCase().includes(term) ||
+      (l.empleadoDocumento && l.empleadoDocumento.toLowerCase().includes(term)) ||
+      (l.cargoNombre && l.cargoNombre.toLowerCase().includes(term))
     );
-  }, [empleados, simulacionParams]);
+  }, [liquidaciones, filtroLiquidaciones]);
+
+  const liquidacionesPaginadas = useMemo(() => {
+    return liquidacionesFiltradas.slice(0, limiteLiquidaciones);
+  }, [liquidacionesFiltradas, limiteLiquidaciones]);
 
   // Handler para actualizar novedades de un empleado en el período activo
   const handleUpdateNovedad = (empleadoId: string, campo: keyof NovedadNominaEmpleado, valor: any) => {
@@ -802,6 +840,16 @@ export function NominaView({
           </div>
 
           <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+            <button
+              onClick={() => ejecutarGuardadoNominaLoteAtómico()}
+              disabled={sincronizandoLote}
+              className="px-3 py-1.5 text-xs font-bold bg-[#18235C] hover:bg-[#101740] text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+              title="Guardar de forma 100% atómica el período y todas las colillas en Firestore (writeBatch)"
+            >
+              <Database className="w-3.5 h-3.5 text-[#8FA7D6]" />
+              {sincronizandoLote ? 'Guardando Lote Atómico…' : 'Guardar Lote en Nube'}
+            </button>
+
             {periodoActivo.estado === 'Borrador' && (
               <button
                 onClick={() => handleCambiarEstadoPeriodo('Liquidada')}
@@ -832,6 +880,24 @@ export function NominaView({
             )}
           </div>
         </div>
+
+        {/* Notificación de resultado de transacción atómica writeBatch */}
+        {mensajeSincronizacion && (
+          <div
+            className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 border shadow-xs ${
+              mensajeSincronizacion.tipo === 'success'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                : 'bg-rose-50 text-rose-800 border-rose-300'
+            }`}
+          >
+            {mensajeSincronizacion.tipo === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{mensajeSincronizacion.texto}</span>
+          </div>
+        )}
 
         {/* Métricas consolidadas en tarjetas limpias */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mt-5 pt-4 border-t border-[#8FA7D6]">
@@ -983,21 +1049,51 @@ export function NominaView({
       {activeTab === 'periodo' && (
         <div className="space-y-4">
           <div className="bg-[#FFFFFF] rounded-2xl border border-[#8FA7D6] overflow-hidden shadow-sm">
-            <div className="p-4 bg-[#FFFFFF] border-b border-[#8FA7D6] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="p-4 bg-[#FFFFFF] border-b border-[#8FA7D6] flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-sm text-[#18235C] flex items-center gap-2">
                   Planilla de Liquidación — {periodoActivo.nombre} ({periodoActivo.tipo})
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#8FA7D6]/20 text-[#18235C] border border-[#8FA7D6]">
                     Mes comercial (30 días)
                   </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#18235C] text-white">
+                    Mostrando {liquidacionesPaginadas.length} de {liquidacionesFiltradas.length}
+                  </span>
                 </h3>
                 <p className="text-xs text-[#282829] mt-0.5">
-                  Haga clic en <strong>"Gestionar Novedades"</strong> en cualquier fila para registrar horas extras, recargos o préstamos.
+                  Haga clic en <strong>"Novedades"</strong> en cualquier fila para registrar horas extras, recargos o préstamos.
                 </p>
               </div>
 
-              <div className="text-xs text-[#282829]">
-                SMMLV 2026: <strong className="text-[#18235C]">{formatMonedaCOP(parametrosLegales.smmlv)}</strong> | Aux. Transporte: <strong className="text-[#18235C]">{formatMonedaCOP(parametrosLegales.auxilioTransporte)}</strong>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="relative w-full sm:w-60">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#282829]/50" />
+                  <input
+                    type="text"
+                    value={filtroLiquidaciones}
+                    onChange={e => {
+                      setFiltroLiquidaciones(e.target.value);
+                      setLimiteLiquidaciones(25);
+                    }}
+                    placeholder="Filtrar por nombre, CC o cargo..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-[#F8FAFC] border border-[#8FA7D6] rounded text-xs text-[#282829] focus:outline-hidden focus:ring-2 focus:ring-[#18235C]"
+                  />
+                </div>
+                {filtroLiquidaciones && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFiltroLiquidaciones('');
+                      setLimiteLiquidaciones(25);
+                    }}
+                    className="text-xs text-[#18235C] hover:underline font-semibold cursor-pointer"
+                  >
+                    Limpiar
+                  </button>
+                )}
+                <div className="text-xs text-[#282829] whitespace-nowrap">
+                  SMMLV 2026: <strong className="text-[#18235C]">{formatMonedaCOP(parametrosLegales.smmlv)}</strong>
+                </div>
               </div>
             </div>
 
@@ -1019,7 +1115,7 @@ export function NominaView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#8FA7D6]/30">
-                  {liquidaciones.map(liq => (
+                  {liquidacionesPaginadas.map(liq => (
                     <tr key={liq.empleadoId} className="hover:bg-[#8FA7D6]/10 transition-colors">
                       <td className="py-3 px-3">
                         <div className="font-bold text-[#18235C]">{liq.empleadoNombre}</div>
@@ -1093,7 +1189,7 @@ export function NominaView({
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setEmpleadoEditandoNovedad(liq.empleadoId)}
-                            className="px-2.5 py-1 bg-white hover:bg-[#8FA7D6]/10 text-[#18235C] border border-[#8FA7D6] rounded-lg text-[11px] font-bold transition-colors shadow-2xs"
+                            className="px-2.5 py-1 bg-white hover:bg-[#8FA7D6]/10 text-[#18235C] border border-[#8FA7D6] rounded-lg text-[11px] font-bold transition-colors shadow-2xs cursor-pointer"
                             title="Editar novedades"
                           >
                             Novedades
@@ -1103,7 +1199,7 @@ export function NominaView({
                               setEmpleadoDesprendibleId(liq.empleadoId);
                               setActiveTab('desprendible');
                             }}
-                            className="px-2.5 py-1 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-[11px] font-bold transition-colors shadow-2xs"
+                            className="px-2.5 py-1 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-[11px] font-bold transition-colors shadow-2xs cursor-pointer"
                             title="Ver desprendible de pago"
                           >
                             Colilla
@@ -1112,6 +1208,13 @@ export function NominaView({
                       </td>
                     </tr>
                   ))}
+                  {liquidacionesFiltradas.length === 0 && liquidaciones.length > 0 && (
+                    <tr>
+                      <td colSpan={11} className="py-8 px-4 text-center text-[#282829]/70">
+                        No se encontraron colaboradores en la planilla de nómina que coincidan con <strong>"{filtroLiquidaciones}"</strong>.
+                      </td>
+                    </tr>
+                  )}
                   {liquidaciones.length === 0 && (
                     <tr>
                       <td colSpan={11} className="py-8 px-4 text-center text-[#282829]/70">
@@ -1145,6 +1248,44 @@ export function NominaView({
                 </tfoot>
               </table>
             </div>
+
+            {/* Paginación de Planilla de Nómina */}
+            {liquidacionesFiltradas.length > 25 && (
+              <div className="p-3.5 bg-[#F8FAFC] border-t border-[#8FA7D6] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <span className="text-[#282829]/80 font-medium">
+                  Mostrando {liquidacionesPaginadas.length} de {liquidacionesFiltradas.length} colaboradores en nómina
+                </span>
+                <div className="flex items-center gap-2">
+                  {limiteLiquidaciones < liquidacionesFiltradas.length && (
+                    <button
+                      type="button"
+                      onClick={() => setLimiteLiquidaciones(prev => prev + 25)}
+                      className="px-3 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white rounded text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                      Cargar más (+25 colaboradores)
+                    </button>
+                  )}
+                  {limiteLiquidaciones < liquidacionesFiltradas.length ? (
+                    <button
+                      type="button"
+                      onClick={() => setLimiteLiquidaciones(liquidacionesFiltradas.length)}
+                      className="px-2.5 py-1.5 bg-white hover:bg-[#8FA7D6]/20 border border-[#8FA7D6] text-[#18235C] rounded text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Cargar todos ({liquidacionesFiltradas.length})
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setLimiteLiquidaciones(25)}
+                      className="px-2.5 py-1.5 bg-white hover:bg-[#8FA7D6]/20 border border-[#8FA7D6] text-[#18235C] rounded text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Restablecer a 25
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Modal / Panel de Novedades de Empleado */}
@@ -1621,139 +1762,9 @@ export function NominaView({
         </div>
       )}
 
-      {/* TAB 3: Simulador de Liquidación Definitiva de Contrato (Art 64 CST) */}
+      {/* TAB 3: Simulador de Liquidación Definitiva de Contrato (Art 64 CST - Componente Desacoplado) */}
       {activeTab === 'liquidacion' && (
-        <div className="space-y-6">
-          <div className="bg-[#FFFFFF] rounded-2xl border border-[#8FA7D6] p-6 shadow-sm">
-            <h3 className="text-base font-black text-[#18235C] flex items-center gap-2 mb-1">
-              <Scale className="w-5 h-5 text-[#18235C]" />
-              Simulador de Liquidación Definitiva de Contrato Laboral
-            </h3>
-            <p className="text-xs text-[#282829] mb-5">
-              Cálculo formal de prestaciones sociales pendientes e indemnización por despido injustificado con base en el <strong>Artículo 64 del Código Sustantivo del Trabajo (CST)</strong>.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-[#8FA7D6]/10 rounded-xl border border-[#8FA7D6] text-xs">
-              <div>
-                <label className="block font-bold text-[#18235C] mb-1">Colaborador:</label>
-                <select
-                  value={simulacionParams.empleadoId}
-                  onChange={e => setSimulacionParams(p => ({ ...p, empleadoId: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white rounded-xl border border-[#8FA7D6] text-[#282829] font-medium focus:outline-none focus:ring-2 focus:ring-[#18235C]"
-                >
-                  {empleados.map(e => (
-                    <option key={e.id} value={e.id}>
-                      {e.nombre} ({e.contrato.tipo})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#18235C] mb-1">Motivo de Retiro:</label>
-                <select
-                  value={simulacionParams.motivo}
-                  onChange={e => setSimulacionParams(p => ({ ...p, motivo: e.target.value as any }))}
-                  className="w-full px-3 py-2 bg-white rounded-xl border border-[#8FA7D6] text-[#282829] font-medium focus:outline-none focus:ring-2 focus:ring-[#18235C]"
-                >
-                  <option value="Renuncia voluntaria">Renuncia voluntaria</option>
-                  <option value="Despido sin justa causa">Despido sin justa causa (con indemnización Art. 64)</option>
-                  <option value="Despido con justa causa">Despido con justa causa (sin indemnización)</option>
-                  <option value="Terminación contrato término fijo">Vencimiento término fijo pactado</option>
-                  <option value="Mutuo acuerdo">Mutuo acuerdo transaccional</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#18235C] mb-1">Fecha Efectiva de Retiro:</label>
-                <input
-                  type="date"
-                  value={simulacionParams.fechaRetiro}
-                  onChange={e => setSimulacionParams(p => ({ ...p, fechaRetiro: e.target.value }))}
-                  className="w-full px-3 py-2 bg-white rounded-xl border border-[#8FA7D6] text-[#282829] font-medium focus:outline-none focus:ring-2 focus:ring-[#18235C]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#18235C] mb-1">Días Vacaciones Pendientes:</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={60}
-                  value={simulacionParams.diasVacacionesPendientes}
-                  onChange={e => setSimulacionParams(p => ({ ...p, diasVacacionesPendientes: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-3 py-2 bg-white rounded-xl border border-[#8FA7D6] text-[#282829] font-medium focus:outline-none focus:ring-2 focus:ring-[#18235C]"
-                />
-              </div>
-            </div>
-
-            {/* Resultado de la simulación */}
-            {simulacionLiquidacion && (
-              <div className="mt-6 border border-[#8FA7D6] rounded-2xl overflow-hidden shadow-sm">
-                <div className="p-4 bg-[#18235C] text-white flex justify-between items-center">
-                  <div>
-                    <h4 className="font-bold text-sm text-white">
-                      Liquidación de Prestaciones e Indemnización — {empleados.find(e => e.id === simulacionParams.empleadoId)?.nombre}
-                    </h4>
-                    <div className="text-[11px] text-[#8FA7D6] font-medium">
-                      Ingreso: {simulacionLiquidacion.fechaIngreso} • Retiro: {simulacionLiquidacion.fechaRetiro} • Días totales laborados: {simulacionLiquidacion.diasTotalesLaborados}
-                    </div>
-                  </div>
-                  <span className="px-3 py-1 rounded-lg bg-white/10 text-[#00FF00] text-xs font-bold border border-white/20">
-                    Salario base: {formatMonedaCOP(simulacionLiquidacion.salarioBase)}
-                  </span>
-                </div>
-
-                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-white">
-                  <div className="space-y-2.5">
-                    <div className="flex justify-between py-1.5 border-b border-[#8FA7D6]/20">
-                      <span className="text-[#282829]">Cesantías definitivas año en curso ({simulacionLiquidacion.diasTrabajadosPeriodoActual} días):</span>
-                      <span className="font-bold text-[#18235C]">{formatMonedaCOP(simulacionLiquidacion.cesantiasPendientes)}</span>
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-[#8FA7D6]/20">
-                      <span className="text-[#282829]">Intereses sobre cesantías (12% anual proporcional):</span>
-                      <span className="font-bold text-[#18235C]">{formatMonedaCOP(simulacionLiquidacion.interesesCesantiasPendientes)}</span>
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-[#8FA7D6]/20">
-                      <span className="text-[#282829]">Prima de servicios proporcional semestre:</span>
-                      <span className="font-bold text-[#18235C]">{formatMonedaCOP(simulacionLiquidacion.primaServiciosPendiente)}</span>
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-[#8FA7D6]/20">
-                      <span className="text-[#282829]">Vacaciones compensadas en dinero ({simulacionLiquidacion.vacacionesPendientesDias} días):</span>
-                      <span className="font-bold text-[#18235C]">{formatMonedaCOP(simulacionLiquidacion.valorVacacionesPendientes)}</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 bg-[#8FA7D6]/10 p-4 rounded-xl border border-[#8FA7D6]">
-                    <div className="font-bold text-xs text-[#18235C] mb-1">
-                      Indemnización Legal por Despido (Art. 64 CST):
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-[#8FA7D6]/30">
-                      <span className="text-[#282829]">Causal:</span>
-                      <span className="font-bold text-[#18235C]">{simulacionParams.motivo}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-[#8FA7D6]/30">
-                      <span className="text-[#282829]">Valor indemnización legal:</span>
-                      <span className={`font-bold ${simulacionLiquidacion.indemnizacionDespidoInjusto > 0 ? 'text-rose-700' : 'text-[#282829]'}`}>
-                        {formatMonedaCOP(simulacionLiquidacion.indemnizacionDespidoInjusto)}
-                      </span>
-                    </div>
-                    {simulacionLiquidacion.indemnizacionDespidoInjusto > 0 && (
-                      <p className="text-[10px] text-[#282829]/80 leading-tight mt-1">
-                        Calculada a razón de 30 días de salario por el primer año laborado y 20 días por cada año subsiguiente o fracción proporcional (para salarios menores a 10 SMMLV).
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-[#18235C] text-white p-4 flex justify-between items-center text-sm font-bold border-t border-[#101740]">
-                  <span>GRAN TOTAL LIQUIDACIÓN DEFINITIVA A PAGAR:</span>
-                  <span className="text-xl font-black text-[#00FF00]">{formatMonedaCOP(simulacionLiquidacion.totalLiquidacionDefinitiva)}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <SimuladorLiquidacionContratoView empleados={empleados} />
       )}
 
       {/* TAB 4: Parámetros y Normatividad Legal 2026 */}
@@ -1768,131 +1779,21 @@ export function NominaView({
         />
       )}
 
-      {/* MODAL 1: APERTURA DE NUEVO PERÍODO (TODOS LOS MESES Y AÑOS) */}
-      {modalAperturaPeriodoAbierto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border-2 border-[#8FA7D6] w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 bg-[#18235C] text-white flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-base flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-[#00FF00]" />
-                  Aperturar Período de Nómina
-                </h3>
-                <p className="text-xs text-[#8FA7D6] mt-0.5">
-                  Genere y configure la nómina para cualquier mes y año
-                </p>
-              </div>
-              <button
-                onClick={() => setModalAperturaPeriodoAbierto(false)}
-                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAperturarPeriodo} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block font-bold text-[#18235C] mb-1">Año de Nómina:</label>
-                  <select
-                    value={nuevoPeriodoAno}
-                    onChange={e => setNuevoPeriodoAno(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 bg-white rounded-xl border border-[#8FA7D6] text-[#282829] font-bold focus:outline-none focus:ring-2 focus:ring-[#18235C]"
-                  >
-                    {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
-                      <option key={y} value={y}>
-                        {y} {y === 2026 ? '(Vigente)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#18235C] mb-1">Mes del Año:</label>
-                  <select
-                    value={nuevoPeriodoMes}
-                    onChange={e => setNuevoPeriodoMes(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 bg-white rounded-xl border border-[#8FA7D6] text-[#282829] font-bold focus:outline-none focus:ring-2 focus:ring-[#18235C]"
-                  >
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                      <option key={m} value={m}>
-                        Mes {m.toString().padStart(2, '0')} — {obtenerNombreMes(m)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#18235C] mb-1">Tipo de Liquidación:</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['Mensual', 'Primera Quincena', 'Segunda Quincena'] as const).map(tipo => (
-                    <button
-                      key={tipo}
-                      type="button"
-                      onClick={() => setNuevoPeriodoTipo(tipo)}
-                      className={`px-2.5 py-2 rounded-xl text-center border font-bold text-xs transition-colors ${
-                        nuevoPeriodoTipo === tipo
-                          ? 'bg-[#18235C] text-white border-[#18235C]'
-                          : 'bg-white text-[#282829] border-[#8FA7D6] hover:bg-[#8FA7D6]/10'
-                      }`}
-                    >
-                      {tipo}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-3 bg-[#FFFFFF] rounded-xl border border-[#8FA7D6] space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={copiarNovedadesDeActual}
-                    onChange={e => setCopiarNovedadesDeActual(e.target.checked)}
-                    className="rounded border-[#8FA7D6] text-[#18235C] focus:ring-[#18235C] w-4 h-4"
-                  />
-                  <span className="font-semibold text-[#18235C]">
-                    Copiar bonificaciones fijas y deducciones del período actual
-                  </span>
-                </label>
-                <p className="text-[11px] text-[#282829]/70 pl-6">
-                  Copia los valores recurrentes (bonos fijos, comisiones base y préstamos) para agilizar la liquidación.
-                </p>
-              </div>
-
-              {/* Botón rápido para generar el año completo */}
-              <div className="pt-2 border-t border-[#8FA7D6]/30 flex items-center justify-between">
-                <span className="text-[#282829] text-[11px]">¿Desea aperturar todo el año?</span>
-                <button
-                  type="button"
-                  onClick={() => handleGenerarAnoCompleto(nuevoPeriodoAno)}
-                  className="text-xs font-bold text-[#18235C] hover:underline flex items-center gap-1"
-                >
-                  <Calendar className="w-3.5 h-3.5" />
-                  Generar los 12 meses de {nuevoPeriodoAno}
-                </button>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-[#8FA7D6]">
-                <button
-                  type="button"
-                  onClick={() => setModalAperturaPeriodoAbierto(false)}
-                  className="px-4 py-2 bg-white hover:bg-[#8FA7D6]/10 text-[#282829] border border-[#8FA7D6] rounded-xl font-bold transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-xl font-bold transition-colors shadow-sm flex items-center gap-1.5"
-                >
-                  <Check className="w-4 h-4 text-[#00FF00]" />
-                  Aperturar Período
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* MODAL 1: APERTURA DE NUEVO PERÍODO (COMPONENTE DESACOPLADO) */}
+      <NominaAperturaPeriodoModal
+        isOpen={modalAperturaPeriodoAbierto}
+        onClose={() => setModalAperturaPeriodoAbierto(false)}
+        nuevoPeriodoAno={nuevoPeriodoAno}
+        setNuevoPeriodoAno={setNuevoPeriodoAno}
+        nuevoPeriodoMes={nuevoPeriodoMes}
+        setNuevoPeriodoMes={setNuevoPeriodoMes}
+        nuevoPeriodoTipo={nuevoPeriodoTipo}
+        setNuevoPeriodoTipo={setNuevoPeriodoTipo}
+        copiarNovedadesDeActual={copiarNovedadesDeActual}
+        setCopiarNovedadesDeActual={setCopiarNovedadesDeActual}
+        onAperturarPeriodo={handleAperturarPeriodo}
+        onGenerarAnoCompleto={handleGenerarAnoCompleto}
+      />
 
       {/* MODAL 2: EDICIÓN DE PARÁMETROS LEGALES */}
       {modalParametrosAbierto && (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Cargo,
   Empleado,
@@ -36,7 +36,10 @@ import {
   Send,
   UserCheck,
   Shield,
-  ExternalLink
+  ExternalLink,
+  Search,
+  ChevronDown,
+  Layers
 } from 'lucide-react';
 import { uid } from '../data/initialData';
 import { INITIAL_INVENTARIO_EPP, INITIAL_SOLICITUDES_ENTREGA_EPP } from '../data/eppData';
@@ -68,6 +71,11 @@ interface EmpleadosViewProps {
   onActualizarSolicitudes?: (nuevas: SolicitudEntregaEPP[]) => void;
   userRole?: Role;
   usuarios?: UsuarioSistema[];
+  hayMasNube?: boolean;
+  cargandoMasNube?: boolean;
+  onCargarMasNube?: () => Promise<void>;
+  cargandoNube?: boolean;
+  onRefrescarNube?: () => Promise<void>;
 }
 
 export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
@@ -82,7 +90,12 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
   onActualizarInventario,
   onActualizarSolicitudes,
   userRole = 'admin',
-  usuarios = []
+  usuarios = [],
+  hayMasNube = false,
+  cargandoMasNube = false,
+  onCargarMasNube,
+  cargandoNube = false,
+  onRefrescarNube
 }) => {
   const [selectedEmpleadoId, setSelectedEmpleadoId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'hv' | 'contrato' | 'historial' | 'evals' | 'epps'>('hv');
@@ -115,6 +128,25 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
   const [solicitudParaEntrega, setSolicitudParaEntrega] = useState<SolicitudEntregaEPP | null>(null);
   const [actaEntregaModalOpen, setActaEntregaModalOpen] = useState(false);
   const [solicitudParaActa, setSolicitudParaActa] = useState<SolicitudEntregaEPP | null>(null);
+
+  // Paginación y búsqueda para escalabilidad (lotes de 25)
+  const [filtroBusqueda, setFiltroBusqueda] = useState('');
+  const [limiteVisible, setLimiteVisible] = useState(25);
+
+  const empleadosFiltrados = useMemo(() => {
+    if (!filtroBusqueda.trim()) return empleados;
+    const term = filtroBusqueda.toLowerCase();
+    return empleados.filter(e =>
+      e.nombre.toLowerCase().includes(term) ||
+      (e.documento && e.documento.toLowerCase().includes(term)) ||
+      (e.email && e.email.toLowerCase().includes(term)) ||
+      getCargoNombre(e.cargoId).toLowerCase().includes(term)
+    );
+  }, [empleados, filtroBusqueda, cargos]);
+
+  const empleadosPaginados = useMemo(() => {
+    return empleadosFiltrados.slice(0, limiteVisible);
+  }, [empleadosFiltrados, limiteVisible]);
 
   const handleCrearSolicitudEpp = (nueva: SolicitudEntregaEPP) => {
     const actualizadas = [nueva, ...solicitudesEppList];
@@ -829,20 +861,67 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
             Gestión de colaboradores, hojas de vida, asignación a manual de cargos y seguimiento histórico de desempeño.
           </p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow-xs transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nuevo empleado</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onRefrescarNube && (
+            <button
+              type="button"
+              onClick={() => onRefrescarNube()}
+              disabled={cargandoNube}
+              className="px-3 py-2 bg-white hover:bg-[#F8FAFC] text-[#18235C] border border-[#8FA7D6] text-xs font-semibold rounded flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer disabled:opacity-60"
+              title="Consultar lote actualizado de Firestore"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${cargandoNube ? 'animate-spin text-[#18235C]' : ''}`} />
+              <span>{cargandoNube ? 'Consultando nube...' : 'Refrescar Nube'}</span>
+            </button>
+          )}
+          <button
+            onClick={() => setModalOpen(true)}
+            className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow-xs transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nuevo empleado</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded border border-[#8FA7D6] overflow-hidden shadow-xs">
-        <div className="p-4 border-b border-[#8FA7D6] flex items-center justify-between">
-          <span className="text-xs font-bold text-[#282829] uppercase tracking-wider">
-            Total {empleados.length} colaboradores activos
-          </span>
+        <div className="p-4 border-b border-[#8FA7D6] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[#18235C] uppercase tracking-wider">
+              Total {empleadosFiltrados.length} colaboradores {filtroBusqueda ? 'encontrados' : 'activos'}
+            </span>
+            <span className="text-[11px] text-[#282829]/70 bg-[#8FA7D6]/20 px-2 py-0.5 rounded-full font-semibold">
+              Mostrando {empleadosPaginados.length} de {empleadosFiltrados.length}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#282829]/50" />
+              <input
+                type="text"
+                value={filtroBusqueda}
+                onChange={e => {
+                  setFiltroBusqueda(e.target.value);
+                  setLimiteVisible(25); // Reiniciar paginación al buscar
+                }}
+                placeholder="Buscar por nombre, CC o cargo..."
+                className="w-full pl-8 pr-3 py-1.5 bg-[#F8FAFC] border border-[#8FA7D6] rounded text-xs text-[#282829] focus:outline-hidden focus:ring-2 focus:ring-[#18235C]"
+              />
+            </div>
+            {filtroBusqueda && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFiltroBusqueda('');
+                  setLimiteVisible(25);
+                }}
+                className="text-xs text-[#18235C] hover:underline font-semibold cursor-pointer"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -858,12 +937,12 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#8FA7D6]/60">
-              {empleados.map(emp => (
+              {empleadosPaginados.map(emp => (
                 <tr key={emp.id} className="hover:bg-[#F8FAFC]/50">
                   <td className="py-3 px-4 font-medium text-[#18235C]">
                     <button
                       onClick={() => setSelectedEmpleadoId(emp.id)}
-                      className="text-left hover:text-[#18235C] hover:underline"
+                      className="text-left hover:text-[#18235C] hover:underline cursor-pointer"
                     >
                       <div className="font-semibold text-sm text-[#18235C]">{emp.nombre}</div>
                       <div className="text-[11px] text-[#282829]">{emp.email || emp.documento}</div>
@@ -879,24 +958,31 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
                     {emp.contrato.salario}
                   </td>
                   <td className="py-3 px-4">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#8FA7D6/20] text-[#18235C]">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#8FA7D6]/20 text-[#18235C]">
                       Activo
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right">
                     <button
                       onClick={() => setSelectedEmpleadoId(emp.id)}
-                      className="text-xs font-semibold text-[#18235C] hover:underline"
+                      className="text-xs font-semibold text-[#18235C] hover:underline cursor-pointer"
                     >
                       Ver expediente
                     </button>
                   </td>
                 </tr>
               ))}
+              {empleadosFiltrados.length === 0 && empleados.length > 0 && (
+                <tr>
+                  <td colSpan={6} className="py-8 px-4 text-center text-[#282829]/70">
+                    No se encontraron colaboradores que coincidan con <strong>"{filtroBusqueda}"</strong>.
+                  </td>
+                </tr>
+              )}
               {empleados.length === 0 && (
                 <tr>
                   <td colSpan={6} className="py-12 px-4 text-center">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-[#8FA7D6/20] text-[#18235C] flex items-center justify-center mb-3">
+                    <div className="w-12 h-12 mx-auto rounded-full bg-[#8FA7D6]/20 text-[#18235C] flex items-center justify-center mb-3">
                       <Users className="w-6 h-6" />
                     </div>
                     <h3 className="font-bold tracking-tight text-base font-semibold text-[#18235C]">
@@ -908,7 +994,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setModalOpen(true)}
-                      className="mt-4 px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded inline-flex items-center gap-2 transition-colors shadow-xs"
+                      className="mt-4 px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded inline-flex items-center gap-2 transition-colors shadow-xs cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Registrar Primer Colaborador Real</span>
@@ -918,6 +1004,67 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Barra de Paginación y Cargar Más */}
+        <div className="p-3.5 bg-[#F8FAFC] border-t border-[#8FA7D6] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-[#282829]/80 font-medium">
+              Mostrando {empleadosPaginados.length} de {empleadosFiltrados.length} colaboradores
+            </span>
+            {hayMasNube && (
+              <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                Lotes pendientes en Firestore
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Botón de consulta paginada con cursor a Firestore */}
+            {hayMasNube && onCargarMasNube && (
+              <button
+                type="button"
+                onClick={() => onCargarMasNube()}
+                disabled={cargandoMasNube}
+                className="px-3 py-1.5 bg-[#101740] hover:bg-[#18235C] text-white rounded text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                title="Cargar los siguientes 25 registros de Firestore mediante cursor startAfter"
+              >
+                {cargandoMasNube ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+                <span>{cargandoMasNube ? 'Consultando nube...' : 'Cargar más de la Nube (+25 con cursor)'}</span>
+              </button>
+            )}
+
+            {limiteVisible < empleadosFiltrados.length && (
+              <button
+                type="button"
+                onClick={() => setLimiteVisible(prev => prev + 25)}
+                className="px-3 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white rounded text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+                Mostrar más locales (+25)
+              </button>
+            )}
+            {limiteVisible < empleadosFiltrados.length ? (
+              <button
+                type="button"
+                onClick={() => setLimiteVisible(empleadosFiltrados.length)}
+                className="px-2.5 py-1.5 bg-white hover:bg-[#8FA7D6]/20 border border-[#8FA7D6] text-[#18235C] rounded text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Mostrar todos ({empleadosFiltrados.length})
+              </button>
+            ) : empleadosFiltrados.length > 25 ? (
+              <button
+                type="button"
+                onClick={() => setLimiteVisible(25)}
+                className="px-2.5 py-1.5 bg-white hover:bg-[#8FA7D6]/20 border border-[#8FA7D6] text-[#18235C] rounded text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Restablecer a 25
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 

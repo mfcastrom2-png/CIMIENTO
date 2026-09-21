@@ -10,8 +10,8 @@ const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN || '';
 
 Sentry.init({
   dsn: SENTRY_DSN || undefined,
-  // Activo automáticamente si hay DSN configurado o en entorno de producción
-  enabled: Boolean(SENTRY_DSN) || import.meta.env.PROD,
+  // Activo solo cuando se haya configurado un DSN válido
+  enabled: Boolean(SENTRY_DSN),
   integrations: [
     Sentry.browserTracingIntegration(),
   ],

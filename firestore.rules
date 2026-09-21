@@ -111,10 +111,14 @@ service cloud.firestore {
       allow delete: if isAdmin() && sameCompany(resource.data);
     }
 
-    // 5. Inventario de EPP
+    // 5. Inventario de EPP (Aislamiento Multi-Tenant)
     match /inventario_epp/{eppId} {
-      allow read: if signedIn();
-      allow write: if isSSTorAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isSSTorAdmin() && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow update: if isSSTorAdmin()
+        && sameCompany(resource.data)
+        && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow delete: if isSSTorAdmin() && sameCompany(resource.data);
     }
 
     // 6. Solicitudes y Entregas de EPP
@@ -185,13 +189,29 @@ service cloud.firestore {
         && sameCompany(request.resource.data);
     }
 
-    // 10. Capacitaciones y Exámenes
-    match /capacitaciones/{capId} {
-      allow read: if signedIn();
-      allow write: if isSSTorAdmin();
+    // 9.1 Consolidado de Períodos de Nómina
+    match /periodos_nomina/{periodoId} {
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow write: if isAdmin() && sameCompany(request.resource.data);
     }
 
-    // 11. Auditoría Inmutable
+    // 10. Capacitaciones y Exámenes (Aislamiento Multi-Tenant)
+    match /capacitaciones/{capId} {
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isSSTorAdmin() && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow update: if isSSTorAdmin()
+        && sameCompany(resource.data)
+        && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
+      allow delete: if isSSTorAdmin() && sameCompany(resource.data);
+    }
+
+    // 11. Auditoría Inmutable del Sistema (Append-only)
+    match /auditoria_sistema/{logId} {
+      allow read: if isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
     match /logs_auditoria/{logId} {
       allow read: if isAdmin();
       allow create: if signedIn();

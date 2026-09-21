@@ -22,9 +22,14 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
-  onSnapshot,
   writeBatch,
   getDocFromServer,
+  query,
+  orderBy,
+  limit,
+  startAfter,
+  QueryDocumentSnapshot,
+  DocumentData,
   Firestore
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -39,7 +44,11 @@ import {
   Solicitud,
   EvaluacionDesempeno,
   UsuarioSistema,
-  RolSistema
+  RolSistema,
+  PeriodoNomina,
+  LiquidacionEmpleadoNomina,
+  EventoAuditoria,
+  AccionAuditoria
 } from '../types';
 
 // 1. Inicialización de Firebase con soporte de Long Polling para proxies y contenedores
@@ -66,22 +75,8 @@ if (typeof window !== 'undefined' && recaptchaSiteKey) {
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-let firestoreInstance: Firestore;
-try {
-  firestoreInstance = initializeFirestore(
-    app,
-    {
-      experimentalAutoDetectLongPolling: true
-    },
-    firebaseConfig.firestoreDatabaseId || undefined
-  );
-} catch {
-  firestoreInstance = firebaseConfig.firestoreDatabaseId
-    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-    : getFirestore(app);
-}
-
-export const db = firestoreInstance;
+// Inicialización de Firestore según directriz de la habilidad firebase-integration
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 // Estructuras de Error y Diagnóstico según directriz SKILL.md
 export enum OperationType {
@@ -225,53 +220,170 @@ export const obtenerPerfilUsuario = async (uid: string): Promise<UsuarioSistema 
   }
 };
 
-// 3. Sincronización en Tiempo Real de Colecciones
+// 3.0 Registro de Auditoría Inmutable del Sistema (Append-only)
+export const registrarEventoAuditoria = async (
+  accion: AccionAuditoria | string,
+  entidad: string,
+  detalle: string,
+  usuario?: UsuarioSistema | { uid?: string; email?: string; nombre?: string; rol?: string } | null,
+  entidadId?: string,
+  metadatos?: Record<string, any>
+): Promise<void> => {
+  try {
+    const logId = `AUD-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const userLog = usuario || {
+      uid: auth.currentUser?.uid || 'anonimo',
+      email: auth.currentUser?.email || 'desconocido',
+      nombre: auth.currentUser?.displayName || 'Usuario Sistema',
+      rol: 'usuario'
+    };
+
+    const evento: EventoAuditoria = {
+      id: logId,
+      timestamp: new Date().toISOString(),
+      accion,
+      entidad,
+      entidadId: entidadId || '—',
+      detalle,
+      usuario: {
+        uid: (userLog as any).uid || (userLog as any).id || 'anonimo',
+        email: userLog.email || 'desconocido@bgroup.com',
+        nombre: (userLog as any).nombre || userLog.email || 'Usuario',
+        rol: (userLog as any).rol || 'usuario'
+      },
+      empresaId: (userLog as any).empresaId || 'empresa-a',
+      metadatos: metadatos || {}
+    };
+
+    await setDoc(doc(db, 'auditoria_sistema', logId), evento);
+  } catch (err) {
+    console.warn('[Auditoría] Advertencia al registrar evento de auditoría:', err);
+  }
+};
+
+// 3.1 Consultas Paginadas Bajo Demanda con Cursores
+export interface ResultadoPaginado<T> {
+  items: T[];
+  ultimoDoc: QueryDocumentSnapshot<DocumentData> | null;
+  hayMas: boolean;
+}
+
+export const obtenerColeccionPaginada = async <T>(
+  nombreColeccion: string,
+  tamanoPagina: number = 25,
+  cursorUltimoDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+  campoOrden?: string
+): Promise<ResultadoPaginado<T>> => {
+  try {
+    const colRef = collection(db, nombreColeccion);
+    let q;
+    if (campoOrden && campoOrden !== 'id' && campoOrden !== '__name__') {
+      q = cursorUltimoDoc
+        ? query(colRef, orderBy(campoOrden), startAfter(cursorUltimoDoc), limit(tamanoPagina))
+        : query(colRef, orderBy(campoOrden), limit(tamanoPagina));
+    } else {
+      q = cursorUltimoDoc
+        ? query(colRef, startAfter(cursorUltimoDoc), limit(tamanoPagina))
+        : query(colRef, limit(tamanoPagina));
+    }
+    const snap = await getDocs(q);
+    const items: T[] = [];
+    snap.forEach((docSnap) => {
+      items.push({ ...(docSnap.data() as T), id: docSnap.id });
+    });
+    const ultimoDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
+    return {
+      items,
+      ultimoDoc,
+      hayMas: snap.docs.length === tamanoPagina
+    };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, nombreColeccion);
+    return { items: [], ultimoDoc: null, hayMas: false };
+  }
+};
+
+// 3.2 Obtener colección completa bajo demanda (sin listener continuo para optimización de cuota)
+export const obtenerColeccionDirecta = async <T>(
+  nombreColeccion: string
+): Promise<T[]> => {
+  try {
+    const colRef = collection(db, nombreColeccion);
+    const snap = await getDocs(colRef);
+    const items: T[] = [];
+    snap.forEach((docSnap) => {
+      items.push({ ...(docSnap.data() as T), id: docSnap.id });
+    });
+    return items;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, nombreColeccion);
+    return [];
+  }
+};
+
+// 3.3 Consulta bajo demanda compatible (Reemplaza definitivamente las lecturas continuas onSnapshot)
 export const suscribirColeccion = <T>(
   nombreColeccion: string,
   onData: (data: T[]) => void,
   onError?: (error: Error) => void
 ) => {
-  try {
-    const colRef = collection(db, nombreColeccion);
-    return onSnapshot(
-      colRef,
-      (snapshot) => {
-        const items: T[] = [];
-        snapshot.forEach((docSnap) => {
-          items.push({ ...(docSnap.data() as T), id: docSnap.id });
-        });
-        onData(items);
-      },
-      (err) => {
-        handleFirestoreError(err, OperationType.LIST, nombreColeccion);
-        if (onError) onError(err);
-      }
-    );
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, nombreColeccion);
-    return () => {};
-  }
+  obtenerColeccionDirecta<T>(nombreColeccion)
+    .then(items => {
+      onData(items);
+    })
+    .catch(err => {
+      if (onError) onError(err);
+    });
+  return () => {};
 };
 
 // 4. Operaciones de Escritura y Actualización
-export const guardarEmpleadoFB = async (empleado: Empleado) => {
+export const guardarEmpleadoFB = async (empleado: Empleado, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'empleados', empleado.id);
   const data = { ...empleado, empresaId: empleado.empresaId || 'empresa-a' };
   await setDoc(docRef, data, { merge: true });
+  await registrarEventoAuditoria(
+    'ACTUALIZACION',
+    'empleados',
+    `Guardado expediente del colaborador ${empleado.nombre} (C.C. ${empleado.documento})`,
+    autor,
+    empleado.id
+  );
 };
 
-export const eliminarEmpleadoFB = async (id: string) => {
+export const eliminarEmpleadoFB = async (id: string, nombreColaborador?: string, autor?: UsuarioSistema | null) => {
   await deleteDoc(doc(db, 'empleados', id));
+  await registrarEventoAuditoria(
+    'ELIMINACION',
+    'empleados',
+    `Eliminado expediente del colaborador ${nombreColaborador || id}`,
+    autor,
+    id
+  );
 };
 
-export const guardarCargoFB = async (cargo: Cargo) => {
+export const guardarCargoFB = async (cargo: Cargo, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'cargos', cargo.id);
   const data = { ...cargo, empresaId: cargo.empresaId || 'empresa-a' };
   await setDoc(docRef, data, { merge: true });
+  await registrarEventoAuditoria(
+    'ACTUALIZACION',
+    'cargos',
+    `Guardado cargo ${cargo.nombre} (ID: ${cargo.id})`,
+    autor,
+    cargo.id
+  );
 };
 
-export const eliminarCargoFB = async (id: string) => {
+export const eliminarCargoFB = async (id: string, nombre?: string, autor?: UsuarioSistema | null) => {
   await deleteDoc(doc(db, 'cargos', id));
+  await registrarEventoAuditoria(
+    'ELIMINACION',
+    'cargos',
+    `Eliminado cargo ${nombre || id}`,
+    autor,
+    id
+  );
 };
 
 export const guardarAreaFB = async (area: AreaOrganizacion) => {
@@ -294,9 +406,16 @@ export const eliminarProcesoFB = async (id: string) => {
   await deleteDoc(doc(db, 'procesos', id));
 };
 
-export const guardarParametrosNominaFB = async (parametros: ParametrosLegalesNomina) => {
+export const guardarParametrosNominaFB = async (parametros: ParametrosLegalesNomina, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'configuracion_nomina', 'parametros_legales');
   await setDoc(docRef, parametros, { merge: true });
+  await registrarEventoAuditoria(
+    'ACTUALIZACION',
+    'configuracion_nomina',
+    `Actualizados parámetros de ley vigentes (${parametros.anoVigencia}): SMMLV $${parametros.smmlv}, Aux. Transporte $${parametros.auxilioTransporte}`,
+    autor,
+    'parametros_legales'
+  );
 };
 
 export const obtenerParametrosNominaFB = async (): Promise<ParametrosLegalesNomina | null> => {
@@ -319,10 +438,128 @@ export const guardarInventarioEppFB = async (item: ItemInventarioEPP) => {
   await setDoc(docRef, data, { merge: true });
 };
 
+/**
+ * Persistencia atómica de inventario de EPPs en lote (writeBatch)
+ * Elimina bucles secuenciales propensos a estados inconsistentes
+ */
+export const guardarInventarioEppLoteFB = async (
+  items: ItemInventarioEPP[],
+  empresaId: string = 'empresa-a'
+): Promise<void> => {
+  if (!items || items.length === 0) return;
+  const batch = writeBatch(db);
+  items.forEach(item => {
+    const docRef = doc(db, 'inventario_epp', item.id);
+    batch.set(docRef, { ...item, empresaId: item.empresaId || empresaId }, { merge: true });
+  });
+  await batch.commit();
+};
+
 export const guardarSolicitudEppFB = async (solicitud: SolicitudEntregaEPP) => {
   const docRef = doc(db, 'solicitudes_epp', solicitud.id);
   const data = { ...solicitud, empresaId: solicitud.empresaId || 'empresa-a' };
   await setDoc(docRef, data, { merge: true });
+};
+
+/**
+ * Persistencia atómica de solicitudes de entrega de EPPs en lote (writeBatch)
+ */
+export const guardarSolicitudesEppLoteFB = async (
+  solicitudes: SolicitudEntregaEPP[],
+  empresaId: string = 'empresa-a'
+): Promise<void> => {
+  if (!solicitudes || solicitudes.length === 0) return;
+  const batch = writeBatch(db);
+  solicitudes.forEach(sol => {
+    const docRef = doc(db, 'solicitudes_epp', sol.id);
+    batch.set(docRef, { ...sol, empresaId: sol.empresaId || empresaId }, { merge: true });
+  });
+  await batch.commit();
+};
+
+/**
+ * Persistencia atómica de colaboradores en lote (writeBatch)
+ */
+export const guardarEmpleadosLoteFB = async (
+  empleados: Empleado[],
+  empresaId: string = 'empresa-a'
+): Promise<void> => {
+  if (!empleados || empleados.length === 0) return;
+  const batch = writeBatch(db);
+  empleados.forEach(emp => {
+    const docRef = doc(db, 'empleados', emp.id);
+    batch.set(docRef, { ...emp, empresaId: emp.empresaId || empresaId }, { merge: true });
+  });
+  await batch.commit();
+};
+
+/**
+ * Persistencia 100% ATÓMICA de Nómina mediante writeBatch.
+ * Guarda el consolidado del período y todos los desprendibles individuales simultáneamente.
+ * Si falla alguna escritura, se revierte todo, evitando nóminas parciales o estados corruptos.
+ */
+export const guardarPeriodoNominaLoteFB = async (
+  periodo: PeriodoNomina,
+  liquidaciones: LiquidacionEmpleadoNomina[],
+  empresaId: string = 'empresa-a'
+): Promise<{ success: boolean; guardadosCount: number; error?: string }> => {
+  try {
+    const batch = writeBatch(db);
+    const codigoPeriodo = periodo.codigoPeriodo;
+
+    // 1. Guardar consolidado del período en /periodos_nomina/{codigoPeriodo}
+    const periodoRef = doc(db, 'periodos_nomina', codigoPeriodo);
+    batch.set(
+      periodoRef,
+      {
+        ...periodo,
+        empresaId,
+        fechaActualizacion: new Date().toISOString(),
+        totalesCalculados: {
+          totalDevengado: liquidaciones.reduce((acc, l) => acc + l.devengados.totalDevengado, 0),
+          totalDeducciones: liquidaciones.reduce((acc, l) => acc + l.deducciones.totalDeducciones, 0),
+          netoAPagar: liquidaciones.reduce((acc, l) => acc + l.netoAPagar, 0),
+          costoTotalEmpresa: liquidaciones.reduce((acc, l) => acc + l.costoTotalEmpresa, 0),
+          empleadosCount: liquidaciones.length
+        }
+      },
+      { merge: true }
+    );
+
+    // 2. Guardar cada recibo individual de nómina en /nominas/{codigoPeriodo}_{empleadoId}
+    liquidaciones.forEach(liq => {
+      const docId = `${codigoPeriodo}_${liq.empleadoId}`;
+      const nominaRef = doc(db, 'nominas', docId);
+      batch.set(
+        nominaRef,
+        {
+          ...liq,
+          id: docId,
+          codigoPeriodo,
+          empresaId,
+          fechaLiquidacion: new Date().toISOString()
+        },
+        { merge: true }
+      );
+    });
+
+    await batch.commit();
+    await registrarEventoAuditoria(
+      'CIERRE_PERIODO',
+      'nominas',
+      `Liquidado y guardado período ${codigoPeriodo} con ${liquidaciones.length} desprendibles individuales (Neto: $${liquidaciones.reduce((acc, l) => acc + l.netoAPagar, 0).toLocaleString('es-CO')})`,
+      null,
+      codigoPeriodo
+    );
+    return { success: true, guardadosCount: liquidaciones.length };
+  } catch (err: any) {
+    console.error('Fallo en transacción atómica de nómina writeBatch:', err);
+    return {
+      success: false,
+      guardadosCount: 0,
+      error: err?.message || 'Error al persistir lote atómico en Firestore'
+    };
+  }
 };
 
 export const guardarSolicitudGeneralFB = async (solicitud: Solicitud) => {

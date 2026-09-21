@@ -906,3 +906,29 @@ export interface SolicitudEntregaEPP {
   firmaConformidadTrabajador?: boolean;
   proximaReposicionSugerida?: string;
 }
+
+export type AccionAuditoria =
+  | 'CREACION'
+  | 'ACTUALIZACION'
+  | 'ELIMINACION'
+  | 'EXPORTACION'
+  | 'CIERRE_PERIODO'
+  | 'APERTURA_PERIODO'
+  | 'PURGA_DATOS';
+
+export interface EventoAuditoria {
+  id?: string;
+  timestamp: string;
+  accion: AccionAuditoria | string;
+  entidad: string;
+  entidadId?: string;
+  detalle: string;
+  usuario?: {
+    uid?: string;
+    email?: string;
+    nombre?: string;
+    rol?: string;
+  };
+  empresaId?: string;
+  metadatos?: Record<string, any>;
+}

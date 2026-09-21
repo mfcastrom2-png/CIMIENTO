@@ -24,7 +24,8 @@ import {
   limpiarCapacitacionesFB,
   limpiarEstructuraOrganicaFB,
   cargarCatalogoBaseEppEnNube,
-  guardarEmpleadoFB
+  guardarEmpleadoFB,
+  guardarEmpleadosLoteFB
 } from '../lib/firebase';
 import { Empleado, ItemInventarioEPP, Cargo } from '../types';
 
@@ -247,8 +248,12 @@ export const GestionDatosModal: React.FC<GestionDatosModalProps> = ({
               activo: true
             };
             nuevosEmpleados.push(nuevo);
-            await guardarEmpleadoFB(nuevo);
           }
+        }
+
+        // Persistencia 100% atómica de todos los empleados mediante writeBatch
+        if (nuevosEmpleados.length > 0) {
+          await guardarEmpleadosLoteFB(nuevosEmpleados);
         }
 
         onEmpleadosImportados(nuevosEmpleados);

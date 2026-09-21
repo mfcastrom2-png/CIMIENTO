@@ -20,7 +20,8 @@ import {
   Package,
   FileDown,
   Warehouse,
-  Scale
+  Scale,
+  ShieldAlert
 } from 'lucide-react';
 import { Role, UsuarioSistema } from '../types';
 
@@ -505,6 +506,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="text-[10px] bg-[#101740] text-[#00FF00] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
                   <Lock className="w-2.5 h-2.5 text-[#00FF00]" />
                   RBAC
+                </span>
+              </button>
+            )}
+
+            {(rol === 'superadmin' || rol === 'admin_gh' || tienePermiso('auditoria')) && (
+              <button
+                id="nav-auditoria"
+                onClick={() => onNavigate('auditoria')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  currentView === 'auditoria'
+                    ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                    : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <ShieldAlert className={`w-4 h-4 ${currentView === 'auditoria' ? 'text-[#18235C]' : 'text-amber-400'}`} />
+                  <span>Auditoría & Trazabilidad</span>
+                </div>
+                <span className="text-[10px] bg-[#101740] text-amber-300 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                  Audit
                 </span>
               </button>
             )}
