@@ -123,10 +123,16 @@ export function VotacionesSstView({
   const [modalActaAperturaOpen, setModalActaAperturaOpen] = useState(false);
   const [modalActaCierreOpen, setModalActaCierreOpen] = useState(false);
 
-  // ID del empleado actualmente votando (permite al admin simular votar como otro empleado)
+  // ID del empleado actualmente votando
   const [voterEmpleadoId, setVoterEmpleadoId] = useState<string>(
-    userRole === 'empleado' ? currentEmpleadoId : (empleados[0]?.id || '')
+    userRole === 'empleado' ? currentEmpleadoId : (currentEmpleadoId || empleados[0]?.id || '')
   );
+
+  useEffect(() => {
+    if (userRole === 'empleado' && currentEmpleadoId) {
+      setVoterEmpleadoId(currentEmpleadoId);
+    }
+  }, [userRole, currentEmpleadoId]);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -281,7 +287,7 @@ export function VotacionesSstView({
               </span>
             </div>
             <h2 className="text-xl font-bold font-serif text-[#18235C]">
-              Elecciones Electrónicas COPASST y Comité de Convivencia
+              Votaciones Electrónicas COPASST y Comité de Convivencia
             </h2>
             <p className="text-xs sm:text-sm text-[#282829] mt-0.5 max-w-2xl">
               Proceso oficial de votación secreta y directa para la elección de los representantes de los trabajadores ante el Comité Paritario de SST y el Comité de Convivencia Laboral (Periodo 2026 - 2028).
@@ -321,30 +327,36 @@ export function VotacionesSstView({
           </div>
         </div>
 
-        {/* Simulador rápido de votante para pruebas de usuario */}
-        <div className="mt-5 pt-4 border-t border-[#8FA7D6] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs bg-[#FFFFFF] p-3 rounded-lg">
-          <div className="flex items-center gap-2">
+        {/* Identificación del Elector en Sesión */}
+        <div className="mt-5 pt-4 border-t border-[#8FA7D6]/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs bg-slate-50/80 p-3 rounded-lg border border-[#8FA7D6]/20">
+          <div className="flex items-center gap-2 flex-wrap">
             <UserCheck className="w-4 h-4 text-[#18235C]" />
             <span className="font-semibold text-[#18235C]">
-              Simular Votante Activo:
+              {userRole === 'empleado' ? 'Votante Acreditado:' : 'Consultar Estado de Elector:'}
             </span>
-            <select
-              value={voterEmpleadoId}
-              onChange={e => {
-                setVoterEmpleadoId(e.target.value);
-                setCandidatoSeleccionadoId(null);
-              }}
-              className="bg-white border border-[#8FA7D6] rounded px-2.5 py-1 text-xs text-[#18235C] font-medium"
-            >
-              {empleados.map(emp => {
-                const yaVoto = procesoActual.votantesRegistrados.some(v => v.empleadoId === emp.id);
-                return (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.nombre} ({yaVoto ? 'Ya Votó' : 'Pendiente de Votar'})
-                  </option>
-                );
-              })}
-            </select>
+            {userRole === 'empleado' ? (
+              <span className="font-bold text-[#18235C] bg-white px-2.5 py-1 rounded border border-[#8FA7D6]/40 shadow-2xs">
+                {empleadoVotante.nombre} (CC: {empleadoVotante.documento})
+              </span>
+            ) : (
+              <select
+                value={voterEmpleadoId}
+                onChange={e => {
+                  setVoterEmpleadoId(e.target.value);
+                  setCandidatoSeleccionadoId(null);
+                }}
+                className="bg-white border border-[#8FA7D6] rounded px-2.5 py-1 text-xs text-[#18235C] font-medium"
+              >
+                {empleados.map(emp => {
+                  const yaVoto = procesoActual.votantesRegistrados.some(v => v.empleadoId === emp.id);
+                  return (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.nombre} ({yaVoto ? 'Ya Votó' : 'Pendiente de Votar'})
+                    </option>
+                  );
+                })}
+              </select>
+            )}
           </div>
 
           <div className="text-[11px] text-[#282829]">
@@ -452,9 +464,9 @@ export function VotacionesSstView({
               {procesoActual.candidatos.length === 0 && (
                 <div className="col-span-full p-6 bg-[#FFFFFF] border border-dashed border-[#8FA7D6] rounded-xl text-center">
                   <Vote className="w-8 h-8 text-[#18235C] mx-auto mb-2 opacity-70" />
-                  <h4 className="font-bold text-sm text-[#18235C]">Urna de Producción Abierta</h4>
+                  <h4 className="font-bold text-sm text-[#18235C]">Urna Electoral Habilitada</h4>
                   <p className="text-xs text-[#282829] max-w-md mx-auto mt-1">
-                    Los datos de prueba han sido limpiados. En cuanto se inscriban las planchas o candidatos oficiales de los trabajadores, aparecerán en este tarjetón.
+                    No hay candidatos postulados en este momento. Tan pronto la comisión electoral formalice e inscriba las planchas oficiales de los colaboradores, quedarán disponibles para votación en este tarjetón.
                   </p>
                 </div>
               )}
@@ -556,244 +568,246 @@ export function VotacionesSstView({
         )}
       </div>
 
-      {/* SECCIÓN 2: PANEL DE CONTROL Y ESCRUTINIO ADMINISTRATIVO */}
-      <div className="bg-white rounded-xl border border-[#8FA7D6] p-5 sm:p-6 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#8FA7D6] pb-4">
-          <div>
-            <h3 className="font-bold text-base font-serif text-[#18235C] flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-[#18235C]" />
-              Escrutinio Oficial & Censo de Participación
-            </h3>
-            <p className="text-xs text-[#282829] mt-0.5">
-              Resultados en tiempo real, validación de quórum y actas oficiales de apertura y cierre para el MinTrabajo / ARL.
-            </p>
+      {/* SECCIÓN 2: PANEL DE CONTROL Y ESCRUTINIO ADMINISTRATIVO (Exclusivo Administradores y Comisión Electoral) */}
+      {userRole !== 'empleado' && (
+        <div className="bg-white rounded-xl border border-[#8FA7D6] p-5 sm:p-6 shadow-xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#8FA7D6] pb-4">
+            <div>
+              <h3 className="font-bold text-base font-serif text-[#18235C] flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-[#18235C]" />
+                Escrutinio Oficial & Censo de Participación
+              </h3>
+              <p className="text-xs text-[#282829] mt-0.5">
+                Resultados en tiempo real, validación de quórum y actas oficiales de apertura y cierre para el MinTrabajo / ARL.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setModalActaAperturaOpen(true)}
+                className="px-3 py-1.5 rounded-lg border border-[#8FA7D6] text-xs font-semibold text-[#18235C] hover:bg-[#FFFFFF] flex items-center gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5 text-[#18235C]" />
+                <span>Acta de Apertura</span>
+              </button>
+
+              <button
+                onClick={() => setModalActaCierreOpen(true)}
+                className="px-3 py-1.5 rounded-lg border border-[#8FA7D6] text-xs font-semibold text-[#18235C] hover:bg-[#FFFFFF] flex items-center gap-1.5"
+              >
+                <Award className="w-3.5 h-3.5 text-[#B5842A]" />
+                <span>Acta de Escrutinio y Cierre</span>
+              </button>
+
+              <button
+                onClick={handleToggleEstadoUrna}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
+                  procesoActual.estado === 'Abierta'
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                }`}
+              >
+                {procesoActual.estado === 'Abierta' ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                <span>{procesoActual.estado === 'Abierta' ? 'Cerrar Urna' : 'Reabrir Urna'}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setModalActaAperturaOpen(true)}
-              className="px-3 py-1.5 rounded-lg border border-[#8FA7D6] text-xs font-semibold text-[#18235C] hover:bg-[#FFFFFF] flex items-center gap-1.5"
-            >
-              <FileText className="w-3.5 h-3.5 text-[#18235C]" />
-              <span>Acta de Apertura</span>
-            </button>
-
-            <button
-              onClick={() => setModalActaCierreOpen(true)}
-              className="px-3 py-1.5 rounded-lg border border-[#8FA7D6] text-xs font-semibold text-[#18235C] hover:bg-[#FFFFFF] flex items-center gap-1.5"
-            >
-              <Award className="w-3.5 h-3.5 text-[#B5842A]" />
-              <span>Acta de Escrutinio y Cierre</span>
-            </button>
-
-            <button
-              onClick={handleToggleEstadoUrna}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
-                procesoActual.estado === 'Abierta'
-                  ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-              }`}
-            >
-              {procesoActual.estado === 'Abierta' ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-              <span>{procesoActual.estado === 'Abierta' ? 'Cerrar Urna' : 'Reabrir Urna'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Tarjetas de Métricas de Escrutinio */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-          <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
-            <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
-              Censo Habilitado
-              <Users className="w-3.5 h-3.5 text-[#18235C]" />
-            </div>
-            <div className="text-xl font-bold text-[#18235C] mt-0.5">
-              {procesoActual.censoElectoralTotal} <span className="text-xs font-normal text-[#282829]">votantes</span>
-            </div>
-            <div className="text-[10px] text-[#282829]">Trabajadores con contrato vigente</div>
-          </div>
-
-          <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
-            <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
-              Votos Emitidos
-              <Vote className="w-3.5 h-3.5 text-[#18235C]" />
-            </div>
-            <div className="text-xl font-bold text-[#18235C] mt-0.5">
-              {procesoActual.totalVotosEmitidos}
-            </div>
-            <div className="text-[10px] text-[#282829]">Sufragios depositados</div>
-          </div>
-
-          <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
-            <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
-              Participación
-              <BarChart3 className="w-3.5 h-3.5 text-[#B5842A]" />
-            </div>
-            <div className="text-xl font-bold text-[#18235C] mt-0.5">
-              {escrutinio.participacionPorcentaje}%
-            </div>
-            <div className="text-[10px] text-[#282829]">Del total de la planta</div>
-          </div>
-
-          <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
-            <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
-              Quórum Legal
-              <ShieldCheck className="w-3.5 h-3.5 text-[#18235C]" />
-            </div>
-            <div className="text-sm font-bold mt-1">
-              {escrutinio.quorumValido ? (
-                <span className="text-emerald-700 flex items-center gap-1">
-                  <Check className="w-4 h-4" /> Válido (≥ 50%)
-                </span>
-              ) : (
-                <span className="text-amber-700 flex items-center gap-1">
-                  <Clock className="w-4 h-4" /> En curso (&lt; 50%)
-                </span>
-              )}
-            </div>
-            <div className="text-[10px] text-[#282829]">Requisito de validez electoral</div>
-          </div>
-        </div>
-
-        {/* Gráfico de Barras / Resultados por Candidato */}
-        <div className="space-y-3 pt-2">
-          <h4 className="text-xs font-bold text-[#18235C] uppercase tracking-wider">
-            Votos Computados por Plancha / Candidato:
-          </h4>
-
-          <div className="space-y-2.5">
-            {escrutinio.candidatosOrdenados.map((cand, idx) => {
-              const pct =
-                procesoActual.totalVotosEmitidos > 0
-                  ? Math.round((cand.votosObtenidos / procesoActual.totalVotosEmitidos) * 100)
-                  : 0;
-
-              return (
-                <div key={cand.id} className="p-3 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/80 text-xs">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-[#18235C]">
-                        #{cand.numeroTarjeton} {cand.nombre}
-                      </span>
-                      <span className="text-[10px] text-[#282829]">({cand.cargo})</span>
-                      {idx === 0 && cand.votosObtenidos > 0 && (
-                        <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
-                          Principal Electo
-                        </span>
-                      )}
-                      {idx === 1 && cand.votosObtenidos > 0 && (
-                        <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded font-bold text-[10px]">
-                          Suplente Electo
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="font-bold text-[#18235C]">
-                      {cand.votosObtenidos} votos <span className="text-[#282829] font-normal">({pct}%)</span>
-                    </div>
-                  </div>
-
-                  {/* Barra de progreso */}
-                  <div className="w-full h-2 bg-[#8FA7D6]/60 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#18235C] rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Votos en blanco */}
-            <div className="p-3 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/80 text-xs">
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="font-bold text-[#282829]">Voto en Blanco</span>
-                <div className="font-bold text-[#282829]">
-                  {procesoActual.votosEnBlanco} votos (
-                  {procesoActual.totalVotosEmitidos > 0
-                    ? Math.round((procesoActual.votosEnBlanco / procesoActual.totalVotosEmitidos) * 100)
-                    : 0}
-                  %)
-                </div>
+          {/* Tarjetas de Métricas de Escrutinio */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
+              <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
+                Censo Habilitado
+                <Users className="w-3.5 h-3.5 text-[#18235C]" />
               </div>
-              <div className="w-full h-2 bg-[#8FA7D6]/60 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#8DA096] rounded-full"
-                  style={{
-                    width: `${
-                      procesoActual.totalVotosEmitidos > 0
-                        ? Math.round((procesoActual.votosEnBlanco / procesoActual.totalVotosEmitidos) * 100)
-                        : 0
-                    }%`
-                  }}
-                />
+              <div className="text-xl font-bold text-[#18235C] mt-0.5">
+                {procesoActual.censoElectoralTotal} <span className="text-xs font-normal text-[#282829]">votantes</span>
               </div>
+              <div className="text-[10px] text-[#282829]">Trabajadores con contrato vigente</div>
+            </div>
+
+            <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
+              <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
+                Votos Emitidos
+                <Vote className="w-3.5 h-3.5 text-[#18235C]" />
+              </div>
+              <div className="text-xl font-bold text-[#18235C] mt-0.5">
+                {procesoActual.totalVotosEmitidos}
+              </div>
+              <div className="text-[10px] text-[#282829]">Sufragios depositados</div>
+            </div>
+
+            <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
+              <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
+                Participación
+                <BarChart3 className="w-3.5 h-3.5 text-[#B5842A]" />
+              </div>
+              <div className="text-xl font-bold text-[#18235C] mt-0.5">
+                {escrutinio.participacionPorcentaje}%
+              </div>
+              <div className="text-[10px] text-[#282829]">Del total de la planta</div>
+            </div>
+
+            <div className="p-3.5 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/70">
+              <div className="text-[10px] font-semibold text-[#282829] uppercase tracking-wider flex items-center justify-between">
+                Quórum Legal
+                <ShieldCheck className="w-3.5 h-3.5 text-[#18235C]" />
+              </div>
+              <div className="text-sm font-bold mt-1">
+                {escrutinio.quorumValido ? (
+                  <span className="text-emerald-700 flex items-center gap-1">
+                    <Check className="w-4 h-4" /> Válido (≥ 50%)
+                  </span>
+                ) : (
+                  <span className="text-amber-700 flex items-center gap-1">
+                    <Clock className="w-4 h-4" /> En curso (&lt; 50%)
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-[#282829]">Requisito de validez electoral</div>
             </div>
           </div>
-        </div>
 
-        {/* Tabla del Censo Electoral de Trabajadores */}
-        <div className="pt-3">
-          <h4 className="text-xs font-bold text-[#18235C] uppercase tracking-wider mb-2">
-            Registro del Censo Electoral y Constancias de Sufragio:
-          </h4>
+          {/* Gráfico de Barras / Resultados por Candidato */}
+          <div className="space-y-3 pt-2">
+            <h4 className="text-xs font-bold text-[#18235C] uppercase tracking-wider">
+              Votos Computados por Plancha / Candidato:
+            </h4>
 
-          <div className="overflow-x-auto border border-[#8FA7D6] rounded-lg">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="bg-[#FFFFFF] text-[#282829] border-b border-[#8FA7D6] text-[10px] font-semibold uppercase">
-                  <th className="p-2.5">Trabajador Habilitado</th>
-                  <th className="p-2.5">Documento</th>
-                  <th className="p-2.5 text-center">Estado de Voto</th>
-                  <th className="p-2.5">Fecha y Hora de Emisión</th>
-                  <th className="p-2.5 text-right">Código Certificado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#8FA7D6]/60">
-                {empleados.map(emp => {
-                  const reg = procesoActual.votantesRegistrados.find(v => v.empleadoId === emp.id);
-                  return (
-                    <tr key={emp.id} className="hover:bg-[#FFFFFF]/50">
-                      <td className="p-2.5 font-medium text-[#18235C]">{emp.nombre}</td>
-                      <td className="p-2.5 text-[#282829]">{emp.documento}</td>
-                      <td className="p-2.5 text-center">
-                        {reg ? (
-                          <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold text-[10px] border border-emerald-200">
-                            Voto Emitido
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 text-[10px] border border-amber-200">
-                            Pendiente
+            <div className="space-y-2.5">
+              {escrutinio.candidatosOrdenados.map((cand, idx) => {
+                const pct =
+                  procesoActual.totalVotosEmitidos > 0
+                    ? Math.round((cand.votosObtenidos / procesoActual.totalVotosEmitidos) * 100)
+                    : 0;
+
+                return (
+                  <div key={cand.id} className="p-3 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/80 text-xs">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[#18235C]">
+                          #{cand.numeroTarjeton} {cand.nombre}
+                        </span>
+                        <span className="text-[10px] text-[#282829]">({cand.cargo})</span>
+                        {idx === 0 && cand.votosObtenidos > 0 && (
+                          <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
+                            Principal Electo
                           </span>
                         )}
-                      </td>
-                      <td className="p-2.5 text-[#282829]">
-                        {reg ? reg.fechaHoraVoto : '—'}
-                      </td>
-                      <td className="p-2.5 text-right font-mono text-[10px] text-[#18235C]">
-                        {reg ? reg.codigoCertificado : '—'}
+                        {idx === 1 && cand.votosObtenidos > 0 && (
+                          <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded font-bold text-[10px]">
+                            Suplente Electo
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="font-bold text-[#18235C]">
+                        {cand.votosObtenidos} votos <span className="text-[#282829] font-normal">({pct}%)</span>
+                      </div>
+                    </div>
+
+                    {/* Barra de progreso */}
+                    <div className="w-full h-2 bg-[#8FA7D6]/60 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#18235C] rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Votos en blanco */}
+              <div className="p-3 bg-[#FFFFFF] rounded-lg border border-[#8FA7D6]/80 text-xs">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="font-bold text-[#282829]">Voto en Blanco</span>
+                  <div className="font-bold text-[#282829]">
+                    {procesoActual.votosEnBlanco} votos (
+                    {procesoActual.totalVotosEmitidos > 0
+                      ? Math.round((procesoActual.votosEnBlanco / procesoActual.totalVotosEmitidos) * 100)
+                      : 0}
+                    %)
+                  </div>
+                </div>
+                <div className="w-full h-2 bg-[#8FA7D6]/60 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#8DA096] rounded-full"
+                    style={{
+                      width: `${
+                        procesoActual.totalVotosEmitidos > 0
+                          ? Math.round((procesoActual.votosEnBlanco / procesoActual.totalVotosEmitidos) * 100)
+                          : 0
+                      }%`
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla del Censo Electoral de Trabajadores */}
+          <div className="pt-3">
+            <h4 className="text-xs font-bold text-[#18235C] uppercase tracking-wider mb-2">
+              Registro del Censo Electoral y Constancias de Sufragio:
+            </h4>
+
+            <div className="overflow-x-auto border border-[#8FA7D6] rounded-lg">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-[#FFFFFF] text-[#282829] border-b border-[#8FA7D6] text-[10px] font-semibold uppercase">
+                    <th className="p-2.5">Trabajador Habilitado</th>
+                    <th className="p-2.5">Documento</th>
+                    <th className="p-2.5 text-center">Estado de Voto</th>
+                    <th className="p-2.5">Fecha y Hora de Emisión</th>
+                    <th className="p-2.5 text-right">Código Certificado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#8FA7D6]/60">
+                  {empleados.map(emp => {
+                    const reg = procesoActual.votantesRegistrados.find(v => v.empleadoId === emp.id);
+                    return (
+                      <tr key={emp.id} className="hover:bg-[#FFFFFF]/50">
+                        <td className="p-2.5 font-medium text-[#18235C]">{emp.nombre}</td>
+                        <td className="p-2.5 text-[#282829]">{emp.documento}</td>
+                        <td className="p-2.5 text-center">
+                          {reg ? (
+                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold text-[10px] border border-emerald-200">
+                              Voto Emitido
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 text-[10px] border border-amber-200">
+                              Pendiente
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-[#282829]">
+                          {reg ? reg.fechaHoraVoto : '—'}
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-[10px] text-[#18235C]">
+                          {reg ? reg.codigoCertificado : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {empleados.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-[#282829]">
+                        <Users className="w-8 h-8 text-[#18235C] mx-auto mb-2 opacity-50" />
+                        <p className="font-semibold text-sm text-[#18235C]">
+                          No hay colaboradores en el censo electoral
+                        </p>
+                        <p className="text-xs text-[#282829] max-w-md mx-auto mt-1">
+                          La base de datos de producción está limpia. Registre o importe los colaboradores en el módulo de Empleados para habilitar el censo electoral con derecho a sufragio.
+                        </p>
                       </td>
                     </tr>
-                  );
-                })}
-                {empleados.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-[#282829]">
-                      <Users className="w-8 h-8 text-[#18235C] mx-auto mb-2 opacity-50" />
-                      <p className="font-semibold text-sm text-[#18235C]">
-                        No hay colaboradores en el censo electoral
-                      </p>
-                      <p className="text-xs text-[#282829] max-w-md mx-auto mt-1">
-                        La base de datos de producción está limpia. Registre o importe los colaboradores en el módulo de Empleados para habilitar el censo electoral con derecho a sufragio.
-                      </p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* MODAL CERTIFICADO DE VOTACIÓN */}
       {certificadoActivo && (

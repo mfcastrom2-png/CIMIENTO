@@ -4,7 +4,9 @@ import {
   ControlVacacionesEmpleado,
   Empleado,
   Role,
-  SolicitudVacacionDetalle
+  Solicitud,
+  SolicitudVacacionDetalle,
+  UsuarioSistema
 } from '../types';
 import {
   INITIAL_CONTROL_VACACIONES,
@@ -13,7 +15,11 @@ import {
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowRight,
+  Briefcase,
   Calendar,
+  CalendarCheck,
+  CalendarDays,
   Check,
   CheckCircle2,
   Clock,
@@ -24,14 +30,18 @@ import {
   FileSpreadsheet,
   FileText,
   Filter,
+  Info,
+  Layers,
   Palmtree,
   Plus,
   Printer,
   Search,
+  Send,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   Sun,
+  User,
   UserCheck,
   Users,
   X,
@@ -43,15 +53,121 @@ interface ControlVacacionesViewProps {
   cargos: Cargo[];
   userRole?: Role;
   currentEmpleadoId?: string;
+  currentUser?: UsuarioSistema | null;
+  isSuperAdmin?: boolean;
+  onAddSolicitudGeneral?: (solicitud: Solicitud) => void;
 }
+
+/**
+ * Parsea salario a número para provisión contable
+ */
+const parseSalarioNumerico = (salario: number | string | undefined): number => {
+  if (typeof salario === 'number') return salario;
+  if (!salario) return 1300000;
+  const limpio = String(salario).replace(/[^0-9.-]+/g, '');
+  const num = Number(limpio);
+  return isNaN(num) || num <= 0 ? 1300000 : num;
+};
+
+/**
+ * Calcula días laborados contables entre fecha de inicio y fecha de corte
+ */
+export const calcularDiasLaborados = (fechaIngresoStr: string, fechaCorteStr?: string): number => {
+  if (!fechaIngresoStr) return 0;
+  const partes = fechaIngresoStr.split('-');
+  if (partes.length < 3) return 0;
+  const y = parseInt(partes[0], 10);
+  const m = parseInt(partes[1], 10) - 1;
+  const d = parseInt(partes[2], 10);
+  const inicio = new Date(y, m, d);
+
+  let corte = new Date();
+  if (fechaCorteStr) {
+    const partesCorte = fechaCorteStr.split('-');
+    if (partesCorte.length === 3) {
+      corte = new Date(parseInt(partesCorte[0], 10), parseInt(partesCorte[1], 10) - 1, parseInt(partesCorte[2], 10));
+    }
+  }
+
+  inicio.setHours(0, 0, 0, 0);
+  corte.setHours(0, 0, 0, 0);
+
+  if (corte.getTime() < inicio.getTime()) return 0;
+
+  const diffMs = corte.getTime() - inicio.getTime();
+  const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+  return diffDias;
+};
+
+/**
+ * Genera el registro de control de vacaciones dinámico y proporcional conforme al Art. 186 CST
+ */
+export const calcularRegistroVacaciones = (
+  empleado: Empleado,
+  cargoNombre: string,
+  diasDisfrutadosHistoricos: number = 0,
+  diasEnSolicitud: number = 0,
+  ultimoPeriodo?: string
+): ControlVacacionesEmpleado => {
+  const fechaIngreso = empleado.contrato?.inicio || '2026-01-01';
+  const diasLaborados = calcularDiasLaborados(fechaIngreso);
+
+  // Fórmula legal Art. 186 CST: (Días laborados * 15) / 360
+  const diasCausados = Math.round(((diasLaborados * 15) / 360) * 100) / 100;
+  const diasDisfrutados = Math.min(diasCausados, Math.max(0, diasDisfrutadosHistoricos));
+  const diasPendientes = Math.max(0, Math.round((diasCausados - diasDisfrutados) * 100) / 100);
+  const periodosAcumulados = Math.round((diasPendientes / 15) * 100) / 100;
+
+  let estadoAlerta: ControlVacacionesEmpleado['estadoAlerta'] = 'Al día';
+  if (diasPendientes >= 30) {
+    estadoAlerta = 'Crítico (≥ 2 periodos)';
+  } else if (diasPendientes >= 15) {
+    estadoAlerta = '1 periodo';
+  }
+
+  const salario = parseSalarioNumerico(empleado.contrato?.salario);
+  const salarioDiario = salario / 30;
+  const provisionCOP = Math.round(salarioDiario * diasPendientes);
+
+  return {
+    empleadoId: empleado.id,
+    empleadoNombre: empleado.nombre,
+    documento: empleado.documento,
+    cargoNombre,
+    fechaIngreso,
+    diasLaboradosTotal: diasLaborados,
+    diasVacacionesCausados: diasCausados,
+    diasDisfrutadosAcumulados: diasDisfrutados,
+    diasEnSolicitud,
+    diasPendientesDisfrute: diasPendientes,
+    periodosAcumulados,
+    estadoAlerta,
+    provisionAcumuladaCOP: provisionCOP,
+    ultimoPeriodoDisfrutado: ultimoPeriodo || (diasDisfrutados > 0 ? `${Math.floor(diasDisfrutados / 15)} periodo(s)` : 'Ninguno')
+  };
+};
 
 export function ControlVacacionesView({
   empleados,
   cargos,
   userRole = 'admin',
-  currentEmpleadoId
+  currentEmpleadoId,
+  currentUser,
+  isSuperAdmin,
+  onAddSolicitudGeneral
 }: ControlVacacionesViewProps) {
   const [controles, setControles] = useState<ControlVacacionesEmpleado[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bgroup_vacaciones_controles');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch {}
+      }
+    }
     const limpio = typeof window !== 'undefined' && localStorage.getItem('bgroup_datos_limpios') === 'true';
     if (limpio || empleados.length === 0) {
       const empIds = new Set(empleados.map(e => e.id));
@@ -61,6 +177,17 @@ export function ControlVacacionesView({
   });
 
   const [solicitudes, setSolicitudes] = useState<SolicitudVacacionDetalle[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('bgroup_vacaciones_solicitudes');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch {}
+      }
+    }
     const limpio = typeof window !== 'undefined' && localStorage.getItem('bgroup_datos_limpios') === 'true';
     if (limpio || empleados.length === 0) {
       const empIds = new Set(empleados.map(e => e.id));
@@ -69,40 +196,103 @@ export function ControlVacacionesView({
     return INITIAL_SOLICITUDES_VACACIONES;
   });
 
-  // Sincronizar automáticamente controles y solicitudes cuando la lista de empleados cambie
-  useEffect(() => {
-    const limpio = typeof window !== 'undefined' && localStorage.getItem('bgroup_datos_limpios') === 'true';
-    if (limpio || empleados.length === 0) {
-      const empIds = new Set(empleados.map(e => e.id));
-      setControles(prev => {
-        const existentesFiltrados = prev.filter(c => empIds.has(c.empleadoId));
-        const existentesIds = new Set(existentesFiltrados.map(c => c.empleadoId));
-        const nuevos: ControlVacacionesEmpleado[] = empleados.filter(e => !existentesIds.has(e.id)).map(e => {
-          const cargo = cargos.find(cg => cg.id === e.cargoId);
-          const diasCausados = 15;
-          return {
-            empleadoId: e.id,
-            empleadoNombre: e.nombre,
-            documento: e.documento,
-            cargoNombre: cargo?.nombre || 'Colaborador',
-            fechaIngreso: e.contrato.inicio || '2026-01-01',
-            diasLaboradosTotal: 360,
-            diasVacacionesCausados: diasCausados,
-            diasDisfrutadosAcumulados: 0,
-            diasEnSolicitud: 0,
-            diasPendientesDisfrute: diasCausados,
-            periodosAcumulados: 1,
-            estadoAlerta: 'Al día',
-            provisionAcumuladaCOP: 800000,
-            ultimoPeriodoDisfrutado: 'Ninguno'
-          };
-        });
-        return [...existentesFiltrados, ...nuevos];
-      });
+  // Detección del modo Colaborador
+  const isEmployeeMode = userRole === 'empleado' || currentUser?.rol === 'empleado';
 
-      setSolicitudes(prev => prev.filter(s => empIds.has(s.empleadoId)));
+  // Buscar el empleado actual en base a currentUser / currentEmpleadoId
+  const myEmpleado = useMemo(() => {
+    return empleados.find(e =>
+      (currentUser?.empleadoId && e.id === currentUser.empleadoId) ||
+      (currentEmpleadoId && e.id === currentEmpleadoId) ||
+      (currentUser?.email && e.email?.toLowerCase() === currentUser.email?.toLowerCase()) ||
+      (currentUser?.documento && e.documento === currentUser.documento)
+    );
+  }, [empleados, currentEmpleadoId, currentUser]);
+
+  const [simulatedEmpleadoId, setSimulatedEmpleadoId] = useState<string>(() => {
+    return myEmpleado?.id || currentEmpleadoId || currentUser?.empleadoId || empleados[0]?.id || '';
+  });
+
+  useEffect(() => {
+    if (myEmpleado?.id) {
+      setSimulatedEmpleadoId(myEmpleado.id);
+    } else if (currentEmpleadoId) {
+      setSimulatedEmpleadoId(currentEmpleadoId);
+    } else if (empleados.length > 0 && !simulatedEmpleadoId) {
+      setSimulatedEmpleadoId(empleados[0].id);
     }
+  }, [myEmpleado?.id, currentEmpleadoId, empleados]);
+
+  const effectiveEmpleado = (isEmployeeMode && myEmpleado && !isSuperAdmin)
+    ? myEmpleado
+    : (empleados.find(e => e.id === simulatedEmpleadoId) || myEmpleado || empleados[0]);
+
+  const miControl = useMemo(() => {
+    if (!effectiveEmpleado) return null;
+    return controles.find(c => c.empleadoId === effectiveEmpleado.id) || null;
+  }, [controles, effectiveEmpleado]);
+
+  const misSolicitudes = useMemo(() => {
+    if (!effectiveEmpleado) return [];
+    return solicitudes.filter(s => s.empleadoId === effectiveEmpleado.id);
+  }, [solicitudes, effectiveEmpleado]);
+
+  // Modo de vista: 'admin' (Cuadro General de la Empresa) o 'empleado' (Mi Portal de Vacaciones)
+  const [viewMode, setViewMode] = useState<'admin' | 'empleado'>(isEmployeeMode ? 'empleado' : 'admin');
+
+  useEffect(() => {
+    if (isEmployeeMode) {
+      setViewMode('empleado');
+    }
+  }, [isEmployeeMode]);
+
+  const [employeeTab, setEmployeeTab] = useState<'solicitudes' | 'periodos' | 'normativa'>('solicitudes');
+
+  // Sincronizar automáticamente controles y solicitudes calculando causación proporcional exacta (Art. 186 CST)
+  useEffect(() => {
+    if (empleados.length === 0) {
+      setControles([]);
+      setSolicitudes([]);
+      return;
+    }
+
+    setControles(prev => {
+      const prevMap = new Map(prev.map(c => [c.empleadoId, c]));
+      const initMap = new Map(INITIAL_CONTROL_VACACIONES.map(c => [c.empleadoId, c]));
+
+      return empleados.map(emp => {
+        const cargo = cargos.find(cg => cg.id === emp.cargoId);
+        const existing = prevMap.get(emp.id) || initMap.get(emp.id);
+
+        const diasDisfrutados = existing?.diasDisfrutadosAcumulados || 0;
+        const diasEnSolicitud = existing?.diasEnSolicitud || 0;
+        const ultimoPeriodo = existing?.ultimoPeriodoDisfrutado;
+
+        return calcularRegistroVacaciones(
+          emp,
+          cargo?.nombre || existing?.cargoNombre || 'Colaborador',
+          diasDisfrutados,
+          diasEnSolicitud,
+          ultimoPeriodo
+        );
+      });
+    });
+
+    const empIds = new Set(empleados.map(e => e.id));
+    setSolicitudes(prev => prev.filter(s => empIds.has(s.empleadoId)));
   }, [empleados, cargos]);
+
+  // Persistir cambios en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && controles.length > 0) {
+      try {
+        localStorage.setItem('bgroup_vacaciones_controles', JSON.stringify(controles));
+        localStorage.setItem('bgroup_vacaciones_solicitudes', JSON.stringify(solicitudes));
+      } catch (err) {
+        console.warn('Error al guardar vacaciones en localStorage', err);
+      }
+    }
+  }, [controles, solicitudes]);
 
   const [activeTab, setActiveTab] = useState<'matriz' | 'solicitudes' | 'normativa'>('matriz');
 
@@ -217,11 +407,17 @@ export function ControlVacacionesView({
           if (c.empleadoId === sol.empleadoId) {
             const nuevosPendientes = Math.max(0, c.diasPendientesDisfrute - sol.diasHabiles);
             const nuevosDisfrutados = c.diasDisfrutadosAcumulados + sol.diasHabiles;
+            const empObj = empleados.find(e => e.id === c.empleadoId);
+            const salarioNum = parseSalarioNumerico(empObj?.contrato?.salario);
+            const nuevaProvision = Math.round((salarioNum / 30) * nuevosPendientes);
+
             return {
               ...c,
               diasPendientesDisfrute: Math.round(nuevosPendientes * 100) / 100,
               diasDisfrutadosAcumulados: Math.round(nuevosDisfrutados * 100) / 100,
               diasEnSolicitud: 0,
+              periodosAcumulados: Math.round((nuevosPendientes / 15) * 100) / 100,
+              provisionAcumuladaCOP: nuevaProvision,
               estadoAlerta: nuevosPendientes >= 30 ? 'Crítico (≥ 2 periodos)' : nuevosPendientes >= 15 ? '1 periodo' : 'Al día'
             };
           }
@@ -267,16 +463,58 @@ export function ControlVacacionesView({
     showToast('Solicitud actualizada como rechazada / aplazada.');
   };
 
+  // Abrir modal con colaborador y días sugeridos
+  const handleAbrirModalSolicitud = (targetEmpleadoId?: string) => {
+    const empId = targetEmpleadoId || (viewMode === 'empleado' ? effectiveEmpleado?.id : formSolicitud.empleadoId) || empleados[0]?.id || '';
+    const ctrl = controles.find(c => c.empleadoId === empId);
+    const saldo = ctrl ? Math.floor(ctrl.diasPendientesDisfrute) : 6;
+    const diasSugeridos = Math.min(15, Math.max(1, saldo > 0 ? saldo : 6));
+
+    // Sugerir fecha con 15 días hábiles de anticipación (Art. 187 CST)
+    const fechaMin = new Date();
+    fechaMin.setDate(fechaMin.getDate() + 15);
+    const fechaMinStr = fechaMin.toISOString().split('T')[0];
+
+    setFormSolicitud({
+      empleadoId: empId,
+      fechaInicio: fechaMinStr,
+      diasHabiles: diasSugeridos,
+      periodoCorrespondiente: ctrl?.ultimoPeriodoDisfrutado && ctrl.ultimoPeriodoDisfrutado !== 'Ninguno' ? '2025 - 2026' : '2024 - 2025',
+      reemplazoCargo: '',
+      reemplazoEmpleadoId: empleados.find(e => e.id !== empId)?.id || '',
+      observaciones: ''
+    });
+    setModalNuevaSolicitudOpen(true);
+  };
+
   // Acción: Crear nueva solicitud
   const handleCrearSolicitud = (e: React.FormEvent) => {
     e.preventDefault();
     const emp = empleados.find(e => e.id === formSolicitud.empleadoId);
     if (!emp) return;
 
+    const controlEmp = controles.find(c => c.empleadoId === emp.id);
+    const diasPedir = Number(formSolicitud.diasHabiles);
+
+    if (controlEmp && diasPedir > controlEmp.diasPendientesDisfrute) {
+      const confirmarAnticipadas = window.confirm(
+        `Atención: El saldo actual causado es de ${controlEmp.diasPendientesDisfrute} días. ¿Deseas solicitar ${diasPedir} días programando la diferencia como vacaciones anticipadas conforme al Art. 187 del CST?`
+      );
+      if (!confirmarAnticipadas) return;
+    }
+
     // Calcular fecha retorno estimada (sumando días hábiles)
     const fechaSalida = new Date(formSolicitud.fechaInicio);
-    const fechaRetorno = new Date(fechaSalida);
-    fechaRetorno.setDate(fechaRetorno.getDate() + formSolicitud.diasHabiles + 3); // estimación básica sin domingos
+    let fechaRetorno = new Date(fechaSalida);
+    let diasContados = 0;
+    while (diasContados < diasPedir) {
+      fechaRetorno.setDate(fechaRetorno.getDate() + 1);
+      if (fechaRetorno.getDay() !== 0) { // Omitir domingos
+        diasContados++;
+      }
+    }
+
+    const esAdminDirecto = userRole === 'admin' && viewMode === 'admin';
 
     const nuevaSol: SolicitudVacacionDetalle = {
       id: `vac-sol-${Date.now().toString().slice(-4)}`,
@@ -284,17 +522,17 @@ export function ControlVacacionesView({
       empleadoNombre: emp.nombre,
       fechaSolicitud: new Date().toISOString().split('T')[0],
       fechaInicio: formSolicitud.fechaInicio,
-      fechaFin: fechaSalida.toISOString().split('T')[0],
+      fechaFin: fechaRetorno.toISOString().split('T')[0],
       fechaReintegro: fechaRetorno.toISOString().split('T')[0],
-      diasHabiles: Number(formSolicitud.diasHabiles),
-      diasCalendario: Number(formSolicitud.diasHabiles) + 2,
+      diasHabiles: diasPedir,
+      diasCalendario: Math.ceil((fechaRetorno.getTime() - fechaSalida.getTime()) / (1000 * 60 * 60 * 24)),
       periodoCorrespondiente: formSolicitud.periodoCorrespondiente,
-      estado: userRole === 'admin' ? 'Aprobada' : 'Pendiente',
+      estado: esAdminDirecto ? 'Aprobada' : 'Pendiente',
       reemplazoCargo: formSolicitud.reemplazoCargo,
       reemplazoEmpleadoId: formSolicitud.reemplazoEmpleadoId,
       liquidadoEnNomina: false,
-      aprobadoPor: userRole === 'admin' ? 'Administrador GH' : undefined,
-      fechaAprobacion: userRole === 'admin' ? new Date().toISOString().split('T')[0] : undefined
+      aprobadoPor: esAdminDirecto ? 'Administrador GH' : undefined,
+      fechaAprobacion: esAdminDirecto ? new Date().toISOString().split('T')[0] : undefined
     };
 
     setSolicitudes(prev => [nuevaSol, ...prev]);
@@ -303,18 +541,23 @@ export function ControlVacacionesView({
     setControles(prev =>
       prev.map(c => {
         if (c.empleadoId === emp.id) {
-          if (userRole === 'admin') {
+          if (esAdminDirecto) {
             const nuevosPendientes = Math.max(0, c.diasPendientesDisfrute - nuevaSol.diasHabiles);
+            const salarioNum = parseSalarioNumerico(emp.contrato?.salario);
+            const nuevaProvision = Math.round((salarioNum / 30) * nuevosPendientes);
+
             return {
               ...c,
               diasDisfrutadosAcumulados: c.diasDisfrutadosAcumulados + nuevaSol.diasHabiles,
               diasPendientesDisfrute: Math.round(nuevosPendientes * 100) / 100,
+              periodosAcumulados: Math.round((nuevosPendientes / 15) * 100) / 100,
+              provisionAcumuladaCOP: nuevaProvision,
               estadoAlerta: nuevosPendientes >= 30 ? 'Crítico (≥ 2 periodos)' : nuevosPendientes >= 15 ? '1 periodo' : 'Al día'
             };
           } else {
             return {
               ...c,
-              diasEnSolicitud: nuevaSol.diasHabiles
+              diasEnSolicitud: (c.diasEnSolicitud || 0) + nuevaSol.diasHabiles
             };
           }
         }
@@ -322,8 +565,32 @@ export function ControlVacacionesView({
       })
     );
 
+    // Sincronizar con el gestor general de permisos y solicitudes
+    if (onAddSolicitudGeneral) {
+      onAddSolicitudGeneral({
+        id: nuevaSol.id,
+        empresaId: currentUser?.empresaId || 'empresa-a',
+        empleadoId: emp.id,
+        empleadoNombre: emp.nombre,
+        empleadoEmail: emp.email || '',
+        tipo: 'Vacaciones',
+        inicio: formSolicitud.fechaInicio,
+        fin: fechaRetorno.toISOString().split('T')[0],
+        motivo: `Solicitud de vacaciones (${diasPedir} días hábiles) - Periodo ${formSolicitud.periodoCorrespondiente}. ${formSolicitud.observaciones || ''}`.trim(),
+        estado: esAdminDirecto ? 'Aprobada' : 'Pendiente',
+        decisorId: esAdminDirecto ? (currentUser?.id || 'admin') : null,
+        fechaDecision: esAdminDirecto ? new Date().toISOString().split('T')[0] : null,
+        comentario: formSolicitud.observaciones || '',
+        fechaCreacion: new Date().toISOString().split('T')[0]
+      });
+    }
+
     setModalNuevaSolicitudOpen(false);
-    showToast(`Solicitud de ${emp.nombre} registrada correctamente.`);
+    showToast(
+      esAdminDirecto
+        ? `Vacaciones de ${emp.nombre} registradas y aprobadas exitosamente.`
+        : `¡Tu solicitud de vacaciones (${diasPedir} días) ha sido radicada exitosamente y enviada a Gestión Humana!`
+    );
   };
 
   const getAlertaBadge = (alerta: string) => {
@@ -397,143 +664,719 @@ export function ControlVacacionesView({
         </div>
       )}
 
-      {/* Header Principal */}
-      <div className="bg-white rounded-xl border border-[#8FA7D6]/30 p-5 sm:p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#18235C]/10 text-[#18235C] border border-[#18235C]/20 flex items-center gap-1">
-                <Palmtree className="w-3.5 h-3.5 text-[#18235C]" />
-                Control de Descansos Remunerados
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#8FA7D6]/15 text-[#18235C] border border-[#8FA7D6]/30">
-                Artículos 186 al 192 del CST
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                B GROUP INGENIERIA S.A.S.
-              </span>
+      {/* Barra de alternancia de vista para Administradores / Gestión Humana */}
+      {!isEmployeeMode && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-[#8FA7D6]/30 shadow-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-[#18235C] flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              Modo de Gestión:
+            </span>
+            <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-[#8FA7D6]/30">
+              <button
+                onClick={() => setViewMode('admin')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  viewMode === 'admin'
+                    ? 'bg-[#18235C] text-white shadow-xs'
+                    : 'text-[#282829]/70 hover:text-[#18235C]'
+                }`}
+              >
+                Cuadro General GH (Matriz de Saldos)
+              </button>
+              <button
+                onClick={() => setViewMode('empleado')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                  viewMode === 'empleado'
+                    ? 'bg-[#18235C] text-white shadow-xs'
+                    : 'text-[#282829]/70 hover:text-[#18235C]'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                Vista "Mis Vacaciones" (Portal Colaborador)
+              </button>
             </div>
-            <h2 className="text-xl font-bold text-[#18235C]">
-              Cuadro de Control de Solicitudes y Saldos de Vacaciones
-            </h2>
-            <p className="text-xs sm:text-sm text-[#282829]/70 mt-0.5 max-w-2xl">
-              Seguimiento exacto de causación (15 días hábiles por año continuo de servicios), semáforo de acumulación legal para prevención de contingencias (Art. 190 CST) y registro contable de provisiones en libros.
-            </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
-            <button
-              id="btn-ver-planilla-vacaciones"
-              onClick={() => setModalPlanillaOpen(true)}
-              className="px-3.5 py-2 text-xs font-semibold bg-[#8FA7D6]/15 hover:bg-[#8FA7D6]/25 text-[#18235C] rounded-lg border border-[#8FA7D6]/40 flex items-center gap-1.5 transition-colors shadow-xs"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#18235C]" />
-              <span>Planilla Oficial Imprimible</span>
-            </button>
-
-            <button
-              id="btn-nueva-solicitud-vacaciones"
-              onClick={() => setModalNuevaSolicitudOpen(true)}
-              className="px-4 py-2 text-xs font-semibold bg-[#18235C] hover:bg-[#18235C]/90 text-white rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
-            >
-              <Plus className="w-4 h-4 text-[#00FF00]" />
-              <span>Nueva Solicitud</span>
-            </button>
-          </div>
+          {viewMode === 'empleado' && (
+            <div className="flex items-center gap-2 text-xs w-full sm:w-auto">
+              <span className="text-[#282829]/70 whitespace-nowrap font-medium">Ver como:</span>
+              <select
+                value={simulatedEmpleadoId}
+                onChange={e => setSimulatedEmpleadoId(e.target.value)}
+                className="bg-slate-50 border border-[#8FA7D6]/40 rounded-lg px-2.5 py-1 font-semibold text-[#18235C] focus:outline-none focus:border-[#18235C] text-xs"
+              >
+                {empleados.map(emp => {
+                  const ctrl = controles.find(c => c.empleadoId === emp.id);
+                  return (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.nombre} ({ctrl?.diasPendientesDisfrute ?? 0} d disponibles)
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
         </div>
+      )}
 
-        {/* Métricas Consolidadas */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-5 pt-4 border-t border-[#8FA7D6]/20">
-          <div className="p-3.5 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30">
-            <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
-              Días Pendientes Totales
-              <Palmtree className="w-3.5 h-3.5 text-[#18235C]" />
+      {/* ======================================================== */}
+      {/* VISTA MODO COLABORADOR: "MIS VACACIONES"                */}
+      {/* ======================================================== */}
+      {viewMode === 'empleado' && (
+        <div className="space-y-5">
+          {/* Header Principal del Colaborador */}
+          <div className="bg-white rounded-xl border border-[#8FA7D6]/30 p-5 sm:p-6 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#18235C]/10 text-[#18235C] border border-[#18235C]/20 flex items-center gap-1">
+                    <Palmtree className="w-3.5 h-3.5 text-[#18235C]" />
+                    Portal de Autoservicio
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#8FA7D6]/15 text-[#18235C] border border-[#8FA7D6]/30">
+                    Artículos 186 al 192 del CST
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                    B GROUP INGENIERIA S.A.S.
+                  </span>
+                </div>
+                <h2 className="text-xl font-bold text-[#18235C]">
+                  Mis Vacaciones Remuneradas
+                </h2>
+                <p className="text-xs sm:text-sm text-[#282829]/70 mt-0.5 max-w-2xl">
+                  Consulta en tiempo real tus días acumulados por tiempo de servicio laboral, tu saldo pendiente y radica tus solicitudes de descanso para revisión de Gestión Humana.
+                </p>
+              </div>
+
+              {/* Botón Principal para Radicar Solicitud */}
+              <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+                <button
+                  id="btn-solicitar-mis-vacaciones"
+                  onClick={() => handleAbrirModalSolicitud(effectiveEmpleado?.id)}
+                  className="px-5 py-2.5 text-xs sm:text-sm font-bold bg-[#18235C] hover:bg-[#18235C]/90 text-white rounded-xl flex items-center gap-2 transition-all shadow-md hover:shadow-lg cursor-pointer transform active:scale-95"
+                >
+                  <Palmtree className="w-4 h-4 text-[#00FF00]" />
+                  <span>Solicitar Mis Vacaciones</span>
+                </button>
+              </div>
             </div>
-            <div className="text-xl font-bold text-[#18235C] mt-0.5">
-              {resumenVacaciones.totalPendientes} <span className="text-xs font-normal text-[#282829]/60">días hábiles</span>
+
+            {/* Ficha del Titular */}
+            <div className="mt-5 pt-4 border-t border-[#8FA7D6]/20 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-[#8FA7D6]/10 p-4 rounded-xl border border-[#8FA7D6]/30">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-full bg-[#18235C] text-white flex items-center justify-center font-bold text-lg shadow-xs shrink-0">
+                  {effectiveEmpleado?.nombre?.split(' ').map(n => n[0]).slice(0, 2).join('') || 'CO'}
+                </div>
+                <div>
+                  <div className="font-bold text-sm sm:text-base text-[#18235C] flex items-center gap-2 flex-wrap">
+                    {effectiveEmpleado?.nombre}
+                    <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-semibold border border-emerald-200">
+                      Contrato Activo
+                    </span>
+                  </div>
+                  <div className="text-xs text-[#282829]/70 flex items-center gap-2 flex-wrap mt-0.5">
+                    <span className="flex items-center gap-1 font-medium">
+                      <Briefcase className="w-3 h-3 text-[#18235C]" />
+                      {miControl?.cargoNombre || 'Colaborador'}
+                    </span>
+                    <span>•</span>
+                    <span><strong>CC:</strong> {effectiveEmpleado?.documento}</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-[#18235C]" />
+                      <strong>Fecha de Ingreso:</strong> {miControl?.fechaIngreso || '2026-01-01'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 divide-x divide-[#8FA7D6]/30 pt-2 md:pt-0 border-t md:border-t-0 border-[#8FA7D6]/20">
+                <div className="text-left md:text-right">
+                  <div className="text-[10px] text-[#282829]/60 font-semibold uppercase tracking-wider">Antigüedad Contable</div>
+                  <div className="text-xs font-bold text-[#18235C]">
+                    {miControl?.diasLaboradosTotal || 0} días laborados
+                  </div>
+                  <div className="text-[10px] text-[#282829]/60">
+                    Aprox. {((miControl?.diasLaboradosTotal || 0) / 30).toFixed(1)} meses continuos
+                  </div>
+                </div>
+                <div className="pl-4 text-left md:text-right">
+                  <div className="text-[10px] text-[#282829]/60 font-semibold uppercase tracking-wider">Causación Mensual</div>
+                  <div className="text-xs font-bold text-emerald-700">1.25 días / mes</div>
+                  <div className="text-[10px] text-[#282829]/60">15 días hábiles / año</div>
+                </div>
+              </div>
             </div>
-            <div className="text-[10px] text-[#282829]/60">Por disfrutar en la plantilla</div>
+
+            {/* 4 Métricas Principales del Colaborador */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mt-4">
+              {/* Días Causados Acumulados */}
+              <div className="p-4 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-xl border border-[#8FA7D6]/30 shadow-xs">
+                <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
+                  Días Causados Acumulados
+                  <Palmtree className="w-4 h-4 text-[#18235C]" />
+                </div>
+                <div className="text-2xl font-black text-[#18235C] mt-1">
+                  {miControl?.diasVacacionesCausados ?? 0} <span className="text-xs font-medium text-[#282829]/60">días hábiles</span>
+                </div>
+                <div className="text-[10px] text-[#282829]/60 mt-1">
+                  Causación Art. 186 CST (15 d / 360 d)
+                </div>
+              </div>
+
+              {/* Días Disfrutados */}
+              <div className="p-4 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-xl border border-[#8FA7D6]/30 shadow-xs">
+                <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
+                  Días Disfrutados
+                  <Sun className="w-4 h-4 text-amber-500" />
+                </div>
+                <div className="text-2xl font-black text-[#18235C] mt-1">
+                  {miControl?.diasDisfrutadosAcumulados ?? 0} <span className="text-xs font-medium text-[#282829]/60">días gozados</span>
+                </div>
+                <div className="text-[10px] text-[#282829]/60 mt-1">
+                  Último periodo: {miControl?.ultimoPeriodoDisfrutado || 'Ninguno'}
+                </div>
+              </div>
+
+              {/* Saldo Pendiente Disponible */}
+              <div className="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent rounded-xl border border-emerald-300 shadow-xs">
+                <div className="text-[10px] font-semibold text-emerald-900 uppercase tracking-wider flex items-center justify-between">
+                  Saldo Disponible para Goce
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="text-2xl font-black text-emerald-800 mt-1">
+                  {miControl?.diasPendientesDisfrute ?? 0} <span className="text-xs font-medium text-emerald-700">días hábiles</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-1 flex-wrap">
+                  <span className="text-[10px] text-emerald-700 font-semibold">Saldo a tu favor</span>
+                  {getAlertaBadge(miControl?.estadoAlerta || 'Al día')}
+                </div>
+              </div>
+
+              {/* Días en Trámite / Solicitud */}
+              <div className="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent rounded-xl border border-amber-300 shadow-xs">
+                <div className="text-[10px] font-semibold text-amber-900 uppercase tracking-wider flex items-center justify-between">
+                  Días en Trámite
+                  <Clock className="w-4 h-4 text-amber-600" />
+                </div>
+                <div className="text-2xl font-black text-amber-800 mt-1">
+                  {misSolicitudes.filter(s => s.estado === 'Pendiente').reduce((acc, s) => acc + s.diasHabiles, 0)} <span className="text-xs font-medium text-amber-700">días</span>
+                </div>
+                <div className="text-[10px] text-amber-700 mt-1">
+                  {misSolicitudes.filter(s => s.estado === 'Pendiente').length} solicitud(es) en revisión por Gestión Humana
+                </div>
+              </div>
+            </div>
+
+            {/* Banner de Explicación Legal y Fórmula Exacta (Art. 186 CST) */}
+            <div className="mt-4 p-4 bg-blue-50/70 rounded-xl border border-blue-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-900">
+              <div className="flex items-start gap-3">
+                <Info className="w-5 h-5 text-[#18235C] shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-[#18235C]">
+                    ¿Cómo se calcula tu saldo de vacaciones acumuladas?
+                  </div>
+                  <p className="text-[#282829]/80 leading-relaxed text-[11px]">
+                    Conforme al <strong>Art. 186 del Código Sustantivo del Trabajo (CST)</strong>, acumulas 15 días hábiles remunerados por cada 360 días laborados.
+                    Desde tu fecha de ingreso (<strong>{miControl?.fechaIngreso}</strong>), has acumulado exactamente{' '}
+                    <strong className="text-[#18235C]">{miControl?.diasVacacionesCausados} días hábiles</strong>.
+                    Habiendo disfrutado <strong className="text-[#18235C]">{miControl?.diasDisfrutadosAcumulados} días</strong>, tu saldo disponible actual es de{' '}
+                    <strong className="text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">
+                      {miControl?.diasPendientesDisfrute} días hábiles
+                    </strong>.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleAbrirModalSolicitud(effectiveEmpleado?.id)}
+                className="shrink-0 px-3.5 py-1.5 bg-[#18235C] text-white rounded-lg text-xs font-semibold hover:bg-[#18235C]/90 transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                <span>Programar Descanso</span>
+                <ArrowRight className="w-3.5 h-3.5 text-[#00FF00]" />
+              </button>
+            </div>
+
+            {/* Pestañas de Navegación del Colaborador */}
+            <div className="flex border-b border-[#8FA7D6]/20 mt-6 gap-6 text-xs font-semibold overflow-x-auto">
+              <button
+                onClick={() => setEmployeeTab('solicitudes')}
+                className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+                  employeeTab === 'solicitudes'
+                    ? 'border-[#18235C] text-[#18235C] font-bold'
+                    : 'border-transparent text-[#282829]/60 hover:text-[#18235C]'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                Mis Solicitudes y Descansos ({misSolicitudes.length})
+                {misSolicitudes.filter(s => s.estado === 'Pendiente').length > 0 && (
+                  <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px]">
+                    {misSolicitudes.filter(s => s.estado === 'Pendiente').length} en trámite
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setEmployeeTab('periodos')}
+                className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+                  employeeTab === 'periodos'
+                    ? 'border-[#18235C] text-[#18235C] font-bold'
+                    : 'border-transparent text-[#282829]/60 hover:text-[#18235C]'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Mi Estado de Cuenta y Periodos
+              </button>
+              <button
+                onClick={() => setEmployeeTab('normativa')}
+                className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+                  employeeTab === 'normativa'
+                    ? 'border-[#18235C] text-[#18235C] font-bold'
+                    : 'border-transparent text-[#282829]/60 hover:text-[#18235C]'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Guía Laboral del Colaborador (CST)
+              </button>
+            </div>
           </div>
 
-          <div className="p-3.5 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30">
-            <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
-              Alertas de Acumulación
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-            </div>
-            <div className={`text-xl font-bold mt-0.5 ${resumenVacaciones.alertasCriticas > 0 ? 'text-rose-700' : 'text-[#18235C]'}`}>
-              {resumenVacaciones.alertasCriticas} <span className="text-xs font-normal text-[#282829]/60">casos críticos</span>
-            </div>
-            <div className="text-[10px] text-[#282829]/60">Riesgo legal Art. 190 CST</div>
-          </div>
+          {/* TAB 1 EMPLEADO: MIS SOLICITUDES */}
+          {employeeTab === 'solicitudes' && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl border border-[#8FA7D6]/30 overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-[#8FA7D6]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-sm text-[#18235C]">
+                      Historial de Solicitudes Radicadas
+                    </h3>
+                    <p className="text-[11px] text-[#282829]/70">
+                      Registro de tus peticiones de descanso, estado de visto bueno por Gestión Humana y fechas autorizadas.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleAbrirModalSolicitud(effectiveEmpleado?.id)}
+                    className="px-3.5 py-1.5 bg-[#18235C] text-white text-xs font-semibold rounded-lg hover:bg-[#18235C]/90 flex items-center gap-1.5 shadow-xs shrink-0 self-start sm:self-auto"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-[#00FF00]" />
+                    <span>Nueva Solicitud</span>
+                  </button>
+                </div>
 
-          <div className="p-3.5 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30">
-            <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
-              Solicitudes Pendientes
-              <Clock className="w-3.5 h-3.5 text-amber-500" />
-            </div>
-            <div className="text-xl font-bold text-[#18235C] mt-0.5">
-              {resumenVacaciones.pendientesAprobacion}
-            </div>
-            <div className="text-[10px] text-[#282829]/60">Por autorizar por GH</div>
-          </div>
+                {misSolicitudes.length === 0 ? (
+                  <div className="p-12 text-center text-[#282829]/60 space-y-3">
+                    <div className="w-16 h-16 bg-[#8FA7D6]/15 rounded-full flex items-center justify-center mx-auto text-[#18235C]">
+                      <Palmtree className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-[#18235C]">
+                        No tienes solicitudes de vacaciones registradas
+                      </h4>
+                      <p className="text-xs text-[#282829]/70 max-w-md mx-auto mt-1">
+                        Cuentas con <strong className="text-emerald-700">{miControl?.diasPendientesDisfrute ?? 0} días hábiles disponibles</strong>.
+                        Cuando desees programar tu descanso remunerado, haz clic en el botón a continuación.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleAbrirModalSolicitud(effectiveEmpleado?.id)}
+                      className="px-4 py-2 bg-[#18235C] text-white text-xs font-bold rounded-lg hover:bg-[#18235C]/90 inline-flex items-center gap-2 shadow-xs mt-2"
+                    >
+                      <Plus className="w-4 h-4 text-[#00FF00]" />
+                      <span>Radicar mi Primera Solicitud</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-[#18235C] text-white font-semibold uppercase tracking-wider text-[10px]">
+                          <th className="p-3.5">Radicado & Periodo</th>
+                          <th className="p-3.5">Fechas del Descanso</th>
+                          <th className="p-3.5 text-center">Días Hábiles</th>
+                          <th className="p-3.5">Compañero de Cobertura</th>
+                          <th className="p-3.5">Estado de la Solicitud</th>
+                          <th className="p-3.5 text-center">Detalle</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#8FA7D6]/20">
+                        {misSolicitudes.map(sol => (
+                          <tr key={sol.id} className="hover:bg-[#8FA7D6]/10 transition-colors">
+                            <td className="p-3.5">
+                              <div className="font-bold text-[#18235C]">{sol.id}</div>
+                              <div className="text-[11px] text-[#282829]/70 font-medium">
+                                Periodo: {sol.periodoCorrespondiente}
+                              </div>
+                              <div className="text-[10px] text-[#282829]/50">
+                                Radicada el: {sol.fechaSolicitud}
+                              </div>
+                            </td>
 
-          <div className="p-3.5 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30">
-            <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
-              Provisión en Libros
-              <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                            <td className="p-3.5">
+                              <div className="font-medium text-[#282829]">
+                                Salida: <strong>{sol.fechaInicio}</strong> → Fin: {sol.fechaFin}
+                              </div>
+                              <div className="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                                Reintegro a labores: {sol.fechaReintegro}
+                              </div>
+                            </td>
+
+                            <td className="p-3.5 text-center">
+                              <span className="px-2.5 py-1 rounded-md bg-[#18235C]/10 border border-[#18235C]/20 font-bold text-xs text-[#18235C]">
+                                {sol.diasHabiles} días hábiles
+                              </span>
+                              <div className="text-[10px] text-[#282829]/50 mt-1">
+                                {sol.diasCalendario} d. calendario
+                              </div>
+                            </td>
+
+                            <td className="p-3.5 text-[#282829]/70">
+                              <div className="font-medium text-[#282829]">
+                                {sol.reemplazoCargo || 'Sin cobertura requerida'}
+                              </div>
+                            </td>
+
+                            <td className="p-3.5">
+                              {getEstadoSolicitudBadge(sol.estado)}
+                              {sol.aprobadoPor && (
+                                <div className="text-[10px] text-[#282829]/50 mt-1">
+                                  Aprobó: {sol.aprobadoPor} ({sol.fechaAprobacion || ''})
+                                </div>
+                              )}
+                              {sol.motivoRechazo && (
+                                <div className="text-[10px] text-rose-700 mt-1 italic">
+                                  Observación GH: {sol.motivoRechazo}
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="p-3.5 text-center">
+                              <button
+                                onClick={() => setSolicitudSeleccionada(sol)}
+                                className="p-1.5 text-[#18235C] hover:bg-[#8FA7D6]/20 rounded border border-[#8FA7D6]/40 transition-colors"
+                                title="Ver comprobante de solicitud"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="text-base sm:text-lg font-bold text-[#18235C] mt-0.5">
-              {formatCOP(resumenVacaciones.totalProvision)}
+          )}
+
+          {/* TAB 2 EMPLEADO: ESTADO DE CUENTA Y PERIODOS */}
+          {employeeTab === 'periodos' && (
+            <div className="space-y-4">
+              <div className="bg-white p-5 rounded-xl border border-[#8FA7D6]/30 shadow-xs space-y-4 text-xs">
+                <div className="flex items-center justify-between border-b border-[#8FA7D6]/20 pb-3">
+                  <div>
+                    <h3 className="font-bold text-sm text-[#18235C]">
+                      Estado de Cuenta Individual de Vacaciones
+                    </h3>
+                    <p className="text-[11px] text-[#282829]/70">
+                      Detalle técnico de causación continua conforme al Código Sustantivo del Trabajo de Colombia.
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-[#282829]/60 block uppercase font-semibold">Vigencia Actual</span>
+                    <span className="font-bold text-[#18235C]">Año 2026</span>
+                  </div>
+                </div>
+
+                {/* Fórmula explicativa */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3.5 bg-slate-50 rounded-lg border border-[#8FA7D6]/30 space-y-1">
+                    <div className="text-[10px] text-[#282829]/60 uppercase font-semibold">1. Tiempo de Servicio</div>
+                    <div className="text-base font-bold text-[#18235C]">{miControl?.diasLaboradosTotal || 0} días</div>
+                    <div className="text-[10px] text-[#282829]/70">Desde su ingreso ({miControl?.fechaIngreso})</div>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 rounded-lg border border-[#8FA7D6]/30 space-y-1">
+                    <div className="text-[10px] text-[#282829]/60 uppercase font-semibold">2. Tasa de Causación Legal</div>
+                    <div className="text-base font-bold text-[#18235C]">15 días / 360 días</div>
+                    <div className="text-[10px] text-[#282829]/70">Art. 186 CST (1.25 días por cada mes completo)</div>
+                  </div>
+
+                  <div className="p-3.5 bg-emerald-50 rounded-lg border border-emerald-300 space-y-1">
+                    <div className="text-[10px] text-emerald-800 uppercase font-semibold">3. Saldo Disponible</div>
+                    <div className="text-base font-bold text-emerald-800">{miControl?.diasPendientesDisfrute || 0} días hábiles</div>
+                    <div className="text-[10px] text-emerald-700">Listos para solicitar</div>
+                  </div>
+                </div>
+
+                {/* Tabla de desglose por periodos */}
+                <div className="overflow-x-auto mt-2">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-[#18235C] text-white font-semibold text-[10px] uppercase">
+                        <th className="p-2.5">Periodo Laboral</th>
+                        <th className="p-2.5 text-center">Días Causados</th>
+                        <th className="p-2.5 text-center">Días Disfrutados</th>
+                        <th className="p-2.5 text-center">En Solicitud</th>
+                        <th className="p-2.5 text-center font-bold">Saldo Pendiente</th>
+                        <th className="p-2.5">Estado del Periodo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#8FA7D6]/20">
+                      <tr className="hover:bg-slate-50">
+                        <td className="p-2.5 font-semibold text-[#18235C]">
+                          Periodo Histórico Previo (2024 - 2025)
+                        </td>
+                        <td className="p-2.5 text-center">
+                          {Math.min(15, (miControl?.diasDisfrutadosAcumulados || 0))} días
+                        </td>
+                        <td className="p-2.5 text-center">
+                          {Math.min(15, (miControl?.diasDisfrutadosAcumulados || 0))} días
+                        </td>
+                        <td className="p-2.5 text-center">0 días</td>
+                        <td className="p-2.5 text-center font-bold text-emerald-700">0 días</td>
+                        <td className="p-2.5">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                            Disfrutado y Cerrado
+                          </span>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50 bg-emerald-50/30 font-medium">
+                        <td className="p-2.5 font-bold text-[#18235C]">
+                          Periodo Actual en Causación (2025 - 2026)
+                        </td>
+                        <td className="p-2.5 text-center font-bold text-[#18235C]">
+                          {miControl?.diasVacacionesCausados || 0} días
+                        </td>
+                        <td className="p-2.5 text-center">
+                          {Math.max(0, (miControl?.diasDisfrutadosAcumulados || 0) - 15)} días
+                        </td>
+                        <td className="p-2.5 text-center text-amber-700">
+                          {misSolicitudes.filter(s => s.estado === 'Pendiente').reduce((acc, s) => acc + s.diasHabiles, 0)} días
+                        </td>
+                        <td className="p-2.5 text-center font-bold text-emerald-800 text-sm">
+                          {miControl?.diasPendientesDisfrute || 0} días
+                        </td>
+                        <td className="p-2.5">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#00FF00]/20 text-[#18235C] border border-[#00FF00]/40">
+                            En causación activa
+                          </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="p-3 bg-[#8FA7D6]/15 rounded-lg border border-[#8FA7D6]/40 text-[#18235C] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="text-[11px]">
+                    <strong>Semáforo de Acumulación:</strong> Conforme al Art. 190 del CST, se recomienda disfrutar al menos 6 días continuos al año para prevenir acumulación legal.
+                  </div>
+                  <button
+                    onClick={() => handleAbrirModalSolicitud(effectiveEmpleado?.id)}
+                    className="px-3 py-1 bg-[#18235C] text-white font-semibold rounded text-xs whitespace-nowrap self-start sm:self-auto"
+                  >
+                    Solicitar Vacaciones
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="text-[10px] text-[#282829]/60">Pasivo laboral consolidado</div>
-          </div>
+          )}
+
+          {/* TAB 3 EMPLEADO: GUÍA LEGAL CST */}
+          {employeeTab === 'normativa' && (
+            <div className="space-y-4">
+              <div className="bg-white p-5 rounded-xl border border-[#8FA7D6]/30 shadow-xs space-y-4">
+                <h3 className="text-base font-bold text-[#18235C] flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#18235C]" />
+                  Preguntas Frecuentes sobre Vacaciones para Colaboradores (CST)
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="p-4 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30 space-y-2">
+                    <div className="font-bold text-[#18235C] text-sm flex items-center gap-1.5">
+                      <Palmtree className="w-4 h-4 text-[#18235C]" />
+                      ¿Cuántos días de vacaciones me corresponden?
+                    </div>
+                    <p className="text-[#282829]/75 leading-relaxed text-[11px]">
+                      Por cada año continuo laborado (360 días contables), tienes derecho a <strong>15 días hábiles remunerados</strong> de descanso (Art. 186 CST). Si llevas menos tiempo, acumulas proporcionalmente a razón de <strong>1.25 días hábiles por mes laborado</strong>.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30 space-y-2">
+                    <div className="font-bold text-[#18235C] text-sm flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-amber-600" />
+                      ¿Con cuánta anticipación debo solicitar mis vacaciones?
+                    </div>
+                    <p className="text-[#282829]/75 leading-relaxed text-[11px]">
+                      El Código Sustantivo del Trabajo (Art. 187 CST) establece que la época de vacaciones debe programarse con al menos <strong>15 días calendario de anticipación</strong>. Esto permite coordinar los reemplazos y no afectar las operaciones de la empresa.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30 space-y-2">
+                    <div className="font-bold text-[#18235C] text-sm flex items-center gap-1.5">
+                      <CalendarCheck className="w-4 h-4 text-emerald-600" />
+                      ¿Puedo solicitar vacaciones si no he cumplido el año?
+                    </div>
+                    <p className="text-[#282829]/75 leading-relaxed text-[11px]">
+                      Sí. Puedes solicitar los <strong>días causados proporcionalmente</strong> que tengas acumulados a la fecha. Si deseas tomar más días, la empresa puede concederte <strong>vacaciones anticipadas</strong> previo acuerdo entre las partes (Art. 187 CST).
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30 space-y-2">
+                    <div className="font-bold text-[#18235C] text-sm flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-emerald-600" />
+                      ¿Cómo se pagan mis vacaciones?
+                    </div>
+                    <p className="text-[#282829]/75 leading-relaxed text-[11px]">
+                      Conforme al Art. 192 del CST, se liquidan y pagan con base en el <strong>último salario ordinario devengado</strong> al momento de iniciar el descanso. No se computa el auxilio de transporte ni horas extras. Se pagan antes del inicio del descanso.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+      )}
 
-        {/* Pestañas de Navegación */}
-        <div className="flex border-b border-[#8FA7D6]/20 mt-6 gap-6 text-xs font-semibold overflow-x-auto">
-          <button
-            id="tab-vacaciones-matriz"
-            onClick={() => setActiveTab('matriz')}
-            className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'matriz'
-                ? 'border-[#18235C] text-[#18235C] font-bold'
-                : 'border-transparent text-[#282829]/60 hover:text-[#18235C]'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            Matriz de Saldos por Colaborador ({filteredControles.length})
-          </button>
-          <button
-            id="tab-vacaciones-solicitudes"
-            onClick={() => setActiveTab('solicitudes')}
-            className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'solicitudes'
-                ? 'border-[#18235C] text-[#18235C] font-bold'
-                : 'border-transparent text-[#282829]/60 hover:text-[#18235C]'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            Historial de Solicitudes y Aprobaciones ({solicitudes.length})
-            {resumenVacaciones.pendientesAprobacion > 0 && (
-              <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px]">
-                {resumenVacaciones.pendientesAprobacion}
-              </span>
-            )}
-          </button>
-          <button
-            id="tab-vacaciones-normativa"
-            onClick={() => setActiveTab('normativa')}
-            className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'normativa'
-                ? 'border-[#18235C] text-[#18235C] font-bold'
-                : 'border-transparent text-[#282829]/60 hover:text-[#18235C]'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Guía Legal & Normativa CST
-          </button>
-        </div>
-      </div>
+      {/* ======================================================== */}
+      {/* VISTA MODO GESTIÓN HUMANA / ADMINISTRADOR                */}
+      {/* ======================================================== */}
+      {viewMode === 'admin' && (
+        <div className="space-y-6">
+          {/* Header Principal */}
+          <div className="bg-white rounded-xl border border-[#8FA7D6]/30 p-5 sm:p-6 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#18235C]/10 text-[#18235C] border border-[#18235C]/20 flex items-center gap-1">
+                    <Palmtree className="w-3.5 h-3.5 text-[#18235C]" />
+                    Control de Descansos Remunerados
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#8FA7D6]/15 text-[#18235C] border border-[#8FA7D6]/30">
+                    Artículos 186 al 192 del CST
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                    B GROUP INGENIERIA S.A.S.
+                  </span>
+                </div>
+                <h2 className="text-xl font-bold text-[#18235C]">
+                  Cuadro de Control de Solicitudes y Saldos de Vacaciones
+                </h2>
+                <p className="text-xs sm:text-sm text-[#282829]/70 mt-0.5 max-w-2xl">
+                  Seguimiento exacto de causación (15 días hábiles por año continuo de servicios), semáforo de acumulación legal para prevención de contingencias (Art. 190 CST) y registro contable de provisiones en libros.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+                <button
+                  id="btn-ver-planilla-vacaciones"
+                  onClick={() => setModalPlanillaOpen(true)}
+                  className="px-3.5 py-2 text-xs font-semibold bg-[#8FA7D6]/15 hover:bg-[#8FA7D6]/25 text-[#18235C] rounded-lg border border-[#8FA7D6]/40 flex items-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-[#18235C]" />
+                  <span>Planilla Oficial Imprimible</span>
+                </button>
+
+                <button
+                  id="btn-nueva-solicitud-vacaciones"
+                  onClick={() => handleAbrirModalSolicitud()}
+                  className="px-4 py-2 text-xs font-semibold bg-[#18235C] hover:bg-[#18235C]/90 text-white rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <Plus className="w-4 h-4 text-[#00FF00]" />
+                  <span>Nueva Solicitud</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Métricas Consolidadas */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-5 pt-4 border-t border-[#8FA7D6]/20">
+              <div className="p-3.5 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30">
+                <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
+                  Días Pendientes Totales
+                  <Palmtree className="w-3.5 h-3.5 text-[#18235C]" />
+                </div>
+                <div className="text-xl font-bold text-[#18235C] mt-0.5">
+                  {resumenVacaciones.totalPendientes} <span className="text-xs font-normal text-[#282829]/60">días hábiles</span>
+                </div>
+                <div className="text-[10px] text-[#282829]/60">Por disfrutar en la plantilla</div>
+              </div>
+
+              <div className="p-3.5 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30">
+                <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
+                  Alertas de Acumulación
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                </div>
+                <div className={`text-xl font-bold mt-0.5 ${resumenVacaciones.alertasCriticas > 0 ? 'text-rose-700' : 'text-[#18235C]'}`}>
+                  {resumenVacaciones.alertasCriticas} <span className="text-xs font-normal text-[#282829]/60">casos críticos</span>
+                </div>
+                <div className="text-[10px] text-[#282829]/60">Riesgo legal Art. 190 CST</div>
+              </div>
+
+              <div className="p-3.5 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30">
+                <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
+                  Solicitudes Pendientes
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
+                </div>
+                <div className="text-xl font-bold text-[#18235C] mt-0.5">
+                  {resumenVacaciones.pendientesAprobacion}
+                </div>
+                <div className="text-[10px] text-[#282829]/60">Por autorizar por GH</div>
+              </div>
+
+              <div className="p-3.5 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30">
+                <div className="text-[10px] font-semibold text-[#282829]/70 uppercase tracking-wider flex items-center justify-between">
+                  Provisión en Libros
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                </div>
+                <div className="text-base sm:text-lg font-bold text-[#18235C] mt-0.5">
+                  {formatCOP(resumenVacaciones.totalProvision)}
+                </div>
+                <div className="text-[10px] text-[#282829]/60">Pasivo laboral consolidado</div>
+              </div>
+            </div>
+
+            {/* Pestañas de Navegación */}
+            <div className="flex border-b border-[#8FA7D6]/20 mt-6 gap-6 text-xs font-semibold overflow-x-auto">
+              <button
+                id="tab-vacaciones-matriz"
+                onClick={() => setActiveTab('matriz')}
+                className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+                  activeTab === 'matriz'
+                    ? 'border-[#18235C] text-[#18235C] font-bold'
+                    : 'border-transparent text-[#282829]/60 hover:text-[#18235C]'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                Matriz de Saldos por Colaborador ({filteredControles.length})
+              </button>
+              <button
+                id="tab-vacaciones-solicitudes"
+                onClick={() => setActiveTab('solicitudes')}
+                className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+                  activeTab === 'solicitudes'
+                    ? 'border-[#18235C] text-[#18235C] font-bold'
+                    : 'border-transparent text-[#282829]/60 hover:text-[#18235C]'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                Historial de Solicitudes y Aprobaciones ({solicitudes.length})
+                {resumenVacaciones.pendientesAprobacion > 0 && (
+                  <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px]">
+                    {resumenVacaciones.pendientesAprobacion}
+                  </span>
+                )}
+              </button>
+              <button
+                id="tab-vacaciones-normativa"
+                onClick={() => setActiveTab('normativa')}
+                className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+                  activeTab === 'normativa'
+                    ? 'border-[#18235C] text-[#18235C] font-bold'
+                    : 'border-transparent text-[#282829]/60 hover:text-[#18235C]'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Guía Legal & Normativa CST
+              </button>
+            </div>
+          </div>
 
       {/* TAB 1: MATRIZ DE SALDOS POR COLABORADOR */}
       {activeTab === 'matriz' && (
@@ -871,6 +1714,8 @@ export function ControlVacacionesView({
           </div>
         </div>
       )}
+        </div>
+      )}
 
       {/* MODAL REGISTRAR NUEVA SOLICITUD */}
       {modalNuevaSolicitudOpen && (
@@ -881,7 +1726,7 @@ export function ControlVacacionesView({
                 <Palmtree className="w-5 h-5 text-[#00FF00]" />
                 <div>
                   <h3 className="font-bold text-base text-white">
-                    Programar Solicitud de Vacaciones
+                    {viewMode === 'empleado' ? 'Radicar Solicitud de Vacaciones' : 'Programar Solicitud de Vacaciones'}
                   </h3>
                   <div className="text-[11px] text-[#8FA7D6]">B GROUP INGENIERIA S.A.S.</div>
                 </div>
@@ -899,20 +1744,37 @@ export function ControlVacacionesView({
                 <label className="block font-semibold text-[#18235C] mb-1">
                   Colaborador Solicitante *
                 </label>
-                <select
-                  value={formSolicitud.empleadoId}
-                  onChange={e => setFormSolicitud({ ...formSolicitud, empleadoId: e.target.value })}
-                  className="w-full bg-slate-50 border border-[#8FA7D6]/40 rounded-lg px-2.5 py-1.5 font-medium text-[#282829] focus:outline-none focus:border-[#18235C]"
-                >
-                  {empleados.map(emp => {
-                    const ctrl = controles.find(c => c.empleadoId === emp.id);
-                    return (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.nombre} — Saldo: {ctrl?.diasPendientesDisfrute || 15} días hábiles
-                      </option>
-                    );
-                  })}
-                </select>
+                {viewMode === 'empleado' && !isSuperAdmin ? (
+                  <div className="p-2.5 bg-slate-50 rounded-lg border border-[#8FA7D6]/40 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-[#18235C]">{effectiveEmpleado?.nombre}</div>
+                      <div className="text-[10px] text-[#282829]/60">
+                        {miControl?.cargoNombre || 'Colaborador'} • CC: {effectiveEmpleado?.documento}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-emerald-700 block font-semibold">Saldo Disponible:</span>
+                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300">
+                        {miControl?.diasPendientesDisfrute ?? 0} días hábiles
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <select
+                    value={formSolicitud.empleadoId}
+                    onChange={e => setFormSolicitud({ ...formSolicitud, empleadoId: e.target.value })}
+                    className="w-full bg-slate-50 border border-[#8FA7D6]/40 rounded-lg px-2.5 py-1.5 font-medium text-[#282829] focus:outline-none focus:border-[#18235C]"
+                  >
+                    {empleados.map(emp => {
+                      const ctrl = controles.find(c => c.empleadoId === emp.id);
+                      return (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.nombre} — Saldo: {ctrl?.diasPendientesDisfrute || 15} días hábiles
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

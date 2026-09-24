@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Empleado, Solicitud } from '../types';
+import { Empleado, Solicitud, Role, UsuarioSistema } from '../types';
 import {
   FileText,
   Plus,
@@ -10,7 +10,9 @@ import {
   Search,
   Calendar,
   User,
-  MessageSquare
+  MessageSquare,
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 import { uid } from '../data/initialData';
 
@@ -19,6 +21,9 @@ interface SolicitudesViewProps {
   empleados: Empleado[];
   onAddSolicitud: (nueva: Solicitud) => void;
   onUpdateEstado: (id: string, nuevoEstado: 'Aprobada' | 'Rechazada', comentario: string) => void;
+  userRole?: Role;
+  currentUser?: UsuarioSistema | null;
+  isSuperAdmin?: boolean;
 }
 
 export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
@@ -26,10 +31,49 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
   empleados,
   onAddSolicitud,
   onUpdateEstado,
+  userRole,
+  currentUser,
+  isSuperAdmin = false
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [decisionModal, setDecisionModal] = useState<{ id: string; accion: 'Aprobada' | 'Rechazada' } | null>(null);
   const [decisionComentario, setDecisionComentario] = useState('');
+
+  // Identificar el colaborador vinculado al usuario autenticado
+  const myEmpleado = empleados.find(e =>
+    (currentUser?.empleadoId && e.id === currentUser.empleadoId) ||
+    (currentUser?.email && e.email?.toLowerCase() === currentUser.email?.toLowerCase()) ||
+    (currentUser?.documento && e.documento === currentUser.documento)
+  );
+
+  // Modo empleado: usuario con rol colaborador o administrador en modo simulación
+  const isEmployeeMode = userRole === 'empleado' || currentUser?.rol === 'empleado';
+  const isSimulation = (isSuperAdmin || currentUser?.rol === 'admin_gh' || currentUser?.rol === 'superadmin') && userRole === 'empleado';
+
+  // Selección de colaborador simulado para administradores en pruebas de experiencia
+  const [simulatedEmpleadoId, setSimulatedEmpleadoId] = useState<string>(() => {
+    return myEmpleado?.id || (empleados.length > 0 ? empleados[0].id : '');
+  });
+
+  React.useEffect(() => {
+    if (myEmpleado) {
+      setSimulatedEmpleadoId(myEmpleado.id);
+    } else if (!simulatedEmpleadoId && empleados.length > 0) {
+      setSimulatedEmpleadoId(empleados[0].id);
+    }
+  }, [myEmpleado, empleados, simulatedEmpleadoId]);
+
+  const effectiveEmpleado = myEmpleado || empleados.find(e => e.id === simulatedEmpleadoId) || empleados[0];
+
+  // Solo administradores legítimos tienen autorización para aprobar o rechazar solicitudes
+  const canApprove =
+    !isEmployeeMode &&
+    Boolean(
+      isSuperAdmin ||
+      currentUser?.rol === 'superadmin' ||
+      currentUser?.rol === 'admin_gh' ||
+      currentUser?.permisos?.includes('solicitudes')
+    );
 
   // Filter state
   const [filterEstado, setFilterEstado] = useState<string>('TODOS');
@@ -37,21 +81,60 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
   const [search, setSearch] = useState('');
 
   // Form state
-  const [empleadoId, setEmpleadoId] = useState(empleados[0]?.id || '');
+  const [empleadoId, setEmpleadoId] = useState(
+    isEmployeeMode
+      ? (effectiveEmpleado?.id || currentUser?.empleadoId || currentUser?.id || '')
+      : (empleados[0]?.id || '')
+  );
   const [tipo, setTipo] = useState<Solicitud['tipo']>('Permiso');
   const [inicio, setInicio] = useState(new Date().toISOString().slice(0, 10));
   const [fin, setFin] = useState(new Date().toISOString().slice(0, 10));
   const [motivo, setMotivo] = useState('');
 
-  const getEmpleadoNombre = (id: string) => empleados.find(e => e.id === id)?.nombre || 'Empleado no encontrado';
+  // Sincronizar identificador del colaborador ante cambio de rol o perfil simulado
+  React.useEffect(() => {
+    if (isEmployeeMode) {
+      setEmpleadoId(effectiveEmpleado?.id || currentUser?.empleadoId || currentUser?.id || '');
+    } else if (empleados.length > 0 && !empleadoId) {
+      setEmpleadoId(empleados[0].id);
+    }
+  }, [isEmployeeMode, effectiveEmpleado?.id, currentUser?.empleadoId, currentUser?.id, empleados, empleadoId]);
+
+  const getEmpleadoNombre = (id: string) => {
+    const emp = empleados.find(e => e.id === id);
+    if (emp) return emp.nombre;
+    const sol = solicitudes.find(s => s.empleadoId === id);
+    if (sol?.empleadoNombre) return sol.empleadoNombre;
+    if (currentUser && (currentUser.id === id || currentUser.empleadoId === id)) {
+      return currentUser.nombre || 'Colaborador';
+    }
+    if (id === 'usr-superadmin') {
+      return 'Superadministrador';
+    }
+    return 'Colaborador';
+  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!motivo.trim()) return;
 
+    // En modo empleado, se asigna el colaborador efectivo
+    const targetEmp = isEmployeeMode ? effectiveEmpleado : empleados.find(e => e.id === empleadoId) || empleados[0];
+    const finalEmpleadoId = isEmployeeMode
+      ? (effectiveEmpleado?.id || myEmpleado?.id || currentUser?.empleadoId || currentUser?.id || '')
+      : (empleadoId || empleados[0]?.id || '');
+
+    if (!finalEmpleadoId) {
+      alert('No se pudo determinar el registro del colaborador para radicar la solicitud.');
+      return;
+    }
+
     const nueva: Solicitud = {
       id: uid('sol'),
-      empleadoId,
+      empresaId: currentUser?.empresaId || 'empresa-a',
+      empleadoId: finalEmpleadoId,
+      empleadoNombre: targetEmp?.nombre || currentUser?.nombre || 'Colaborador',
+      empleadoEmail: targetEmp?.email || currentUser?.email || '',
       tipo,
       inicio,
       fin,
@@ -69,6 +152,10 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
   };
 
   const handleConfirmDecision = () => {
+    if (!canApprove) {
+      setDecisionModal(null);
+      return;
+    }
     if (!decisionModal) return;
     onUpdateEstado(decisionModal.id, decisionModal.accion, decisionComentario.trim());
     setDecisionModal(null);
@@ -76,6 +163,20 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
   };
 
   const filtered = solicitudes.filter(s => {
+    // Si el usuario es un colaborador, únicamente puede ver sus propias solicitudes
+    if (isEmployeeMode) {
+      const targetId = effectiveEmpleado?.id;
+      const isMine =
+        (targetId && s.empleadoId === targetId) ||
+        (myEmpleado && s.empleadoId === myEmpleado.id) ||
+        (currentUser?.empleadoId && s.empleadoId === currentUser.empleadoId) ||
+        (currentUser?.id && s.empleadoId === currentUser.id) ||
+        (currentUser?.email && s.empleadoEmail && s.empleadoEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
+        // En simulación: incluir solicitudes creadas por o para la simulación del administrador
+        (isSimulation && (s.empleadoId === currentUser?.id || s.empleadoId === 'usr-superadmin' || (targetId && s.empleadoId === targetId)));
+      if (!isMine) return false;
+    }
+
     const empNombre = getEmpleadoNombre(s.empleadoId).toLowerCase();
     const matchSearch = empNombre.includes(search.toLowerCase()) || s.motivo.toLowerCase().includes(search.toLowerCase());
     const matchEstado = filterEstado === 'TODOS' || s.estado === filterEstado;
@@ -88,21 +189,72 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-[#8FA7D6]">
         <div>
-          <h1 className="font-bold tracking-tight text-3xl font-medium text-[#18235C]">
-            Gestión de Solicitudes y Novedades
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="font-bold tracking-tight text-3xl font-medium text-[#18235C]">
+              {isEmployeeMode ? 'Mis Solicitudes y Novedades' : 'Gestión de Solicitudes y Novedades'}
+            </h1>
+            {isEmployeeMode && (
+              <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-bold inline-flex items-center gap-1">
+                <Lock className="w-3 h-3 text-emerald-600" />
+                Perfil Colaborador
+              </span>
+            )}
+          </div>
           <p className="text-sm text-[#282829] mt-1 max-w-2xl">
-            Permisos, vacaciones, incapacidades y solicitudes administrativas con flujo de aprobación formal.
+            {isEmployeeMode
+              ? 'Radica tus permisos, vacaciones, incapacidades y certificaciones para revisión por la jefatura y Gestión Humana.'
+              : 'Permisos, vacaciones, incapacidades y solicitudes administrativas con flujo de aprobación formal.'}
           </p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
-          className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow-xs transition-colors"
+          className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Radicar solicitud</span>
         </button>
       </div>
+
+      {/* Banner de Consulta para Administradores en Modo Portal */}
+      {isSimulation && (
+        <div className="p-3.5 bg-blue-50/90 border border-blue-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#18235C] text-[#8FA7D6] flex items-center justify-center font-bold text-xs shrink-0">
+              <User className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <div className="font-bold text-[#18235C] flex items-center gap-1.5">
+                <span>Portal del Colaborador (Supervisión GH)</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-200/80 text-blue-900 font-semibold">
+                  Vista Previa
+                </span>
+              </div>
+              <p className="text-slate-600 mt-0.5">
+                Visualizando solicitudes personales como: <strong className="text-slate-900">{effectiveEmpleado?.nombre || 'Colaborador'}</strong> {effectiveEmpleado?.documento ? `(C.C. ${effectiveEmpleado.documento})` : ''}.
+              </p>
+            </div>
+          </div>
+          {empleados.length > 0 && (
+            <div className="flex items-center gap-2 shrink-0">
+              <label htmlFor="sim-emp-select" className="text-[#18235C] font-semibold text-[11px]">
+                Consultar como:
+              </label>
+              <select
+                id="sim-emp-select"
+                value={effectiveEmpleado?.id || ''}
+                onChange={e => setSimulatedEmpleadoId(e.target.value)}
+                className="bg-white border border-blue-300 rounded px-2.5 py-1 text-xs font-semibold text-[#18235C] focus:ring-1 focus:ring-[#18235C] shadow-2xs"
+              >
+                {empleados.map(emp => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.nombre} ({emp.documento})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters Bar */}
       <div className="bg-white p-4 rounded border border-[#8FA7D6] shadow-xs flex flex-wrap gap-3 items-center justify-between">
@@ -162,7 +314,7 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                 <th className="py-3 px-4 font-semibold">Motivo / Justificación</th>
                 <th className="py-3 px-4 font-semibold">Estado</th>
                 <th className="py-3 px-4 font-semibold">Resolución</th>
-                <th className="py-3 px-4 font-semibold text-right">Acciones</th>
+                <th className="py-3 px-4 font-semibold text-right">{canApprove ? 'Acciones' : 'Estado de Trámite'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#8FA7D6]/60">
@@ -192,25 +344,45 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                     {sol.fechaDecision ? `${sol.fechaDecision}: ${sol.comentario || 'Aprobado sin observaciones'}` : 'En espera de revisión'}
                   </td>
                   <td className="py-3 px-4 text-right">
-                    {sol.estado === 'Pendiente' ? (
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => setDecisionModal({ id: sol.id, accion: 'Aprobada' })}
-                          className="px-2.5 py-1 rounded bg-[#18235C] hover:bg-[#101740] text-white font-semibold transition-colors flex items-center gap-1"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Aprobar</span>
-                        </button>
-                        <button
-                          onClick={() => setDecisionModal({ id: sol.id, accion: 'Rechazada' })}
-                          className="px-2.5 py-1 rounded bg-[#A8503E] hover:bg-[#863b2c] text-white font-semibold transition-colors flex items-center gap-1"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          <span>Rechazar</span>
-                        </button>
-                      </div>
+                    {canApprove ? (
+                      sol.estado === 'Pendiente' ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setDecisionModal({ id: sol.id, accion: 'Aprobada' })}
+                            className="px-2.5 py-1 rounded bg-[#18235C] hover:bg-[#101740] text-white font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Aprobar</span>
+                          </button>
+                          <button
+                            onClick={() => setDecisionModal({ id: sol.id, accion: 'Rechazada' })}
+                            className="px-2.5 py-1 rounded bg-[#A8503E] hover:bg-[#863b2c] text-white font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Rechazar</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[#282829] italic text-[11px]">Trámite completado</span>
+                      )
                     ) : (
-                      <span className="text-[#282829] italic text-[11px]">Trámite completado</span>
+                      /* En perfil de colaborador, se despliega únicamente el estado del trámite sin controles de decisión */
+                      sol.estado === 'Pendiente' ? (
+                        <span className="inline-flex items-center gap-1 text-amber-800 font-medium text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          En revisión por GH
+                        </span>
+                      ) : sol.estado === 'Aprobada' ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-800 font-medium text-[11px] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          Aprobada
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-rose-800 font-medium text-[11px] bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                          Rechazada
+                        </span>
+                      )
                     )}
                   </td>
                 </tr>
@@ -237,8 +409,27 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
 
             <form onSubmit={handleCreate} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-[#282829] mb-1">Colaborador *</label>
-                {empleados.length === 0 ? (
+                <label className="block font-semibold text-[#282829] mb-1">Colaborador Solicitante *</label>
+                {isEmployeeMode ? (
+                  <div className="p-2.5 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-[#18235C] text-[#8FA7D6] flex items-center justify-center font-bold text-xs shrink-0">
+                        {(effectiveEmpleado?.nombre || currentUser?.nombre || 'CO').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#18235C] text-xs leading-tight">
+                          {effectiveEmpleado?.nombre || currentUser?.nombre}
+                        </div>
+                        <div className="text-[10px] text-slate-500 leading-tight">
+                          {effectiveEmpleado ? `C.C. ${effectiveEmpleado.documento}` : (currentUser?.cargoNombre || 'Colaborador Registrado')}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold border border-emerald-200">
+                      {isSimulation ? 'Vista Previa' : 'Titular'}
+                    </span>
+                  </div>
+                ) : empleados.length === 0 ? (
                   <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200">
                     No hay colaboradores registrados. Agregue primero el personal en el módulo de Empleados.
                   </p>
@@ -249,7 +440,7 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                     className="w-full p-2 rounded border border-[#8FA7D6] bg-[#F8FAFC]"
                   >
                     {empleados.map(e => (
-                      <option key={e.id} value={e.id}>{e.nombre}</option>
+                      <option key={e.id} value={e.id}>{e.nombre} ({e.documento})</option>
                     ))}
                   </select>
                 )}

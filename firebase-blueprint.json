@@ -79,6 +79,46 @@
         "usuario": { "type": "object", "description": "Detalles del usuario que ejecutó la acción: uid, email, nombre, rol" },
         "empresaId": { "type": "string", "description": "Identificador de la empresa para segregación multi-tenant" }
       }
+    },
+    "AnuncioSlide": {
+      "collection": "anuncios_slides",
+      "fields": {
+        "id": { "type": "string", "description": "ID único del slide o anuncio" },
+        "titulo": { "type": "string", "description": "Título principal del anuncio" },
+        "subtitulo": { "type": "string", "description": "Subtítulo o bajada informativa" },
+        "categoria": { "type": "string", "description": "Categoría temática (SG-SST, Bienestar, Capacitación, etc.)" },
+        "imagenUrl": { "type": "string", "description": "URL de la imagen del banner o slide" },
+        "descripcion": { "type": "string", "description": "Texto detallado del comunicado" },
+        "fechaPublicacion": { "type": "string", "description": "Fecha de publicación" },
+        "vigenciaHasta": { "type": "string", "description": "Fecha de vencimiento opcional" },
+        "activo": { "type": "boolean", "description": "Estado de publicación para portal de empleado" },
+        "orden": { "type": "number", "description": "Prioridad u orden de visualización" },
+        "autorNombre": { "type": "string", "description": "Área o funcionario emisor" },
+        "linkAccion": { "type": "string", "description": "Ruta interna o enlace de acción sugerida" },
+        "textoBoton": { "type": "string", "description": "Texto del botón de acción" },
+        "destacado": { "type": "boolean", "description": "Indica si es anuncio prioritario en carrusel" }
+      }
+    },
+    "Capacitacion": {
+      "collection": "capacitaciones",
+      "fields": {
+        "id": { "type": "string", "description": "ID único de la capacitación (ej. CAP-2026-001)" },
+        "codigo": { "type": "string", "description": "Código formal del curso o estándar formativo" },
+        "titulo": { "type": "string", "description": "Título temático de la capacitación" },
+        "objetivo": { "type": "string", "description": "Objetivo de aprendizaje y competencias a desarrollar" },
+        "tipo": { "type": "string", "description": "SST, Técnica, Habilidades Blandas, Normativa y Cumplimiento, Gestión Operativa" },
+        "facilitador": { "type": "string", "description": "Nombre del facilitador o especialista capacitador" },
+        "entidadFacilitadora": { "type": "string", "description": "Entidad o empresa que imparte la formación (ARL, externa o propia)" },
+        "duracionHoras": { "type": "number", "description": "Intensidad horaria certificable" },
+        "modalidad": { "type": "string", "description": "Presencial, Virtual sincrónica, Asincrónica, Mixta" },
+        "fechaProgramada": { "type": "string", "description": "Fecha programada de la sesión (YYYY-MM-DD)" },
+        "horaInicio": { "type": "string", "description": "Hora de inicio de la capacitación" },
+        "lugarOEnlace": { "type": "string", "description": "Ubicación física o enlace de videoconferencia/material" },
+        "cargosAsignados": { "type": "array", "description": "Lista de IDs de cargos o ['TODOS']" },
+        "estado": { "type": "string", "description": "Programada, En ejecución, Finalizada, Cancelada" },
+        "examenConocimiento": { "type": "object", "description": "Evaluación con nota mínima, tiempo y banco de preguntas con retroalimentación" },
+        "participantes": { "type": "array", "description": "Registros individuales de asistencia, calificación, certificado y estado" }
+      }
     }
   }
 }

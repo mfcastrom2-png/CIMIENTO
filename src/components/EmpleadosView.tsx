@@ -35,6 +35,11 @@ import {
   RefreshCw,
   Send,
   UserCheck,
+  UserMinus,
+  UserX,
+  AlertTriangle,
+  Trash2,
+  Power,
   Shield,
   ExternalLink,
   Search,
@@ -46,6 +51,8 @@ import { INITIAL_INVENTARIO_EPP, INITIAL_SOLICITUDES_ENTREGA_EPP } from '../data
 import { SolicitarEppModal } from './SolicitarEppModal';
 import { EntregarEppModal } from './EntregarEppModal';
 import { ActaEntregaEppModal } from './ActaEntregaEppModal';
+import { ModalGestionEstadoEmpleado } from './ModalGestionEstadoEmpleado';
+import { ModalEliminarEmpleado } from './ModalEliminarEmpleado';
 import {
   ComprobanteNotificacionModal,
   ComprobanteNotificacionData
@@ -76,6 +83,10 @@ interface EmpleadosViewProps {
   onCargarMasNube?: () => Promise<void>;
   cargandoNube?: boolean;
   onRefrescarNube?: () => Promise<void>;
+  onUpdateEmpleado?: (empleado: Empleado) => Promise<void> | void;
+  onDeleteEmpleado?: (id: string) => Promise<void> | void;
+  isSuperAdmin?: boolean;
+  currentUser?: UsuarioSistema | null;
 }
 
 export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
@@ -95,11 +106,19 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
   cargandoMasNube = false,
   onCargarMasNube,
   cargandoNube = false,
-  onRefrescarNube
+  onRefrescarNube,
+  onUpdateEmpleado,
+  onDeleteEmpleado,
+  isSuperAdmin = false,
+  currentUser
 }) => {
   const [selectedEmpleadoId, setSelectedEmpleadoId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'hv' | 'contrato' | 'historial' | 'evals' | 'epps'>('hv');
   const [modalOpen, setModalOpen] = useState(false);
+  const [empleadoParaGestionarEstado, setEmpleadoParaGestionarEstado] = useState<Empleado | null>(null);
+  const [empleadoParaEliminar, setEmpleadoParaEliminar] = useState<Empleado | null>(null);
+  const [filtroEstado, setFiltroEstado] = useState<'TODOS' | 'activos' | 'inactivos' | 'retirados'>('TODOS');
+  const [feedbackToast, setFeedbackToast] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
 
   // Estado local para EPPs en caso de operar directamente desde el módulo de empleados
   const [inventario, setInventario] = useState<ItemInventarioEPP[]>(() => {
@@ -133,16 +152,89 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
   const [filtroBusqueda, setFiltroBusqueda] = useState('');
   const [limiteVisible, setLimiteVisible] = useState(25);
 
+  const getEstadoLaboral = (emp: Empleado): 'activo' | 'inactivo' | 'retirado' => {
+    if (emp.estadoLaboral) return emp.estadoLaboral;
+    if (emp.activo === false) return 'inactivo';
+    return 'activo';
+  };
+
+  const canManageEmployees = Boolean(
+    isSuperAdmin ||
+    userRole === 'admin' ||
+    currentUser?.rol === 'admin_gh' ||
+    currentUser?.rol === 'superadmin'
+  );
+
+  const conteosEstado = useMemo(() => {
+    let activos = 0;
+    let inactivos = 0;
+    let retirados = 0;
+    empleados.forEach(e => {
+      const st = getEstadoLaboral(e);
+      if (st === 'activo') activos++;
+      else if (st === 'inactivo') inactivos++;
+      else if (st === 'retirado') retirados++;
+    });
+    return { activos, inactivos, retirados, total: empleados.length };
+  }, [empleados]);
+
   const empleadosFiltrados = useMemo(() => {
-    if (!filtroBusqueda.trim()) return empleados;
-    const term = filtroBusqueda.toLowerCase();
-    return empleados.filter(e =>
-      e.nombre.toLowerCase().includes(term) ||
-      (e.documento && e.documento.toLowerCase().includes(term)) ||
-      (e.email && e.email.toLowerCase().includes(term)) ||
-      getCargoNombre(e.cargoId).toLowerCase().includes(term)
+    return empleados.filter(e => {
+      const st = getEstadoLaboral(e);
+      if (filtroEstado === 'activos' && st !== 'activo') return false;
+      if (filtroEstado === 'inactivos' && st !== 'inactivo') return false;
+      if (filtroEstado === 'retirados' && st !== 'retirado') return false;
+
+      if (!filtroBusqueda.trim()) return true;
+      const term = filtroBusqueda.toLowerCase();
+      return (
+        e.nombre.toLowerCase().includes(term) ||
+        (e.documento && e.documento.toLowerCase().includes(term)) ||
+        (e.email && e.email.toLowerCase().includes(term)) ||
+        getCargoNombre(e.cargoId).toLowerCase().includes(term)
+      );
+    });
+  }, [empleados, filtroBusqueda, filtroEstado, cargos]);
+
+  const renderEstadoBadge = (emp: Empleado, size: 'sm' | 'md' = 'sm') => {
+    const st = getEstadoLaboral(emp);
+    if (st === 'activo') {
+      return (
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full font-bold ${
+            size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'
+          } bg-emerald-50 text-emerald-800 border border-emerald-300`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          Activo
+        </span>
+      );
+    }
+    if (st === 'inactivo') {
+      return (
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full font-bold ${
+            size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'
+          } bg-amber-50 text-amber-800 border border-amber-300`}
+          title={emp.motivoRetiro ? `Motivo: ${emp.motivoRetiro}` : 'Colaborador inactivo'}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          Inactivo
+        </span>
+      );
+    }
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full font-bold ${
+          size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'
+        } bg-rose-50 text-rose-800 border border-rose-300`}
+        title={emp.motivoRetiro ? `Motivo: ${emp.motivoRetiro}` : 'Colaborador retirado'}
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+        Retirado {emp.fechaRetiro ? `(${emp.fechaRetiro})` : ''}
+      </span>
     );
-  }, [empleados, filtroBusqueda, cargos]);
+  };
 
   const empleadosPaginados = useMemo(() => {
     return empleadosFiltrados.slice(0, limiteVisible);
@@ -337,9 +429,31 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-[#18235C]/10 text-[#18235C] border border-[#18235C]/20">
-              Colaborador Activo
-            </span>
+            {renderEstadoBadge(currentEmpleado, 'md')}
+
+            {canManageEmployees && (
+              <button
+                type="button"
+                onClick={() => setEmpleadoParaGestionarEstado(currentEmpleado)}
+                className="text-xs px-3 py-1.5 rounded font-semibold bg-[#18235C] hover:bg-[#101740] text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                title="Cambiar estado: Activar, Inactivar o Retirar colaborador"
+              >
+                <Power className="w-3.5 h-3.5 text-[#8FA7D6]" />
+                <span>Gestionar Estado / Novedad</span>
+              </button>
+            )}
+
+            {canManageEmployees && onDeleteEmpleado && (
+              <button
+                type="button"
+                onClick={() => setEmpleadoParaEliminar(currentEmpleado)}
+                className="text-xs px-2.5 py-1.5 rounded font-semibold bg-rose-50 text-rose-700 border border-rose-300 hover:bg-rose-100 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Eliminar expediente en caso de creación errónea o duplicada"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Eliminar</span>
+              </button>
+            )}
 
             {usuarioVinculado ? (
               <button
@@ -392,6 +506,51 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
             )}
           </div>
         </div>
+
+        {/* Banners informativos según el estado laboral */}
+        {getEstadoLaboral(currentEmpleado) === 'retirado' && (
+          <div className="p-4 bg-rose-50/90 border border-rose-300 rounded-lg flex items-start gap-3 shadow-2xs">
+            <UserX className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <div className="font-bold text-rose-950 text-sm">
+                Colaborador Retirado / Contrato Finalizado
+              </div>
+              <p className="text-rose-900">
+                Este colaborador fue desvinculado formalmente de la organización el <strong>{currentEmpleado.fechaRetiro || 'Fecha no registrada'}</strong>.
+              </p>
+              {currentEmpleado.motivoRetiro && (
+                <p className="text-rose-900">
+                  <strong>Causa Legal de Terminación:</strong> {currentEmpleado.motivoRetiro}
+                </p>
+              )}
+              {currentEmpleado.observacionesRetiro && (
+                <p className="text-rose-800 italic">
+                  <strong>Observaciones / Paz y Salvo:</strong> {currentEmpleado.observacionesRetiro}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {getEstadoLaboral(currentEmpleado) === 'inactivo' && (
+          <div className="p-4 bg-amber-50/90 border border-amber-300 rounded-lg flex items-start gap-3 shadow-2xs">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <div className="font-bold text-amber-950 text-sm">
+                Colaborador Temporalmente Inactivo / Suspensión de Labores
+              </div>
+              <p className="text-amber-900">
+                El colaborador cuenta con una novedad laboral que suspende temporalmente sus funciones. El contrato se mantiene vigente.
+                {currentEmpleado.motivoRetiro ? ` Motivo: ${currentEmpleado.motivoRetiro}.` : ''}
+              </p>
+              {currentEmpleado.observacionesRetiro && (
+                <p className="text-amber-800 italic">
+                  <strong>Observaciones:</strong> {currentEmpleado.observacionesRetiro}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2 border-b border-[#8FA7D6]/30 text-xs">
@@ -495,7 +654,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
             <h3 className="font-bold tracking-tight text-base font-medium text-[#18235C]">
               Condiciones Contractuales
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-xs">
               <div className="p-3 bg-[#F8FAFC] rounded border border-[#8FA7D6]">
                 <span className="text-[#282829] block mb-0.5 font-semibold">Tipo de Contrato</span>
                 <span className="text-[#18235C] font-medium">{currentEmpleado.contrato.tipo}</span>
@@ -512,7 +671,40 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
                 <span className="text-[#282829] block mb-0.5 font-semibold">Vencimiento / Término</span>
                 <span className="text-[#18235C] font-medium">{currentEmpleado.contrato.fin || 'Indefinido'}</span>
               </div>
+              <div className="p-3 bg-[#F8FAFC] rounded border border-[#8FA7D6]">
+                <span className="text-[#282829] block mb-0.5 font-semibold">Estado del Contrato</span>
+                <div>{renderEstadoBadge(currentEmpleado, 'sm')}</div>
+              </div>
             </div>
+
+            {(currentEmpleado.fechaRetiro || currentEmpleado.motivoRetiro || currentEmpleado.observacionesRetiro) && (
+              <div className="p-4 rounded-lg border border-[#8FA7D6]/60 bg-[#F8FAFC] space-y-2">
+                <div className="flex items-center gap-2 font-bold text-xs text-[#18235C] uppercase tracking-wider">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Historial y Registro de Novedad Laboral</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs pt-1">
+                  {currentEmpleado.fechaRetiro && (
+                    <div>
+                      <span className="text-slate-500 block font-medium">Fecha de Retiro / Desvinculación:</span>
+                      <span className="font-semibold text-rose-800">{currentEmpleado.fechaRetiro}</span>
+                    </div>
+                  )}
+                  {currentEmpleado.motivoRetiro && (
+                    <div>
+                      <span className="text-slate-500 block font-medium">Causa / Motivo:</span>
+                      <span className="font-semibold text-slate-800">{currentEmpleado.motivoRetiro}</span>
+                    </div>
+                  )}
+                  {currentEmpleado.observacionesRetiro && (
+                    <div className="col-span-full">
+                      <span className="text-slate-500 block font-medium">Observaciones de Gestión Humana:</span>
+                      <span className="text-slate-700 italic">{currentEmpleado.observacionesRetiro}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -885,12 +1077,54 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
       </div>
 
       <div className="bg-white rounded border border-[#8FA7D6] overflow-hidden shadow-xs">
-        <div className="p-4 border-b border-[#8FA7D6] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[#18235C] uppercase tracking-wider">
-              Total {empleadosFiltrados.length} colaboradores {filtroBusqueda ? 'encontrados' : 'activos'}
-            </span>
-            <span className="text-[11px] text-[#282829]/70 bg-[#8FA7D6]/20 px-2 py-0.5 rounded-full font-semibold">
+        <div className="p-4 border-b border-[#8FA7D6] flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => { setFiltroEstado('TODOS'); setLimiteVisible(25); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                filtroEstado === 'TODOS'
+                  ? 'bg-[#18235C] text-white shadow-2xs'
+                  : 'bg-[#F8FAFC] text-slate-700 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              Todos ({conteosEstado.total})
+            </button>
+            <button
+              type="button"
+              onClick={() => { setFiltroEstado('activos'); setLimiteVisible(25); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                filtroEstado === 'activos'
+                  ? 'bg-emerald-700 text-white shadow-2xs'
+                  : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+              }`}
+            >
+              Activos ({conteosEstado.activos})
+            </button>
+            <button
+              type="button"
+              onClick={() => { setFiltroEstado('inactivos'); setLimiteVisible(25); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                filtroEstado === 'inactivos'
+                  ? 'bg-amber-700 text-white shadow-2xs'
+                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+              }`}
+            >
+              Inactivos ({conteosEstado.inactivos})
+            </button>
+            <button
+              type="button"
+              onClick={() => { setFiltroEstado('retirados'); setLimiteVisible(25); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                filtroEstado === 'retirados'
+                  ? 'bg-rose-700 text-white shadow-2xs'
+                  : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+              }`}
+            >
+              Retirados ({conteosEstado.retirados})
+            </button>
+
+            <span className="text-[11px] text-[#282829]/70 bg-[#8FA7D6]/20 px-2.5 py-1 rounded-full font-semibold ml-1">
               Mostrando {empleadosPaginados.length} de {empleadosFiltrados.length}
             </span>
           </div>
@@ -958,17 +1192,37 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
                     {emp.contrato.salario}
                   </td>
                   <td className="py-3 px-4">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#8FA7D6]/20 text-[#18235C]">
-                      Activo
-                    </span>
+                    {renderEstadoBadge(emp, 'sm')}
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <button
-                      onClick={() => setSelectedEmpleadoId(emp.id)}
-                      className="text-xs font-semibold text-[#18235C] hover:underline cursor-pointer"
-                    >
-                      Ver expediente
-                    </button>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => setSelectedEmpleadoId(emp.id)}
+                        className="px-2.5 py-1 text-xs font-semibold text-[#18235C] hover:bg-[#8FA7D6]/10 rounded border border-[#8FA7D6]/40 cursor-pointer"
+                      >
+                        Ver expediente
+                      </button>
+                      {canManageEmployees && (
+                        <button
+                          type="button"
+                          onClick={() => setEmpleadoParaGestionarEstado(emp)}
+                          className="px-2.5 py-1 text-xs font-semibold bg-[#F8FAFC] text-slate-700 hover:bg-slate-200 rounded border border-slate-300 transition-colors cursor-pointer"
+                          title="Cambiar estado: Activo, Inactivo o Retirado"
+                        >
+                          Estado
+                        </button>
+                      )}
+                      {canManageEmployees && onDeleteEmpleado && (
+                        <button
+                          type="button"
+                          onClick={() => setEmpleadoParaEliminar(emp)}
+                          className="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
+                          title="Eliminar expediente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -986,10 +1240,10 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
                       <Users className="w-6 h-6" />
                     </div>
                     <h3 className="font-bold tracking-tight text-base font-semibold text-[#18235C]">
-                      Base de datos en la nube lista para producción
+                      Base de datos de nómina y personal activa
                     </h3>
                     <p className="text-xs text-[#282829] mt-1 max-w-md mx-auto">
-                      Los datos de prueba han sido limpiados. Puedes comenzar registrando a los colaboradores reales de tu empresa con el botón inferior.
+                      Aún no hay colaboradores vinculados en el sistema. Comienza registrando la ficha del personal con el botón inferior.
                     </p>
                     <button
                       type="button"
@@ -997,7 +1251,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
                       className="mt-4 px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold rounded inline-flex items-center gap-2 transition-colors shadow-xs cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>Registrar Primer Colaborador Real</span>
+                      <span>Registrar Colaborador</span>
                     </button>
                   </td>
                 </tr>
@@ -1308,6 +1562,36 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
         <ComprobanteNotificacionModal
           data={comprobanteData}
           onClose={() => setComprobanteData(null)}
+        />
+      )}
+
+      {/* Modal de Gestión de Estado Laboral (Activar, Inactivar o Retirar) */}
+      {empleadoParaGestionarEstado && (
+        <ModalGestionEstadoEmpleado
+          empleado={empleadoParaGestionarEstado}
+          cargoNombre={getCargoNombre(empleadoParaGestionarEstado.cargoId)}
+          onClose={() => setEmpleadoParaGestionarEstado(null)}
+          onGuardar={async (empleadoActualizado) => {
+            if (onUpdateEmpleado) {
+              await onUpdateEmpleado(empleadoActualizado);
+            }
+          }}
+        />
+      )}
+
+      {/* Modal de Eliminación de Expediente */}
+      {empleadoParaEliminar && (
+        <ModalEliminarEmpleado
+          empleado={empleadoParaEliminar}
+          onClose={() => setEmpleadoParaEliminar(null)}
+          onConfirmar={async (id) => {
+            if (onDeleteEmpleado) {
+              await onDeleteEmpleado(id);
+              if (selectedEmpleadoId === id) {
+                setSelectedEmpleadoId(null);
+              }
+            }
+          }}
         />
       )}
     </div>

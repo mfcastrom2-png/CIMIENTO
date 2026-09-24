@@ -189,12 +189,18 @@ export interface Empleado {
   contrato: ContratoEmpleado;
   familia: Familiar[];
   activo: boolean;
+  estadoLaboral?: 'activo' | 'inactivo' | 'retirado';
+  fechaRetiro?: string;
+  motivoRetiro?: string;
+  observacionesRetiro?: string;
 }
 
 export interface Solicitud {
   id: string;
   empresaId?: string; // Multi-Tenancy
   empleadoId: string;
+  empleadoNombre?: string;
+  empleadoEmail?: string;
   tipo: TipoSolicitud;
   inicio: string;
   fin: string;
@@ -640,7 +646,13 @@ export interface EstadisticaSiniestralidadSST {
 // y evaluación de conocimiento previa por el administrador
 // ==========================================
 
-export type TipoCapacitacion = 'SST' | 'Técnica' | 'Habilidades Blandas' | 'Normativa y Cumplimiento' | 'Gestión Operativa';
+export type TipoCapacitacion =
+  | 'SST'
+  | 'Técnica'
+  | 'Habilidades Blandas'
+  | 'Normativa y Cumplimiento'
+  | 'Gestión Operativa'
+  | string;
 export type ModalidadCapacitacion = 'Presencial' | 'Virtual sincrónica' | 'Virtual asincrónica' | 'Mixta' | 'Asincrónica';
 
 export interface PreguntaExamenCapacitacion {
@@ -931,4 +943,30 @@ export interface EventoAuditoria {
   };
   empresaId?: string;
   metadatos?: Record<string, any>;
+}
+
+export type CategoriaAnuncio =
+  | 'Comunicado Oficial'
+  | 'Seguridad & SG-SST'
+  | 'Bienestar & Salud'
+  | 'Capacitación & Desarrollo'
+  | 'Logros & Reconocimientos'
+  | 'Democracia & Votaciones'
+  | 'Beneficios & Nómina';
+
+export interface AnuncioSlide {
+  id: string;
+  titulo: string;
+  subtitulo?: string;
+  categoria: CategoriaAnuncio;
+  imagenUrl: string;
+  descripcion: string;
+  fechaPublicacion: string;
+  vigenciaHasta?: string;
+  activo: boolean; // Control del administrador para visibilidad en el portal de empleados
+  orden: number;
+  autorNombre?: string;
+  linkAccion?: string;
+  textoBoton?: string;
+  destacado?: boolean;
 }

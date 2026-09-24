@@ -14,7 +14,6 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
-  initializeFirestore,
   collection,
   doc,
   getDoc,
@@ -25,14 +24,15 @@ import {
   writeBatch,
   getDocFromServer,
   query,
+  where,
   orderBy,
   limit,
   startAfter,
   QueryDocumentSnapshot,
-  DocumentData,
-  Firestore
+  DocumentData
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { CUENTAS_PRUEBA_OFICIALES } from '../data/usuariosYVotacionesData';
 import {
   Empleado,
   Cargo,
@@ -48,7 +48,9 @@ import {
   PeriodoNomina,
   LiquidacionEmpleadoNomina,
   EventoAuditoria,
-  AccionAuditoria
+  AccionAuditoria,
+  AnuncioSlide,
+  Capacitacion
 } from '../types';
 
 // 1. Inicialización de Firebase con soporte de Long Polling para proxies y contenedores
@@ -207,15 +209,111 @@ export const cerrarSesion = async () => {
   return await signOut(auth);
 };
 
-export const obtenerPerfilUsuario = async (uid: string): Promise<UsuarioSistema | null> => {
+export const obtenerPerfilUsuario = async (uid: string, emailOpcional?: string): Promise<UsuarioSistema | null> => {
   try {
-    const userDoc = await getDoc(doc(db, 'usuarios', uid));
+    const userDocRef = doc(db, 'usuarios', uid);
+    const userDoc = await getDoc(userDocRef);
     if (userDoc.exists()) {
       return userDoc.data() as UsuarioSistema;
     }
+
+    // Si no existe un documento con ID = uid, buscar por correo o auto-aprovisionar para no bloquear al usuario registrado
+    const currentFbUser = auth.currentUser;
+    const userEmail = (emailOpcional || currentFbUser?.email || '').trim().toLowerCase();
+
+    if (userEmail) {
+      // 1. Buscar si existe en la colección usuarios por correo
+      try {
+        const qUser = query(collection(db, 'usuarios'), where('email', '==', userEmail), limit(1));
+        const snapUser = await getDocs(qUser);
+        if (!snapUser.empty) {
+          const docExistente = snapUser.docs[0];
+          const datos = docExistente.data() as UsuarioSistema;
+          const perfilEnlazado: UsuarioSistema = {
+            ...datos,
+            id: uid,
+            ultimoAcceso: new Date().toISOString()
+          };
+          await setDoc(userDocRef, perfilEnlazado, { merge: true });
+          return perfilEnlazado;
+        }
+      } catch (errQ) {
+        console.debug('Búsqueda por email en usuarios no completada:', errQ);
+      }
+
+      // 2. Si coincide con una de las cuentas corporativas oficiales
+      const cuentaOficial = CUENTAS_PRUEBA_OFICIALES.find(c => c.email.toLowerCase() === userEmail);
+      if (cuentaOficial) {
+        const perfilOficial: UsuarioSistema = {
+          id: uid,
+          nombre: cuentaOficial.nombre,
+          email: userEmail,
+          documento: cuentaOficial.documento,
+          rol: cuentaOficial.rol,
+          cargoNombre: cuentaOficial.rol === 'admin_gh' ? 'Administrador de Gestión Humana' : cuentaOficial.rol === 'responsable_sst' ? 'Responsable SST' : 'Colaborador',
+          empresaId: cuentaOficial.empresaId,
+          estado: 'activo',
+          ultimoAcceso: new Date().toISOString(),
+          fechaCreacion: new Date().toISOString().split('T')[0],
+          dobleFactorHabilitado: false,
+          permisos: cuentaOficial.permisos,
+          ...(cuentaOficial.empleadoId ? { empleadoId: cuentaOficial.empleadoId } : {})
+        };
+        await setDoc(userDocRef, perfilOficial);
+        return perfilOficial;
+      }
+
+      // 4. Si coincide con un empleado del censo institucional
+      try {
+        const qEmp = query(collection(db, 'empleados'), where('email', '==', userEmail), limit(1));
+        const snapEmp = await getDocs(qEmp);
+        if (!snapEmp.empty) {
+          const empDoc = snapEmp.docs[0];
+          const empData = empDoc.data();
+          const perfilEmpleado: UsuarioSistema = {
+            id: uid,
+            nombre: empData.nombre || currentFbUser?.displayName || 'Colaborador B GROUP',
+            email: userEmail,
+            documento: empData.documento || '—',
+            rol: 'empleado',
+            cargoNombre: empData.cargo || 'Colaborador',
+            empresaId: empData.empresaId || 'empresa-a',
+            empleadoId: empDoc.id,
+            estado: 'activo',
+            ultimoAcceso: new Date().toISOString(),
+            fechaCreacion: new Date().toISOString().split('T')[0],
+            dobleFactorHabilitado: false,
+            permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones']
+          };
+          await setDoc(userDocRef, perfilEmpleado);
+          return perfilEmpleado;
+        }
+      } catch (errEmp) {
+        console.debug('Búsqueda en empleados no completada:', errEmp);
+      }
+
+      // 5. Usuario registrado en Firebase Auth: asignación de perfil de colaborador institucional activo
+      const perfilColaboradorDefault: UsuarioSistema = {
+        id: uid,
+        nombre: currentFbUser?.displayName || userEmail.split('@')[0].replace('.', ' ').toUpperCase(),
+        email: userEmail,
+        documento: '—',
+        rol: 'empleado',
+        cargoNombre: 'Colaborador Institucional',
+        empresaId: 'empresa-a',
+        estado: 'activo',
+        ultimoAcceso: new Date().toISOString(),
+        fechaCreacion: new Date().toISOString().split('T')[0],
+        dobleFactorHabilitado: false,
+        permisos: ['dashboard', 'solicitudes', 'capacitaciones']
+      };
+      await setDoc(userDocRef, perfilColaboradorDefault);
+      return perfilColaboradorDefault;
+    }
+
     return null;
   } catch (err) {
-    console.warn('Error al obtener perfil de usuario:', err);
+    console.warn('Error al obtener o aprovisionar perfil de usuario:', err);
     return null;
   }
 };
@@ -386,24 +484,52 @@ export const eliminarCargoFB = async (id: string, nombre?: string, autor?: Usuar
   );
 };
 
-export const guardarAreaFB = async (area: AreaOrganizacion) => {
+export const guardarAreaFB = async (area: AreaOrganizacion, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'areas', area.id);
-  const data = { ...area, empresaId: area.empresaId || 'empresa-a' };
+  const data = { ...area, empresaId: area.empresaId || autor?.empresaId || 'empresa-a' };
   await setDoc(docRef, data, { merge: true });
+  await registrarEventoAuditoria(
+    'ACTUALIZACION',
+    'estructura',
+    `Guardada área organizacional: ${area.nombre} (${area.codigo || area.id})`,
+    autor,
+    area.id
+  );
 };
 
-export const eliminarAreaFB = async (id: string) => {
+export const eliminarAreaFB = async (id: string, nombre?: string, autor?: UsuarioSistema | null) => {
   await deleteDoc(doc(db, 'areas', id));
+  await registrarEventoAuditoria(
+    'ELIMINACION',
+    'estructura',
+    `Eliminada área organizacional: ${nombre || id}`,
+    autor,
+    id
+  );
 };
 
-export const guardarProcesoFB = async (proceso: ProcesoOrganizacion) => {
+export const guardarProcesoFB = async (proceso: ProcesoOrganizacion, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'procesos', proceso.id);
-  const data = { ...proceso, empresaId: proceso.empresaId || 'empresa-a' };
+  const data = { ...proceso, empresaId: proceso.empresaId || autor?.empresaId || 'empresa-a' };
   await setDoc(docRef, data, { merge: true });
+  await registrarEventoAuditoria(
+    'ACTUALIZACION',
+    'estructura',
+    `Guardado proceso organizacional: ${proceso.nombre} (${proceso.codigo || proceso.id})`,
+    autor,
+    proceso.id
+  );
 };
 
-export const eliminarProcesoFB = async (id: string) => {
+export const eliminarProcesoFB = async (id: string, nombre?: string, autor?: UsuarioSistema | null) => {
   await deleteDoc(doc(db, 'procesos', id));
+  await registrarEventoAuditoria(
+    'ELIMINACION',
+    'estructura',
+    `Eliminado proceso organizacional: ${nombre || id}`,
+    autor,
+    id
+  );
 };
 
 export const guardarParametrosNominaFB = async (parametros: ParametrosLegalesNomina, autor?: UsuarioSistema | null) => {
@@ -938,6 +1064,78 @@ export const cargarCatalogoBaseEppEnNube = async () => {
   }
 
   await batch.commit();
+};
+
+export const guardarAnuncioFB = async (anuncio: AnuncioSlide): Promise<void> => {
+  const path = 'anuncios_slides';
+  try {
+    const docRef = doc(db, path, anuncio.id);
+    await setDoc(docRef, anuncio, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${path}/${anuncio.id}`);
+  }
+};
+
+export const eliminarAnuncioFB = async (anuncioId: string): Promise<void> => {
+  const path = 'anuncios_slides';
+  try {
+    const docRef = doc(db, path, anuncioId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${path}/${anuncioId}`);
+  }
+};
+
+export const obtenerAnunciosFB = async (): Promise<AnuncioSlide[]> => {
+  const path = 'anuncios_slides';
+  try {
+    const snap = await getDocs(collection(db, path));
+    return snap.docs.map(d => ({ ...(d.data() as AnuncioSlide), id: d.id }));
+  } catch (error) {
+    console.warn('Error fetching anuncios from Firestore, using local fallback:', error);
+    return [];
+  }
+};
+
+export const guardarCapacitacionFB = async (capacitacion: Capacitacion): Promise<void> => {
+  const path = 'capacitaciones';
+  try {
+    const docRef = doc(db, path, capacitacion.id);
+    await setDoc(docRef, capacitacion, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${path}/${capacitacion.id}`);
+  }
+};
+
+export const guardarCapacitacionesLoteFB = async (capacitaciones: Capacitacion[]): Promise<void> => {
+  if (!capacitaciones || capacitaciones.length === 0) return;
+  const batch = writeBatch(db);
+  capacitaciones.forEach(cap => {
+    const docRef = doc(db, 'capacitaciones', cap.id);
+    batch.set(docRef, cap, { merge: true });
+  });
+  await batch.commit();
+};
+
+export const obtenerCapacitacionesFB = async (): Promise<Capacitacion[]> => {
+  const path = 'capacitaciones';
+  try {
+    const snap = await getDocs(collection(db, path));
+    return snap.docs.map(d => ({ ...(d.data() as Capacitacion), id: d.id }));
+  } catch (error) {
+    console.warn('Error fetching capacitaciones from Firestore, using local fallback:', error);
+    return [];
+  }
+};
+
+export const eliminarCapacitacionFB = async (capId: string): Promise<void> => {
+  const path = 'capacitaciones';
+  try {
+    const docRef = doc(db, path, capId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${path}/${capId}`);
+  }
 };
 
 export { migrarDocumentosConEmpresaId, CUENTAS_PRUEBA_OFICIALES } from './migracionEmpresa';

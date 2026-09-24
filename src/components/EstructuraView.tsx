@@ -31,21 +31,22 @@ import {
 } from 'lucide-react';
 import { fichaVacia, uid } from '../data/initialData';
 import { limpiarEstructuraOrganicaFB } from '../lib/firebase';
+import { generarSiguienteCodigo } from '../lib/codigoUtils';
 
 interface EstructuraViewProps {
   cargos: Cargo[];
   empleados: Empleado[];
   areas?: AreaOrganizacion[];
   procesos?: ProcesoOrganizacion[];
-  onAddCargo: (nuevoCargo: Cargo) => void;
-  onUpdateCargo?: (cargoActualizado: Cargo) => void;
-  onDeleteCargo?: (cargoId: string) => void;
-  onAddArea?: (nuevaArea: AreaOrganizacion) => void;
-  onUpdateArea?: (areaActualizada: AreaOrganizacion) => void;
-  onDeleteArea?: (areaId: string) => void;
-  onAddProceso?: (nuevoProceso: ProcesoOrganizacion) => void;
-  onUpdateProceso?: (procesoActualizado: ProcesoOrganizacion) => void;
-  onDeleteProceso?: (procesoId: string) => void;
+  onAddCargo: (nuevoCargo: Cargo) => void | Promise<void>;
+  onUpdateCargo?: (cargoActualizado: Cargo) => void | Promise<void>;
+  onDeleteCargo?: (cargoId: string) => void | Promise<void>;
+  onAddArea?: (nuevaArea: AreaOrganizacion) => void | Promise<void>;
+  onUpdateArea?: (areaActualizada: AreaOrganizacion) => void | Promise<void>;
+  onDeleteArea?: (areaId: string) => void | Promise<void>;
+  onAddProceso?: (nuevoProceso: ProcesoOrganizacion) => void | Promise<void>;
+  onUpdateProceso?: (procesoActualizado: ProcesoOrganizacion) => void | Promise<void>;
+  onDeleteProceso?: (procesoId: string) => void | Promise<void>;
   onSelectCargoForManual: (cargoId: string) => void;
   onDepurarEstructura?: () => void;
   isSuperAdmin?: boolean;
@@ -83,11 +84,15 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
   const [modalAreaOpen, setModalAreaOpen] = useState(false);
   const [areaAEditar, setAreaAEditar] = useState<AreaOrganizacion | null>(null);
   const [areaAEliminar, setAreaAEliminar] = useState<AreaOrganizacion | null>(null);
+  const [guardandoArea, setGuardandoArea] = useState(false);
+  const [eliminandoArea, setEliminandoArea] = useState(false);
 
   // Modales de Procesos
   const [modalProcesoOpen, setModalProcesoOpen] = useState(false);
   const [procesoAEditar, setProcesoAEditar] = useState<ProcesoOrganizacion | null>(null);
   const [procesoAEliminar, setProcesoAEliminar] = useState<ProcesoOrganizacion | null>(null);
+  const [guardandoProceso, setGuardandoProceso] = useState(false);
+  const [eliminandoProceso, setEliminandoProceso] = useState(false);
 
   // Depuración (Superadmin)
   const [modalDepurarOpen, setModalDepurarOpen] = useState(false);
@@ -122,16 +127,32 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
   // -------------------------------------------------------------
   // ACCIONES DE CARGOS
   // -------------------------------------------------------------
+  const abrirModalNuevoCargo = () => {
+    setCargoAEditar(null);
+    setNombreCargo('');
+    setReportaACargo('');
+    const codigosExistentes = cargos.map(c => c.ficha?.identificacion?.codigo);
+    setCodigoCargo(generarSiguienteCodigo('CAR', codigosExistentes));
+    setFamiliaCargo('');
+    setAreaCargo(areas && areas[0] ? areas[0].nombre : 'Operaciones');
+    setProcesoCargo(procesos && procesos[0] ? procesos[0].nombre : 'Gestión Integral');
+    setModalEditarCargoOpen(false);
+    setModalCargoOpen(true);
+  };
+
   const handleCreateCargo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombreCargo.trim()) return;
 
+    const codigosExistentes = cargos.map(c => c.ficha?.identificacion?.codigo);
+    const codigoFinal = codigoCargo.trim() || generarSiguienteCodigo('CAR', codigosExistentes);
+
     const nuevaFicha = fichaVacia({
       identificacion: {
-        codigo: codigoCargo.trim() || `CAR-${Math.floor(100 + Math.random() * 900)}`,
+        codigo: codigoFinal,
         familia: familiaCargo.trim() || 'General',
-        area: areaCargo.trim() || 'Operaciones',
-        proceso: procesoCargo.trim() || 'Gestión Integral',
+        area: areaCargo.trim() || (areas && areas[0] ? areas[0].nombre : 'Operaciones'),
+        proceso: procesoCargo.trim() || (procesos && procesos[0] ? procesos[0].nombre : 'Gestión Integral'),
         tipoVinculacion: 'Término indefinido',
         modalidad: 'Presencial',
         ubicacion: 'Sede principal Bogotá',
@@ -231,7 +252,8 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
   // -------------------------------------------------------------
   const abrirModalNuevaArea = () => {
     setAreaAEditar(null);
-    setAreaFormCodigo(`AR-${Math.floor(100 + Math.random() * 900)}`);
+    const codigosExistentes = areas.map(a => a.codigo);
+    setAreaFormCodigo(generarSiguienteCodigo('AR', codigosExistentes));
     setAreaFormNombre('');
     setAreaFormProcesoId(procesos[0]?.id || '');
     setAreaFormLider('');
@@ -249,48 +271,63 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
     setModalAreaOpen(true);
   };
 
-  const handleGuardarArea = (e: React.FormEvent) => {
+  const handleGuardarArea = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!areaFormNombre.trim()) return;
+    if (!areaFormNombre.trim() || guardandoArea) return;
 
-    const procesoRelacionado = procesos.find(p => p.id === areaFormProcesoId);
+    setGuardandoArea(true);
+    try {
+      const procesoRelacionado = procesos.find(p => p.id === areaFormProcesoId);
 
-    if (areaAEditar) {
-      const areaActualizada: AreaOrganizacion = {
-        ...areaAEditar,
-        codigo: areaFormCodigo.trim() || areaAEditar.codigo,
-        nombre: areaFormNombre.trim(),
-        procesoId: areaFormProcesoId || undefined,
-        procesoNombre: procesoRelacionado?.nombre || undefined,
-        lider: areaFormLider.trim() || undefined,
-        descripcion: areaFormDescripcion.trim() || undefined
-      };
-      if (onUpdateArea) onUpdateArea(areaActualizada);
-      setMensajeExito(`Área "${areaActualizada.nombre}" modificada con éxito.`);
-    } else {
-      const nuevaArea: AreaOrganizacion = {
-        id: uid('ar'),
-        codigo: areaFormCodigo.trim() || `AR-${Math.floor(100 + Math.random() * 900)}`,
-        nombre: areaFormNombre.trim(),
-        procesoId: areaFormProcesoId || undefined,
-        procesoNombre: procesoRelacionado?.nombre || undefined,
-        lider: areaFormLider.trim() || undefined,
-        descripcion: areaFormDescripcion.trim() || undefined
-      };
-      if (onAddArea) onAddArea(nuevaArea);
-      setMensajeExito(`Nueva área "${nuevaArea.nombre}" creada e integrada.`);
+      if (areaAEditar) {
+        const areaActualizada: AreaOrganizacion = {
+          ...areaAEditar,
+          codigo: areaFormCodigo.trim() || areaAEditar.codigo,
+          nombre: areaFormNombre.trim(),
+          procesoId: areaFormProcesoId || undefined,
+          procesoNombre: procesoRelacionado?.nombre || undefined,
+          lider: areaFormLider.trim() || undefined,
+          descripcion: areaFormDescripcion.trim() || undefined
+        };
+        if (onUpdateArea) await onUpdateArea(areaActualizada);
+        setMensajeExito(`Área "${areaActualizada.nombre}" modificada con éxito.`);
+      } else {
+        const codigosExistentes = areas.map(a => a.codigo);
+        const nuevaArea: AreaOrganizacion = {
+          id: uid('ar'),
+          codigo: areaFormCodigo.trim() || generarSiguienteCodigo('AR', codigosExistentes),
+          nombre: areaFormNombre.trim(),
+          procesoId: areaFormProcesoId || undefined,
+          procesoNombre: procesoRelacionado?.nombre || undefined,
+          lider: areaFormLider.trim() || undefined,
+          descripcion: areaFormDescripcion.trim() || undefined
+        };
+        if (onAddArea) await onAddArea(nuevaArea);
+        setMensajeExito(`Nueva área "${nuevaArea.nombre}" creada e integrada.`);
+      }
+
+      setModalAreaOpen(false);
+      setTimeout(() => setMensajeExito(null), 4000);
+    } catch (err: any) {
+      alert('Error al guardar el área: ' + (err?.message || 'Error en servidor'));
+    } finally {
+      setGuardandoArea(false);
     }
-
-    setModalAreaOpen(false);
-    setTimeout(() => setMensajeExito(null), 4000);
   };
 
-  const handleConfirmarEliminarArea = () => {
-    if (!areaAEliminar) return;
-    if (onDeleteArea) onDeleteArea(areaAEliminar.id);
-    setMensajeExito(`Área "${areaAEliminar.nombre}" eliminada de la estructura orgánica.`);
-    setAreaAEliminar(null);
-    setTimeout(() => setMensajeExito(null), 4000);
+  const handleConfirmarEliminarArea = async () => {
+    if (!areaAEliminar || eliminandoArea) return;
+    setEliminandoArea(true);
+    try {
+      if (onDeleteArea) await onDeleteArea(areaAEliminar.id);
+      setMensajeExito(`Área "${areaAEliminar.nombre}" eliminada de la estructura orgánica.`);
+      setAreaAEliminar(null);
+      setTimeout(() => setMensajeExito(null), 4000);
+    } catch (err: any) {
+      alert('Error al eliminar área: ' + (err?.message || 'Error'));
+    } finally {
+      setEliminandoArea(false);
+    }
   };
 
   // -------------------------------------------------------------
@@ -298,7 +335,8 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
   // -------------------------------------------------------------
   const abrirModalNuevoProceso = () => {
     setProcesoAEditar(null);
-    setProcesoFormCodigo(`PR-${Math.floor(10 + Math.random() * 90)}`);
+    const codigosExistentes = procesos.map(p => p.codigo);
+    setProcesoFormCodigo(generarSiguienteCodigo('PR', codigosExistentes));
     setProcesoFormNombre('');
     setProcesoFormTipo('Misional / Operativo');
     setProcesoFormObjetivo('');
@@ -316,44 +354,59 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
     setModalProcesoOpen(true);
   };
 
-  const handleGuardarProceso = (e: React.FormEvent) => {
+  const handleGuardarProceso = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!procesoFormNombre.trim()) return;
+    if (!procesoFormNombre.trim() || guardandoProceso) return;
 
-    if (procesoAEditar) {
-      const procesoActualizado: ProcesoOrganizacion = {
-        ...procesoAEditar,
-        codigo: procesoFormCodigo.trim() || procesoAEditar.codigo,
-        nombre: procesoFormNombre.trim(),
-        tipo: procesoFormTipo,
-        objetivo: procesoFormObjetivo.trim() || undefined,
-        liderNombre: procesoFormLider.trim() || undefined
-      };
-      if (onUpdateProceso) onUpdateProceso(procesoActualizado);
-      setMensajeExito(`Proceso "${procesoActualizado.nombre}" actualizado con éxito.`);
-    } else {
-      const nuevoProceso: ProcesoOrganizacion = {
-        id: uid('proc'),
-        codigo: procesoFormCodigo.trim() || `PR-${Math.floor(10 + Math.random() * 90)}`,
-        nombre: procesoFormNombre.trim(),
-        tipo: procesoFormTipo,
-        objetivo: procesoFormObjetivo.trim() || undefined,
-        liderNombre: procesoFormLider.trim() || undefined
-      };
-      if (onAddProceso) onAddProceso(nuevoProceso);
-      setMensajeExito(`Proceso "${nuevoProceso.nombre}" creado e integrado.`);
+    setGuardandoProceso(true);
+    try {
+      if (procesoAEditar) {
+        const procesoActualizado: ProcesoOrganizacion = {
+          ...procesoAEditar,
+          codigo: procesoFormCodigo.trim() || procesoAEditar.codigo,
+          nombre: procesoFormNombre.trim(),
+          tipo: procesoFormTipo,
+          objetivo: procesoFormObjetivo.trim() || undefined,
+          liderNombre: procesoFormLider.trim() || undefined
+        };
+        if (onUpdateProceso) await onUpdateProceso(procesoActualizado);
+        setMensajeExito(`Proceso "${procesoActualizado.nombre}" actualizado con éxito.`);
+      } else {
+        const codigosExistentes = procesos.map(p => p.codigo);
+        const nuevoProceso: ProcesoOrganizacion = {
+          id: uid('proc'),
+          codigo: procesoFormCodigo.trim() || generarSiguienteCodigo('PR', codigosExistentes),
+          nombre: procesoFormNombre.trim(),
+          tipo: procesoFormTipo,
+          objetivo: procesoFormObjetivo.trim() || undefined,
+          liderNombre: procesoFormLider.trim() || undefined
+        };
+        if (onAddProceso) await onAddProceso(nuevoProceso);
+        setMensajeExito(`Proceso "${nuevoProceso.nombre}" creado e integrado.`);
+      }
+
+      setModalProcesoOpen(false);
+      setTimeout(() => setMensajeExito(null), 4000);
+    } catch (err: any) {
+      alert('Error al guardar proceso: ' + (err?.message || 'Error en servidor'));
+    } finally {
+      setGuardandoProceso(false);
     }
-
-    setModalProcesoOpen(false);
-    setTimeout(() => setMensajeExito(null), 4000);
   };
 
-  const handleConfirmarEliminarProceso = () => {
-    if (!procesoAEliminar) return;
-    if (onDeleteProceso) onDeleteProceso(procesoAEliminar.id);
-    setMensajeExito(`Proceso "${procesoAEliminar.nombre}" eliminado de la organización.`);
-    setProcesoAEliminar(null);
-    setTimeout(() => setMensajeExito(null), 4000);
+  const handleConfirmarEliminarProceso = async () => {
+    if (!procesoAEliminar || eliminandoProceso) return;
+    setEliminandoProceso(true);
+    try {
+      if (onDeleteProceso) await onDeleteProceso(procesoAEliminar.id);
+      setMensajeExito(`Proceso "${procesoAEliminar.nombre}" eliminado de la organización.`);
+      setProcesoAEliminar(null);
+      setTimeout(() => setMensajeExito(null), 4000);
+    } catch (err: any) {
+      alert('Error al eliminar proceso: ' + (err?.message || 'Error'));
+    } finally {
+      setEliminandoProceso(false);
+    }
   };
 
   // Depuración (solo superadmin)
@@ -506,7 +559,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
 
           {/* Botón Nuevo Cargo */}
           <button
-            onClick={() => setModalCargoOpen(true)}
+            onClick={abrirModalNuevoCargo}
             className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4 text-[#00FF00]" />
@@ -662,7 +715,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                             <div>
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[10px] font-mono font-extrabold px-2 py-0.5 bg-white border border-[#8FA7D6] rounded text-[#18235C]">
-                                  {proc.codigo || 'PR-00'}
+                                  {proc.codigo || 'PR-001'}
                                 </span>
                                 <div className="flex items-center gap-1">
                                   <button
@@ -754,7 +807,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono font-extrabold px-2 py-0.5 bg-white border border-[#8FA7D6] rounded text-[#18235C]">
-                        {area.codigo || 'AR-00'}
+                        {area.codigo || 'AR-001'}
                       </span>
                       <h4 className="font-bold text-xs text-[#18235C]">
                         {area.nombre}
@@ -820,7 +873,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono font-extrabold px-2 py-0.5 bg-white border border-[#8FA7D6] rounded text-[#18235C]">
-                        {proc.codigo || 'PR-00'}
+                        {proc.codigo || 'PR-001'}
                       </span>
                       <h4 className="font-bold text-xs text-[#18235C]">
                         {proc.nombre}
@@ -934,7 +987,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="Ej. OPR-002"
+                    placeholder="Ej. CAR-001"
                     value={codigoCargo}
                     onChange={e => setCodigoCargo(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC] focus:outline-none focus:border-[#18235C]"
@@ -1122,6 +1175,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                   <input
                     type="text"
                     required
+                    placeholder="Ej. AR-001"
                     value={areaFormCodigo}
                     onChange={e => setAreaFormCodigo(e.target.value)}
                     className="w-full p-2 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC]"
@@ -1188,9 +1242,10 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 font-bold text-white bg-[#18235C] hover:bg-[#101740] rounded-xl shadow-xs"
+                  disabled={guardandoArea}
+                  className="px-4 py-1.5 font-bold text-white bg-[#18235C] hover:bg-[#101740] rounded-xl shadow-xs disabled:opacity-50"
                 >
-                  {areaAEditar ? 'Guardar Cambios' : 'Crear Área'}
+                  {guardandoArea ? 'Guardando...' : (areaAEditar ? 'Guardar Cambios' : 'Crear Área')}
                 </button>
               </div>
             </form>
@@ -1233,9 +1288,10 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmarEliminarArea}
-                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-2xs"
+                disabled={eliminandoArea}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-2xs disabled:opacity-50"
               >
-                Eliminar Área
+                {eliminandoArea ? 'Eliminando...' : 'Eliminar Área'}
               </button>
             </div>
           </div>
@@ -1273,6 +1329,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                   <input
                     type="text"
                     required
+                    placeholder="Ej. PR-001"
                     value={procesoFormCodigo}
                     onChange={e => setProcesoFormCodigo(e.target.value)}
                     className="w-full p-2 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC]"
@@ -1337,9 +1394,10 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 font-bold text-white bg-[#18235C] hover:bg-[#101740] rounded-xl shadow-xs"
+                  disabled={guardandoProceso}
+                  className="px-4 py-1.5 font-bold text-white bg-[#18235C] hover:bg-[#101740] rounded-xl shadow-xs disabled:opacity-50"
                 >
-                  {procesoAEditar ? 'Guardar Cambios' : 'Crear Proceso'}
+                  {guardandoProceso ? 'Guardando...' : (procesoAEditar ? 'Guardar Cambios' : 'Crear Proceso')}
                 </button>
               </div>
             </form>
@@ -1382,9 +1440,10 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmarEliminarProceso}
-                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-2xs"
+                disabled={eliminandoProceso}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-2xs disabled:opacity-50"
               >
-                Eliminar Proceso
+                {eliminandoProceso ? 'Eliminando...' : 'Eliminar Proceso'}
               </button>
             </div>
           </div>

@@ -43,8 +43,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     return () => clearInterval(timer);
   }, [resetCooldown]);
 
-  const finishLogin = async (uid: string) => {
-    const profile = await obtenerPerfilUsuario(uid);
+  const finishLogin = async (uid: string, emailStr?: string) => {
+    const profile = await obtenerPerfilUsuario(uid, emailStr);
     if (!profile || profile.estado !== 'activo') {
       throw new Error('La cuenta no tiene un perfil activo autorizado. Contacte al administrador.');
     }
@@ -65,7 +65,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
     try {
       const credential = await loginConEmail(cleanEmail, password);
-      await finishLogin(credential.user.uid);
+      await finishLogin(credential.user.uid, cleanEmail);
     } catch (err: any) {
       setError(err?.code === 'auth/invalid-credential'
         ? 'Credenciales inválidas.'
@@ -81,7 +81,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
     try {
       const { user } = await loginConGoogle();
-      await finishLogin(user.uid);
+      await finishLogin(user.uid, user.email || undefined);
     } catch (err: any) {
       setError(err?.message || 'No fue posible iniciar sesión con Google.');
     } finally {

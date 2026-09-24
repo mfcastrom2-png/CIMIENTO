@@ -12,7 +12,8 @@ import {
   Save,
   Check
 } from 'lucide-react';
-import { uid } from '../data/initialData';
+import { uid, fichaVacia } from '../data/initialData';
+import { generarSiguienteCodigo } from '../lib/codigoUtils';
 
 interface ManualCargosViewProps {
   cargos: Cargo[];
@@ -72,10 +73,80 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
   const [vResponsable, setVResponsable] = useState('Gestión Humana');
   const [vAprobador, setVAprobador] = useState('Gerencia General');
 
+  // Modal Nuevo Cargo
+  const [modalNuevoCargo, setModalNuevoCargo] = useState(false);
+  const [nuevoNombreCargo, setNuevoNombreCargo] = useState('');
+  const [nuevoCodigoCargo, setNuevoCodigoCargo] = useState('');
+  const [nuevoAreaCargo, setNuevoAreaCargo] = useState('Operaciones');
+  const [nuevoProcesoCargo, setNuevoProcesoCargo] = useState('Gestión Integral');
+  const [nuevoReportaA, setNuevoReportaA] = useState('');
+
+  const abrirModalNuevoCargo = () => {
+    const codigosExistentes = cargos.map(c => c.ficha?.identificacion?.codigo);
+    setNuevoCodigoCargo(generarSiguienteCodigo('CAR', codigosExistentes));
+    setNuevoNombreCargo('');
+    setNuevoAreaCargo('Operaciones');
+    setNuevoProcesoCargo('Gestión Integral');
+    setNuevoReportaA('');
+    setModalNuevoCargo(true);
+  };
+
+  const handleCrearCargo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nuevoNombreCargo.trim()) return;
+    const codigosExistentes = cargos.map(c => c.ficha?.identificacion?.codigo);
+    const codigoFinal = nuevoCodigoCargo.trim() || generarSiguienteCodigo('CAR', codigosExistentes);
+
+    const nuevaFicha = fichaVacia({
+      identificacion: {
+        codigo: codigoFinal,
+        familia: 'General',
+        area: nuevoAreaCargo.trim() || 'Operaciones',
+        proceso: nuevoProcesoCargo.trim() || 'Gestión Integral',
+        tipoVinculacion: 'Término indefinido',
+        modalidad: 'Presencial',
+        ubicacion: 'Sede principal Bogotá',
+        personalACargo: '0',
+        estado: 'Vigente',
+        version: '1.0'
+      },
+      proposito: `Garantizar el cumplimiento eficiente y seguro de las actividades correspondientes al cargo de ${nuevoNombreCargo.trim()}.`,
+      historial: [{
+        id: uid('h'),
+        version: '1.0',
+        fecha: new Date().toISOString().slice(0, 10),
+        motivo: 'Creación de ficha técnica de cargo',
+        responsable: 'Gestión Humana B GROUP',
+        aprobador: 'Gerencia General'
+      }]
+    });
+
+    const nuevo: Cargo = {
+      id: uid('c'),
+      nombre: nuevoNombreCargo.trim(),
+      reportaA: nuevoReportaA || null,
+      ficha: nuevaFicha
+    };
+
+    if (onAddCargo) onAddCargo(nuevo);
+    setInternalId(nuevo.id);
+    if (onSelectCargo) onSelectCargo(nuevo.id);
+    setModalNuevoCargo(false);
+  };
+
   if (!currentCargo) {
     return (
-      <div className="p-8 text-center bg-white rounded border border-[#8FA7D6]">
-        No se ha seleccionado ningún cargo.
+      <div className="p-8 text-center bg-white rounded-2xl border border-[#8FA7D6] space-y-4">
+        <p className="text-sm text-[#282829]">No hay ningún cargo registrado en la estructura.</p>
+        {onAddCargo && (
+          <button
+            onClick={abrirModalNuevoCargo}
+            className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-xl inline-flex items-center gap-2 shadow-xs transition-colors"
+          >
+            <Plus className="w-4 h-4 text-[#00FF00]" />
+            <span>Crear Primer Cargo (CAR-001)</span>
+          </button>
+        )}
       </div>
     );
   }
@@ -290,6 +361,16 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
               </option>
             ))}
           </select>
+          {onAddCargo && (
+            <button
+              onClick={abrirModalNuevoCargo}
+              className="text-xs font-semibold px-3 py-2 rounded bg-[#18235C] hover:bg-[#101740] text-white flex items-center gap-1.5 transition-colors shadow-xs"
+              title="Crear nuevo cargo con código institucional secuencial"
+            >
+              <Plus className="w-3.5 h-3.5 text-[#00FF00]" />
+              <span>Nuevo Cargo</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1251,6 +1332,112 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                   className="px-4 py-2 text-white bg-[#B5842A] hover:bg-[#966b1e] rounded font-semibold transition-colors"
                 >
                   Formalizar Versión
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Nuevo Cargo */}
+      {modalNuevoCargo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#18235C]/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-[#8FA7D6] max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#8FA7D6]/40">
+              <div>
+                <h3 className="text-base font-bold text-[#18235C]">
+                  Crear Nuevo Cargo Orgánico
+                </h3>
+                <p className="text-xs text-[#282829]/70">
+                  Crea una nueva ficha de cargo con código institucional secuencial (CAR-001).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalNuevoCargo(false)}
+                className="text-[#282829] hover:text-[#18235C] font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCrearCargo} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-[#18235C] mb-1">Nombre del Cargo *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Técnico de Planta Externa / Analista de Calidad"
+                  value={nuevoNombreCargo}
+                  onChange={e => setNuevoNombreCargo(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-[#18235C] mb-1">Código de Cargo *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. CAR-001"
+                    value={nuevoCodigoCargo}
+                    onChange={e => setNuevoCodigoCargo(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#18235C] mb-1">Jefe Inmediato (Reporta a):</label>
+                  <select
+                    value={nuevoReportaA}
+                    onChange={e => setNuevoReportaA(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC]"
+                  >
+                    <option value="">— Ninguno (Nivel Directivo) —</option>
+                    {cargos.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} ({c.ficha?.identificacion?.codigo || 'S/C'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-[#18235C] mb-1">Área Perteneciente</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Operaciones"
+                    value={nuevoAreaCargo}
+                    onChange={e => setNuevoAreaCargo(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#18235C] mb-1">Proceso Perteneciente</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Operaciones de Montaje"
+                    value={nuevoProcesoCargo}
+                    onChange={e => setNuevoProcesoCargo(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-[#8FA7D6]/30">
+                <button
+                  type="button"
+                  onClick={() => setModalNuevoCargo(false)}
+                  className="px-4 py-2 font-bold text-[#282829] hover:bg-[#F8FAFC] rounded-xl border border-[#8FA7D6]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 font-bold text-white bg-[#18235C] hover:bg-[#101740] rounded-xl shadow-xs"
+                >
+                  Crear Ficha de Cargo
                 </button>
               </div>
             </form>

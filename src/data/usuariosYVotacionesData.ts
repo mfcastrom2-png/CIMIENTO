@@ -26,7 +26,7 @@ export const INITIAL_USUARIOS_SISTEMA: UsuarioSistema[] = [
     id: 'usr-admin-principal',
     nombre: 'Super Administrador',
     documento: 'NIT 900.995.99-2',
-    email: 'mf.castrom2@gmail.com',
+    email: 'superadmin@test-cimiento.com',
     rol: 'superadmin',
     cargoNombre: 'Gerencia General & Dirección GH',
     estado: 'activo',
@@ -37,6 +37,94 @@ export const INITIAL_USUARIOS_SISTEMA: UsuarioSistema[] = [
       'dashboard', 'estructura', 'cargos', 'empleados', 'evaluaciones',
       'solicitudes', 'capacitaciones', 'sst', 'epps', 'nomina', 'usuarios', 'documentos'
     ]
+  }
+];
+
+export const CUENTAS_PRUEBA_OFICIALES = [
+  {
+    email: 'superadmin@test-cimiento.com',
+    pass: 'Cimiento2026*!',
+    nombre: 'Super Administrador Global',
+    rol: 'superadmin' as const,
+    empresaId: 'empresa-a',
+    documento: '10.000.001',
+    permisos: [
+      'dashboard',
+      'empleados',
+      'cargos',
+      'estructura',
+      'evaluaciones',
+      'solicitudes',
+      'nomina',
+      'parametros-nomina',
+      'sst',
+      'epps',
+      'capacitaciones',
+      'vacaciones',
+      'votaciones-sst',
+      'usuarios',
+      'documentos'
+    ]
+  },
+  {
+    email: 'admin-a@test-cimiento.com',
+    pass: 'Cimiento2026*!',
+    nombre: 'Administrador Empresa A',
+    rol: 'admin_gh' as const,
+    empresaId: 'empresa-a',
+    documento: '10.000.002',
+    permisos: [
+      'dashboard',
+      'empleados',
+      'cargos',
+      'estructura',
+      'evaluaciones',
+      'solicitudes',
+      'nomina',
+      'sst',
+      'epps',
+      'capacitaciones',
+      'vacaciones',
+      'votaciones-sst',
+      'usuarios',
+      'documentos'
+    ]
+  },
+  {
+    email: 'sst-a@test-cimiento.com',
+    pass: 'Cimiento2026*!',
+    nombre: 'Responsable SST Empresa A',
+    rol: 'responsable_sst' as const,
+    empresaId: 'empresa-a',
+    documento: '10.000.003',
+    permisos: [
+      'dashboard',
+      'sst',
+      'epps',
+      'capacitaciones',
+      'votaciones-sst',
+      'empleados'
+    ]
+  },
+  {
+    email: 'empleado-a@test-cimiento.com',
+    pass: 'Cimiento2026*!',
+    nombre: 'Carlos Mendoza (Empresa A)',
+    rol: 'empleado' as const,
+    empresaId: 'empresa-a',
+    empleadoId: 'empleado-a-001',
+    documento: '10.000.004',
+    permisos: ['dashboard', 'solicitudes', 'capacitaciones']
+  },
+  {
+    email: 'empleado-b@test-cimiento.com',
+    pass: 'Cimiento2026*!',
+    nombre: 'Laura Restrepo (Empresa B)',
+    rol: 'empleado' as const,
+    empresaId: 'empresa-b',
+    empleadoId: 'empleado-b-001',
+    documento: '20.000.001',
+    permisos: ['dashboard', 'solicitudes', 'capacitaciones']
   }
 ];
 

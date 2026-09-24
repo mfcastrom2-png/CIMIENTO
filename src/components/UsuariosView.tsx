@@ -13,6 +13,7 @@ import {
 import {
   guardarUsuarioFB,
   eliminarUsuarioFB,
+  registrarUsuarioEnAuth,
   enviarNotificacionCorreoNuevoUsuario,
   migrarDocumentosConEmpresaId,
   CUENTAS_PRUEBA_OFICIALES
@@ -64,6 +65,7 @@ interface UsuariosViewProps {
   isSuperAdmin?: boolean;
   usuarios?: UsuarioSistema[];
   onActualizarUsuarios?: (nuevos: UsuarioSistema[]) => void;
+  currentUser?: UsuarioSistema | null;
 }
 
 export function UsuariosView({
@@ -74,9 +76,27 @@ export function UsuariosView({
   cargos = [],
   isSuperAdmin = false,
   usuarios: propsUsuarios,
-  onActualizarUsuarios
+  onActualizarUsuarios,
+  currentUser
 }: UsuariosViewProps) {
   const activeUserRole = userRole || currentRole || 'admin';
+  const rolReal = currentUser?.rol || (activeUserRole === 'admin' ? 'admin_gh' : 'empleado');
+  const puedeGestionarUsuarios = isSuperAdmin || rolReal === 'superadmin' || rolReal === 'admin_gh' || currentUser?.permisos?.includes('usuarios');
+
+  if (!puedeGestionarUsuarios) {
+    return (
+      <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-xl shadow-xs border border-rose-200 text-center">
+        <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800">Acceso No Autorizado</h2>
+        <p className="text-sm text-slate-600 mt-2">
+          El módulo de Administración de Usuarios, Roles y Credenciales está restringido exclusivamente a perfiles de Dirección de Gestión Humana y Superadministradores.
+        </p>
+      </div>
+    );
+  }
+
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>(propsUsuarios || INITIAL_USUARIOS_SISTEMA);
   const [logs, setLogs] = useState<LogAuditoriaUsuario[]>(INITIAL_LOGS_AUDITORIA);
   const [activeTab, setActiveTab] = useState<'usuarios' | 'rolesMatriz' | 'auditoria' | 'aislamiento'>('usuarios');
@@ -189,8 +209,24 @@ export function UsuariosView({
     const emailLimpio = (nuevoUsuario.email || '').trim().toLowerCase();
     const claveAsignada = passwordTemporal.trim() || 'BGroup2026*';
 
+    // 1. Crear o asegurar la cuenta en Firebase Authentication para obtener su UID oficial
+    let authUid = '';
+    try {
+      const resAuth = await registrarUsuarioEnAuth(
+        emailLimpio,
+        claveAsignada,
+        (nuevoUsuario.nombre || '').trim()
+      );
+      if (resAuth.uid) {
+        authUid = resAuth.uid;
+      }
+    } catch (errAuth) {
+      console.warn('Registro en Firebase Auth secundario:', errAuth);
+    }
+
+    const finalId = authUid || `usr-${Date.now()}`;
     const nuevo: UsuarioSistema = {
-      id: `usr-${Date.now()}`,
+      id: finalId,
       nombre: (nuevoUsuario.nombre || '').trim(),
       documento: (nuevoUsuario.documento || '').trim(),
       email: emailLimpio,
@@ -201,24 +237,26 @@ export function UsuariosView({
       fechaCreacion: new Date().toISOString().split('T')[0],
       dobleFactorHabilitado: Boolean(nuevoUsuario.dobleFactorHabilitado),
       password: claveAsignada,
-      permisos: nuevoUsuario.permisos || ['dashboard']
+      permisos: nuevoUsuario.permisos && nuevoUsuario.permisos.length > 0
+        ? nuevoUsuario.permisos
+        : ['dashboard', 'solicitudes', 'capacitaciones']
     };
 
-    // 1. Guardar en Firestore
+    // 2. Guardar en Firestore con su ID enlazado al UID de Authentication
     try {
       await guardarUsuarioFB(nuevo);
     } catch (err) {
       console.warn('Error al guardar usuario en Firestore:', err);
     }
 
-    // 2. Guardar en estado local
+    // 3. Guardar en estado local
     setUsuarios(prev => [nuevo, ...prev]);
     onActualizarUsuarios?.([nuevo, ...usuarios]);
 
-    // 3. Despachar notificación al correo creado
+    // 4. Despachar notificación al correo creado si está seleccionado
     let resultadoEnvio: { success: boolean; message: string; method?: string; errorDetalle?: string } = {
       success: true,
-      message: 'Notificación procesada localmente'
+      message: 'Cuenta creada y activada con éxito en Firebase Authentication.'
     };
     if (enviarNotificacionEmail) {
       resultadoEnvio = await enviarNotificacionCorreoNuevoUsuario(

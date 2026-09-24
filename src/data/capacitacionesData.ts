@@ -3,7 +3,7 @@ import { Capacitacion } from '../types';
 export const CAPACITACIONES_INICIALES: Capacitacion[] = [
   {
     id: 'cap_01',
-    codigo: 'CAP-2026-001',
+    codigo: '001',
     titulo: 'Seguridad Integral en Alturas, Rescate y Trabajo Seguro en Redes FTTH (Res. 4272 de 2021)',
     objetivo: 'Capacitar y validar las competencias técnicas del personal operativo en el uso correcto de equipos de protección contra caídas, verificación de puntos de anclaje, diligenciamiento del permiso de trabajo y respuesta inicial ante emergencias en postería.',
     tipo: 'SST',
@@ -101,7 +101,7 @@ export const CAPACITACIONES_INICIALES: Capacitacion[] = [
   },
   {
     id: 'cap_02',
-    codigo: 'CAP-2026-002',
+    codigo: '002',
     titulo: 'Ergonomía Aplicada, Cuidado Osteomuscular y Prevención de Riesgo Biomecánico en Oficinas',
     objetivo: 'Entrenar al personal administrativo en la adecuada graduación del puesto de trabajo, prevención del síndrome de túnel del carpo y rutinas activas de descongestión muscular y fatiga visual.',
     tipo: 'SST',
@@ -184,7 +184,7 @@ export const CAPACITACIONES_INICIALES: Capacitacion[] = [
   },
   {
     id: 'cap_03',
-    codigo: 'CAP-2026-003',
+    codigo: '003',
     titulo: 'Protección de Datos Personales (Habeas Data - Ley 1581 de 2012) y Confidencialidad en la Empresa',
     objetivo: 'Concientizar a todos los colaboradores en el manejo ético, custodia de datos personales de clientes y empleados, confidencialidad salarial y reporte oportuno de incidentes de seguridad de la información.',
     tipo: 'Normativa y Cumplimiento',

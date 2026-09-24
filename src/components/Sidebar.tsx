@@ -23,7 +23,7 @@ import {
   Scale,
   ShieldAlert
 } from 'lucide-react';
-import { Role, UsuarioSistema } from '../types';
+import { Role, UsuarioSistema, RolSistema } from '../types';
 
 interface SidebarProps {
   currentRole?: Role;
@@ -46,17 +46,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onLogout
 }) => {
-  const rol = currentUser?.rol || (currentRole === 'admin' ? 'admin_gh' : 'empleado');
+  // Rol institucional real verificado desde el perfil de base de datos
+  const rolReal: RolSistema = currentUser?.rol || 'empleado';
+  const esAdminReal = rolReal === 'superadmin' || rolReal === 'admin_gh';
+
+  // Solo si es administrador real puede simular la vista de prueba de empleado
+  const rol: RolSistema = esAdminReal ? (currentRole === 'empleado' ? 'empleado' : rolReal) : rolReal;
   const permisos = currentUser?.permisos || [];
 
   const tienePermiso = (modulo: string) => {
+    // Si el usuario autenticado real es colaborador/empleado, se rige estrictamente por sus permisos asignados
+    if (rolReal === 'empleado') {
+      if (modulo === 'evaluaciones') return true;
+      return permisos.includes(modulo);
+    }
+    // Si un administrador real está simulando la vista de empleado, filtrar módulos administrativos para fidelidad de prueba
+    if (rol === 'empleado') {
+      return ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps', 'evaluaciones', 'nomina'].includes(modulo);
+    }
     if (rol === 'superadmin' || rol === 'admin_gh') return true;
     if (permisos.includes(modulo)) return true;
     return false;
   };
 
-  const esEmpleado = rol === 'empleado';
-  const esSST = rol === 'responsable_sst';
+  const esEmpleado = rolReal === 'empleado' || rol === 'empleado';
+  const esSST = rolReal === 'responsable_sst';
 
   return (
     <aside className="w-64 bg-[#18235C] text-white flex flex-col shrink-0 min-h-screen p-5 select-none border-r border-[#101740]">
@@ -108,71 +122,83 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               id="nav-nomina-empleado"
               onClick={() => onNavigate('nomina')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                 currentView === 'nomina'
                   ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
                   : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <FileDown className={`w-4 h-4 ${currentView === 'nomina' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-                <span>Mi Desprendible de Pago</span>
-              </div>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                currentView === 'nomina' ? 'bg-[#18235C] text-[#00FF00]' : 'bg-[#00FF00] text-[#18235C]'
-              }`}>
-                Descargar
-              </span>
+              <FileDown className={`w-4 h-4 ${currentView === 'nomina' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+              <span>Mi Desprendible de Pago</span>
             </button>
 
             <button
               id="nav-epp-empleado"
               onClick={() => onNavigate('epps')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                 currentView === 'epps'
                   ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
                   : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <HardHat className={`w-4 h-4 ${currentView === 'epps' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                <span>Solicitar EPPs & Dotación</span>
-              </div>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                currentView === 'epps' ? 'bg-[#18235C] text-[#8FA7D6]' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
-              }`}>
-                Res. 2400
-              </span>
+              <HardHat className={`w-4 h-4 ${currentView === 'epps' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+              <span>Solicitar EPPs & Dotación</span>
             </button>
 
             <button
               id="nav-solicitudes-empleado"
               onClick={() => onNavigate('solicitudes')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                 currentView === 'solicitudes'
                   ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
                   : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <CalendarCheck className={`w-4 h-4 ${currentView === 'solicitudes' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                <span>Permisos & Solicitudes</span>
-              </div>
+              <CalendarCheck className={`w-4 h-4 ${currentView === 'solicitudes' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+              <span>Permisos & Solicitudes</span>
             </button>
 
             <button
               id="nav-vacaciones-empleado"
               onClick={() => onNavigate('vacaciones')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                 currentView === 'vacaciones'
                   ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
                   : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <Palmtree className={`w-4 h-4 ${currentView === 'vacaciones' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                <span>Mis Vacaciones (CST 186)</span>
-              </div>
+              <Palmtree className={`w-4 h-4 ${currentView === 'vacaciones' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+              <span>Mis Vacaciones</span>
+            </button>
+
+            <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
+              Desempeño & Formación
+            </div>
+
+            <button
+              id="nav-evaluaciones-empleado"
+              onClick={() => onNavigate('evaluaciones')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'evaluaciones'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <Award className={`w-4 h-4 ${currentView === 'evaluaciones' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+              <span>Evaluación de Desempeño</span>
+            </button>
+
+            <button
+              id="nav-capacitaciones-empleado"
+              onClick={() => onNavigate('capacitaciones')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'capacitaciones'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <GraduationCap className={`w-4 h-4 ${currentView === 'capacitaciones' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+              <span>Mis Capacitaciones</span>
             </button>
 
             <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
@@ -182,34 +208,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               id="nav-votaciones-sst-empleado"
               onClick={() => onNavigate('votaciones-sst')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                 currentView === 'votaciones-sst'
                   ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
                   : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-                <span>Votar COPASST & Convivencia</span>
-              </div>
-              <span className="text-[10px] bg-[#00FF00] text-[#18235C] px-1.5 py-0.5 rounded font-bold">
-                Activa
-              </span>
-            </button>
-
-            <button
-              id="nav-capacitaciones-empleado"
-              onClick={() => onNavigate('capacitaciones')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                currentView === 'capacitaciones'
-                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <GraduationCap className={`w-4 h-4 ${currentView === 'capacitaciones' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                <span>Mis Capacitaciones</span>
-              </div>
+              <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+              <span>Votaciones</span>
             </button>
           </>
         )}
@@ -278,19 +284,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     id="nav-evaluaciones"
                     onClick={() => onNavigate('evaluaciones')}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                       currentView === 'evaluaciones'
                         ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
                         : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <Award className={`w-4 h-4 ${currentView === 'evaluaciones' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-                      <span>Evaluación desempeño</span>
-                    </div>
-                    <span className="text-[10px] bg-[#00FF00] text-[#18235C] px-1.5 py-0.5 rounded font-bold">
-                      100 pts
-                    </span>
+                    <Award className={`w-4 h-4 ${currentView === 'evaluaciones' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                    <span>Evaluación desempeño</span>
                   </button>
                 )}
                 {tienePermiso('solicitudes') && (
@@ -366,19 +367,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   id="nav-votaciones-sst"
                   onClick={() => onNavigate('votaciones-sst')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                     currentView === 'votaciones-sst'
                       ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
                       : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-                    <span>Votaciones COPASST</span>
-                  </div>
-                  <span className="text-[10px] bg-[#00FF00] text-[#18235C] px-1.5 py-0.5 rounded font-bold">
-                    Elecciones
-                  </span>
+                  <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                  <span>Votaciones</span>
                 </button>
 
                 {tienePermiso('capacitaciones') && (

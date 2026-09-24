@@ -21,11 +21,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<UsuarioSistema | null>(null);
   const [authReady, setAuthReady] = useState<boolean>(false);
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
-  const [userRole, setUserRole] = useState<Role>('admin');
+  const [userRoleState, setUserRoleState] = useState<Role>('empleado');
 
   const isSuperAdmin =
-    currentUser?.rol === 'superadmin' ||
-    currentUser?.email?.toLowerCase() === 'mf.castrom2@gmail.com';
+    currentUser?.rol === 'superadmin';
+
+  const isRealAdmin =
+    isSuperAdmin ||
+    currentUser?.rol === 'admin_gh';
+
+  // Setter seguro con protección estricta contra escalación de privilegios
+  const setUserRole: React.Dispatch<React.SetStateAction<Role>> = (valueOrFn) => {
+    // Si el usuario autenticado es empleado, NUNCA permitir adoptar rol admin
+    if (currentUser?.rol === 'empleado') {
+      console.warn('[Seguridad RBAC] Intento de escalación de privilegios bloqueado: un colaborador no puede adoptar rol administrador.');
+      setUserRoleState('empleado');
+      return;
+    }
+
+    // Solo los administradores legítimos (superadmin / admin_gh) pueden alternar para simular vista de empleado
+    if (!isRealAdmin) {
+      console.warn('[Seguridad RBAC] Solo administradores pueden alternar la vista de prueba.');
+      setUserRoleState('empleado');
+      return;
+    }
+
+    setUserRoleState(valueOrFn);
+  };
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -33,22 +55,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAuthReady(true);
       if (!user) {
         setCurrentUser(null);
+        setUserRoleState('empleado');
         return;
       }
 
       try {
-        const profile = await obtenerPerfilUsuario(user.uid);
+        const profile = await obtenerPerfilUsuario(user.uid, user.email || undefined);
         if (!profile || profile.estado !== 'activo') {
           await cerrarSesion();
           setCurrentUser(null);
+          setUserRoleState('empleado');
           return;
         }
 
         setCurrentUser(profile);
-        setUserRole(profile.rol === 'empleado' ? 'empleado' : 'admin');
+        // Asignar rol inicial basado estrictamente en el perfil oficial de la base de datos
+        setUserRoleState(profile.rol === 'empleado' ? 'empleado' : 'admin');
       } catch (err) {
         console.warn('Error al verificar perfil institucional:', err);
         setCurrentUser(null);
+        setUserRoleState('empleado');
       }
     });
 
@@ -62,18 +88,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Error al cerrar sesión:', e);
     }
     setCurrentUser(null);
+    setUserRoleState('empleado');
   };
 
   const loginSuccess = (usuario: UsuarioSistema) => {
     setCurrentUser(usuario);
-    setUserRole(usuario.rol === 'empleado' ? 'empleado' : 'admin');
+    setUserRoleState(usuario.rol === 'empleado' ? 'empleado' : 'admin');
   };
 
   return (
     <AuthContext.Provider
       value={{
         currentUser,
-        userRole,
+        userRole: userRoleState,
         fbUser,
         authReady,
         isSuperAdmin,

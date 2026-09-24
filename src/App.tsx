@@ -39,7 +39,10 @@ import {
   LogOut,
   User,
   ShieldAlert,
-  RefreshCw
+  ShieldCheck,
+  Lock,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 
 function AppLayout() {
@@ -55,6 +58,7 @@ function AppLayout() {
     solicitudesEpp,
     usuariosList,
     cloudSynced,
+    cloudError,
     cargandoNube,
     hayMasEmpleadosNube,
     cargandoMasEmpleados,
@@ -62,8 +66,16 @@ function AppLayout() {
     recargarDatosBajoDemanda,
     handleAddEmpleado,
     handleUpdateEmpleado,
+    handleDeleteEmpleado,
     handleAddCargo,
     handleUpdateCargo,
+    handleDeleteCargo,
+    handleAddArea,
+    handleUpdateArea,
+    handleDeleteArea,
+    handleAddProceso,
+    handleUpdateProceso,
+    handleDeleteProceso,
     handleAddSolicitud,
     handleUpdateEstadoSolicitud,
     handleSaveEvaluacion,
@@ -159,49 +171,67 @@ function AppLayout() {
               </div>
             )}
 
-            {/* Selector de Rol para pruebas de auditoría */}
-            <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-[#101740] rounded-lg border border-[#8FA7D6]/30 text-xs">
-              <span className="text-[11px] font-bold text-[#8FA7D6] flex items-center gap-1">
-                <User className="w-3 h-3 text-[#8FA7D6]" />
-                Rol:
-              </span>
-              <button
-                onClick={() => setUserRole('admin')}
-                className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors ${
-                  userRole === 'admin'
-                    ? 'bg-[#8FA7D6] text-[#18235C] shadow-2xs'
-                    : 'text-[#8FA7D6] hover:text-white'
-                }`}
+            {/* Insignia de perfil verificado o selector de simulación para administradores */}
+            {currentUser?.rol === 'empleado' ? (
+              <div
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-[#101740] rounded-full border border-[#8FA7D6]/30 text-xs shadow-2xs"
+                title="Perfil Institucional de Colaborador con RBAC Estricto"
               >
-                Administrador
-              </button>
-              <button
-                onClick={() => setUserRole('empleado')}
-                className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors ${
-                  userRole === 'empleado'
-                    ? 'bg-[#8FA7D6] text-[#18235C] shadow-2xs'
-                    : 'text-[#8FA7D6] hover:text-white'
-                }`}
-              >
-                Empleado
-              </button>
-            </div>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[#8FA7D6] font-medium">Perfil:</span>
+                <span className="font-semibold text-white">Colaborador</span>
+                <span className="text-[10px] px-1.5 py-0.5 bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 rounded font-bold inline-flex items-center gap-0.5">
+                  <Lock className="w-2.5 h-2.5" />
+                  RBAC
+                </span>
+              </div>
+            ) : (isSuperAdmin || currentUser?.rol === 'admin_gh') ? (
+              /* Selector de vista para administradores y gestión humana */
+              <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-[#101740] rounded-lg border border-[#8FA7D6]/30 text-xs">
+                <span className="text-[11px] font-bold text-[#8FA7D6] flex items-center gap-1" title="Alternar entre vista de gestión y portal del colaborador">
+                  <User className="w-3 h-3 text-[#8FA7D6]" />
+                  Vista:
+                </span>
+                <button
+                  onClick={() => setUserRole('admin')}
+                  className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                    userRole === 'admin'
+                      ? 'bg-[#8FA7D6] text-[#18235C] shadow-2xs'
+                      : 'text-[#8FA7D6] hover:text-white'
+                  }`}
+                >
+                  Admin
+                </button>
+                <button
+                  onClick={() => setUserRole('empleado')}
+                  className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                    userRole === 'empleado'
+                      ? 'bg-[#8FA7D6] text-[#18235C] shadow-2xs'
+                      : 'text-[#8FA7D6] hover:text-white'
+                  }`}
+                >
+                  Vista Colaborador
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Botón de Auditoría Directo */}
-            <button
-              onClick={() => navigate('/auditoria')}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors shadow-2xs ${
-                currentPath === 'auditoria'
-                  ? 'bg-amber-400 text-[#18235C] border-amber-300 font-bold'
-                  : 'bg-[#101740] text-amber-300 hover:bg-[#18235C] border-amber-400/30'
-              }`}
-              title="Libro Mayor de Auditoría Inmutable (CST / DIAN / UGPP)"
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline font-medium">Auditoría</span>
-            </button>
+            {/* Botón de Auditoría Directo (Solo para roles autorizados) */}
+            {(isSuperAdmin || currentUser?.rol === 'admin_gh' || currentUser?.permisos?.includes('auditoria')) && (
+              <button
+                onClick={() => navigate('/auditoria')}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors shadow-2xs ${
+                  currentPath === 'auditoria'
+                    ? 'bg-amber-400 text-[#18235C] border-amber-300 font-bold'
+                    : 'bg-[#101740] text-amber-300 hover:bg-[#18235C] border-amber-400/30'
+                }`}
+                title="Libro Mayor de Auditoría Inmutable (CST / DIAN / UGPP)"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline font-medium">Auditoría</span>
+              </button>
+            )}
 
             {/* Botón base de datos (Exclusivo Superadministrador) */}
             {isSuperAdmin && (
@@ -250,6 +280,26 @@ function AppLayout() {
           </div>
         </header>
 
+        {/* Banner de Estado de Conexión Offline / Error de Firestore */}
+        {cloudError && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between text-xs text-amber-900 shrink-0">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Modo sin conexión:</strong> {cloudError}. Operando con datos locales.
+              </span>
+            </div>
+            <button
+              onClick={() => recargarDatosBajoDemanda()}
+              disabled={cargandoNube}
+              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-xs transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${cargandoNube ? 'animate-spin' : ''}`} />
+              <span>Reintentar</span>
+            </button>
+          </div>
+        )}
+
         {/* Dynamic Route View Body */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#FFFFFF]">
           <div className="max-w-7xl mx-auto">
@@ -263,6 +313,8 @@ function AppLayout() {
                     empleados={empleados}
                     solicitudes={solicitudes}
                     evaluaciones={evaluaciones}
+                    userRole={userRole}
+                    currentUser={currentUser}
                     onNavigate={(view) => navigate('/' + view)}
                     onOpenEvaluacionDetalle={(evalId) => setActiveEvaluacionDetalleId(evalId)}
                     onOpenGestionDatos={isSuperAdmin ? () => setGestionDatosModalOpen(true) : undefined}
@@ -275,7 +327,17 @@ function AppLayout() {
                   <EstructuraView
                     cargos={cargos}
                     empleados={empleados}
+                    areas={areas}
+                    procesos={procesos}
                     onAddCargo={handleAddCargo}
+                    onUpdateCargo={handleUpdateCargo}
+                    onDeleteCargo={handleDeleteCargo}
+                    onAddArea={handleAddArea}
+                    onUpdateArea={handleUpdateArea}
+                    onDeleteArea={handleDeleteArea}
+                    onAddProceso={handleAddProceso}
+                    onUpdateProceso={handleUpdateProceso}
+                    onDeleteProceso={handleDeleteProceso}
                     onSelectCargoForManual={(_cargoId) => navigate('/cargos')}
                     isSuperAdmin={isSuperAdmin}
                     onDepurarEstructura={isSuperAdmin ? handleLimpiarEstructura : undefined}
@@ -306,6 +368,10 @@ function AppLayout() {
                     solicitudesEpp={solicitudesEpp}
                     onActualizarInventario={handleActualizarInventarioEpp}
                     onActualizarSolicitudes={handleActualizarSolicitudesEpp}
+                    onUpdateEmpleado={handleUpdateEmpleado}
+                    onDeleteEmpleado={handleDeleteEmpleado}
+                    isSuperAdmin={isSuperAdmin}
+                    currentUser={currentUser}
                     userRole={userRole}
                     usuarios={usuariosList}
                     hayMasNube={hayMasEmpleadosNube}
@@ -323,6 +389,9 @@ function AppLayout() {
                     evaluaciones={evaluaciones}
                     empleados={empleados}
                     cargos={cargos}
+                    userRole={userRole}
+                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
+                    currentUser={currentUser}
                     onSaveEvaluacion={handleSaveEvaluacion}
                     onDeleteEvaluacion={handleDeleteEvaluacion}
                   />
@@ -336,6 +405,9 @@ function AppLayout() {
                     empleados={empleados}
                     onAddSolicitud={handleAddSolicitud}
                     onUpdateEstado={handleUpdateEstadoSolicitud}
+                    userRole={userRole}
+                    currentUser={currentUser}
+                    isSuperAdmin={isSuperAdmin}
                   />
                 }
               />
@@ -347,6 +419,8 @@ function AppLayout() {
                     empleados={empleados}
                     userRole={userRole}
                     rolSistema={currentUser?.rol}
+                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
+                    currentUser={currentUser}
                   />
                 }
               />
@@ -355,7 +429,7 @@ function AppLayout() {
                 element={
                   <SstView
                     userRole={userRole}
-                    currentEmpleadoId={empleados[0]?.id || 'e1'}
+                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     empleados={empleados}
                   />
                 }
@@ -365,7 +439,7 @@ function AppLayout() {
                 element={
                   <VotacionesSstView
                     userRole={userRole}
-                    currentEmpleadoId={empleados[0]?.id || 'e1'}
+                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     empleados={empleados}
                   />
                 }
@@ -376,7 +450,7 @@ function AppLayout() {
                   <EppInventarioView
                     userRole={userRole}
                     rolSistema={currentUser?.rol}
-                    currentEmpleadoId={currentUser?.id || empleados[0]?.id || 'e1'}
+                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     empleados={empleados}
                     inventarioEpp={inventarioEpp}
                     solicitudesEpp={solicitudesEpp}
@@ -392,16 +466,28 @@ function AppLayout() {
                     empleados={empleados}
                     cargos={cargos}
                     userRole={userRole}
-                    currentEmpleadoId={empleados[0]?.id || 'e1'}
+                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                   />
                 }
               />
               <Route
                 path="/parametros-nomina"
                 element={
-                  <ParametrosNominaView
-                    isSuperAdmin={isSuperAdmin}
-                  />
+                  !isSuperAdmin && currentUser?.rol !== 'admin_gh' ? (
+                    <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-xl shadow-xs border border-rose-200 text-center">
+                      <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <ShieldAlert className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-lg font-bold text-slate-800">Acceso No Autorizado</h2>
+                      <p className="text-sm text-slate-600 mt-2">
+                        La configuración de parámetros de nómina está reservada exclusivamente para directores de Gestión Humana y Superadministradores.
+                      </p>
+                    </div>
+                  ) : (
+                    <ParametrosNominaView
+                      isSuperAdmin={isSuperAdmin}
+                    />
+                  )
                 }
               />
               <Route
@@ -411,21 +497,37 @@ function AppLayout() {
                     empleados={empleados}
                     cargos={cargos}
                     userRole={userRole}
-                    currentEmpleadoId={empleados[0]?.id || 'e1'}
+                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
+                    currentUser={currentUser}
+                    isSuperAdmin={isSuperAdmin}
+                    onAddSolicitudGeneral={handleAddSolicitud}
                   />
                 }
               />
               <Route
                 path="/usuarios"
                 element={
-                  <UsuariosView
-                    empleados={empleados}
-                    cargos={cargos}
-                    userRole={userRole}
-                    isSuperAdmin={isSuperAdmin}
-                    usuarios={usuariosList}
-                    onActualizarUsuarios={handleActualizarUsuarios}
-                  />
+                  currentUser?.rol === 'empleado' && !currentUser?.permisos?.includes('usuarios') ? (
+                    <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-xl shadow-xs border border-rose-200 text-center">
+                      <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <ShieldAlert className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-lg font-bold text-slate-800">Acceso No Autorizado</h2>
+                      <p className="text-sm text-slate-600 mt-2">
+                        Su perfil de colaborador no dispone de privilegios para administrar cuentas, roles o credenciales del sistema.
+                      </p>
+                    </div>
+                  ) : (
+                    <UsuariosView
+                      empleados={empleados}
+                      cargos={cargos}
+                      userRole={userRole}
+                      isSuperAdmin={isSuperAdmin}
+                      usuarios={usuariosList}
+                      onActualizarUsuarios={handleActualizarUsuarios}
+                      currentUser={currentUser}
+                    />
+                  )
                 }
               />
               <Route
@@ -441,7 +543,21 @@ function AppLayout() {
               />
               <Route
                 path="/auditoria"
-                element={<AuditoriaView currentUser={currentUser} />}
+                element={
+                  !isSuperAdmin && currentUser?.rol !== 'admin_gh' && !currentUser?.permisos?.includes('auditoria') ? (
+                    <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-xl shadow-xs border border-rose-200 text-center">
+                      <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <ShieldAlert className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-lg font-bold text-slate-800">Acceso Restringido a Auditoría</h2>
+                      <p className="text-sm text-slate-600 mt-2">
+                        El Libro Mayor de Auditoría Inmutable (Resolución DIAN / CST / UGPP) está reservado para directores de auditoría y administradores de Gestión Humana.
+                      </p>
+                    </div>
+                  ) : (
+                    <AuditoriaView currentUser={currentUser} />
+                  )
+                }
               />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

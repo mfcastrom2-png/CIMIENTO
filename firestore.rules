@@ -14,7 +14,7 @@ service cloud.firestore {
 
     function hasRole(roles) {
       return signedIn() && (
-        request.auth.token.email in ['mf.castrom2@gmail.com'] ||
+        (request.auth.token.role != null && request.auth.token.role in roles) ||
         (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
          currentUser().data.rol in roles)
       );
@@ -31,16 +31,18 @@ service cloud.firestore {
     // Aislamiento Multi-Tenant estricto
     function sameCompany(data) {
       return signedIn() && (
-        request.auth.token.email in ['mf.castrom2@gmail.com'] ||
         hasRole(['superadmin']) ||
         (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
-         (!('empresaId' in data) || data.empresaId == currentUser().data.empresaId))
+         ('empresaId' in data) &&
+         ('empresaId' in currentUser().data) &&
+         data.empresaId == currentUser().data.empresaId)
       );
     }
 
     // 0. Conectividad y verificación de estado
     match /test/connection {
-      allow read: if true;
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
 
     // 1. Configuración de la Empresa y Parámetros
@@ -56,9 +58,15 @@ service cloud.firestore {
 
     // 2. Usuarios del Sistema (Protección de roles e inmutabilidad de privilegios)
     match /usuarios/{uid} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow read: if isAdmin()
+        || (signedIn() && (request.auth.uid == uid || resource.data.email == request.auth.token.email));
 
-      allow create: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create: if isAdmin()
+        || (
+          signedIn()
+          && request.auth.uid == uid
+          && (!('rol' in request.resource.data) || request.resource.data.rol == 'empleado')
+        );
 
       allow update: if isAdmin()
         || (
@@ -79,36 +87,24 @@ service cloud.firestore {
       allow update: if isAdmin()
         && sameCompany(resource.data)
         && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
-      allow delete: if hasRole(['superadmin'])
+      allow delete: if isAdmin()
         && sameCompany(resource.data);
     }
 
-    // 4. Cargos, Áreas y Procesos Organizacionales (Aislamiento Multi-Tenant)
+    // 4. Cargos, Áreas y Procesos Organizacionales (Estructura Orgánica Institucional)
     match /cargos/{cargoId} {
-      allow read: if signedIn() && sameCompany(resource.data);
-      allow create: if isAdmin() && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
-      allow update: if isAdmin()
-        && sameCompany(resource.data)
-        && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
-      allow delete: if isAdmin() && sameCompany(resource.data);
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
 
     match /areas/{areaId} {
-      allow read: if signedIn() && sameCompany(resource.data);
-      allow create: if isAdmin() && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
-      allow update: if isAdmin()
-        && sameCompany(resource.data)
-        && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
-      allow delete: if isAdmin() && sameCompany(resource.data);
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
 
     match /procesos/{procesoId} {
-      allow read: if signedIn() && sameCompany(resource.data);
-      allow create: if isAdmin() && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
-      allow update: if isAdmin()
-        && sameCompany(resource.data)
-        && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
-      allow delete: if isAdmin() && sameCompany(resource.data);
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
 
     // 5. Inventario de EPP (Aislamiento Multi-Tenant)
@@ -135,18 +131,11 @@ service cloud.firestore {
 
     // 7. Solicitudes Laborales (Vacaciones, Permisos, Incapacidades)
     match /solicitudes/{solicitudId} {
-      allow read: if isAdmin()
-        || (
-          signedIn()
-          && sameCompany(resource.data)
-          && (
-            resource.data.empleadoId == currentUser().data.empleadoId ||
-            resource.data.empleadoEmail == request.auth.token.email
-          )
-        );
+      allow read: if signedIn() && sameCompany(resource.data);
 
       allow create: if signedIn()
-        && sameCompany(request.resource.data);
+        && sameCompany(request.resource.data)
+        && (isAdmin() || request.resource.data.estado == 'Pendiente');
 
       allow update: if isAdmin()
         && sameCompany(resource.data)
@@ -195,14 +184,12 @@ service cloud.firestore {
       allow write: if isAdmin() && sameCompany(request.resource.data);
     }
 
-    // 10. Capacitaciones y Exámenes (Aislamiento Multi-Tenant)
+    // 10. Capacitaciones y Exámenes (Plan Anual y Evaluaciones)
     match /capacitaciones/{capId} {
-      allow read: if signedIn() && sameCompany(resource.data);
-      allow create: if isSSTorAdmin() && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
-      allow update: if isSSTorAdmin()
-        && sameCompany(resource.data)
-        && (sameCompany(request.resource.data) || !('empresaId' in request.resource.data));
-      allow delete: if isSSTorAdmin() && sameCompany(resource.data);
+      allow read: if signedIn();
+      allow create: if isSSTorAdmin();
+      allow update: if signedIn();
+      allow delete: if isSSTorAdmin();
     }
 
     // 11. Auditoría Inmutable del Sistema (Append-only)
@@ -216,6 +203,12 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if signedIn();
       allow update, delete: if false;
+    }
+
+    // 12. Tablero de Anuncios y Slides (Muro de Noticias Institucionales)
+    match /anuncios_slides/{anuncioId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
 
     // Default deny catch-all

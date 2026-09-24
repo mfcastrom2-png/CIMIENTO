@@ -52,6 +52,7 @@ interface SyncContextType {
   solicitudesEpp: SolicitudEntregaEPP[];
   usuariosList: UsuarioSistema[];
   cloudSynced: boolean;
+  cloudError: string | null;
   esLimpio: boolean;
   setEsLimpio: (val: boolean) => void;
   // Estado de Consultas Paginadas Bajo Demanda en la Nube
@@ -96,32 +97,50 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, fbUser, authReady } = useAuth();
 
+  const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production';
+  const shouldOmitMocks = isProduction || localStorage.getItem('bgroup_datos_limpios') === 'true';
+
   const [esLimpio, setEsLimpio] = useState<boolean>(() => {
     return localStorage.getItem('bgroup_datos_limpios') === 'true';
   });
 
   const [areas, setAreas] = useState<AreaOrganizacion[]>(() => {
-    return localStorage.getItem('bgroup_datos_limpios') === 'true' ? [] : initialAreas;
+    try {
+      const guardadas = localStorage.getItem('bgroup_areas');
+      if (guardadas) {
+        const parsed = JSON.parse(guardadas);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return shouldOmitMocks ? [] : initialAreas;
   });
   const [procesos, setProcesos] = useState<ProcesoOrganizacion[]>(() => {
-    return localStorage.getItem('bgroup_datos_limpios') === 'true' ? [] : initialProcesos;
+    try {
+      const guardadas = localStorage.getItem('bgroup_procesos');
+      if (guardadas) {
+        const parsed = JSON.parse(guardadas);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return shouldOmitMocks ? [] : initialProcesos;
   });
-  const [cargos, setCargos] = useState<Cargo[]>(initialCargos);
+  const [cargos, setCargos] = useState<Cargo[]>(() => shouldOmitMocks ? [] : initialCargos);
   const [empleados, setEmpleados] = useState<Empleado[]>(() => {
-    return localStorage.getItem('bgroup_datos_limpios') === 'true' ? [] : initialEmpleados;
+    return shouldOmitMocks ? [] : initialEmpleados;
   });
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>(() => {
-    return localStorage.getItem('bgroup_datos_limpios') === 'true' ? [] : initialSolicitudes;
+    return shouldOmitMocks ? [] : initialSolicitudes;
   });
   const [evaluaciones, setEvaluaciones] = useState<EvaluacionDesempeno[]>(() => {
-    return localStorage.getItem('bgroup_datos_limpios') === 'true' ? [] : initialEvaluaciones;
+    return shouldOmitMocks ? [] : initialEvaluaciones;
   });
-  const [inventarioEpp, setInventarioEpp] = useState<ItemInventarioEPP[]>(INITIAL_INVENTARIO_EPP);
+  const [inventarioEpp, setInventarioEpp] = useState<ItemInventarioEPP[]>(() => shouldOmitMocks ? [] : INITIAL_INVENTARIO_EPP);
   const [solicitudesEpp, setSolicitudesEpp] = useState<SolicitudEntregaEPP[]>(() => {
-    return localStorage.getItem('bgroup_datos_limpios') === 'true' ? [] : INITIAL_SOLICITUDES_ENTREGA_EPP;
+    return shouldOmitMocks ? [] : INITIAL_SOLICITUDES_ENTREGA_EPP;
   });
   const [usuariosList, setUsuariosList] = useState<UsuarioSistema[]>([]);
   const [cloudSynced, setCloudSynced] = useState<boolean>(false);
+  const [cloudError, setCloudError] = useState<string | null>(null);
   const [cargandoNube, setCargandoNube] = useState<boolean>(false);
 
   // Estados de cursores para paginación bajo demanda en la nube
@@ -137,33 +156,43 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const recargarDatosBajoDemanda = useCallback(async () => {
     if (!fbUser) return;
     setCargandoNube(true);
+    setCloudError(null);
     try {
-      const [resEmp, resSol, carData, evalData, eppData, solEppData, usrData] = await Promise.all([
+      const [resEmp, resSol, carData, evalData, eppData, solEppData, usrData, procData, areaData] = await Promise.all([
         obtenerColeccionPaginada<Empleado>('empleados', 25, null),
         obtenerColeccionPaginada<Solicitud>('solicitudes', 25, null),
         obtenerColeccionDirecta<Cargo>('cargos'),
         obtenerColeccionDirecta<EvaluacionDesempeno>('evaluaciones'),
         obtenerColeccionDirecta<ItemInventarioEPP>('inventario_epp'),
         obtenerColeccionDirecta<SolicitudEntregaEPP>('solicitudes_epp'),
-        obtenerColeccionDirecta<UsuarioSistema>('usuarios')
+        obtenerColeccionDirecta<UsuarioSistema>('usuarios'),
+        obtenerColeccionDirecta<ProcesoOrganizacion>('procesos'),
+        obtenerColeccionDirecta<AreaOrganizacion>('areas')
       ]);
 
-      const limpio = localStorage.getItem('bgroup_datos_limpios') === 'true';
-      if (resEmp.items.length > 0 || limpio) {
-        setEmpleados(resEmp.items);
-        setCursorUltimoEmpleado(resEmp.ultimoDoc);
-        setHayMasEmpleadosNube(resEmp.hayMas);
-      }
-      if (carData.length > 0) setCargos(carData);
-      if (resSol.items.length > 0 || limpio) {
-        setSolicitudes(resSol.items);
-        setCursorUltimaSolicitud(resSol.ultimoDoc);
-        setHayMasSolicitudesNube(resSol.hayMas);
-      }
-      if (evalData.length > 0 || limpio) setEvaluaciones(evalData);
-      if (eppData.length > 0) setInventarioEpp(eppData);
-      if (solEppData.length > 0 || limpio) setSolicitudesEpp(solEppData);
-      if (usrData.length > 0) setUsuariosList(usrData);
+      setEmpleados(resEmp.items);
+      setCursorUltimoEmpleado(resEmp.ultimoDoc);
+      setHayMasEmpleadosNube(resEmp.hayMas);
+
+      setCargos(carData);
+      setProcesos(procData);
+      try {
+        if (procData.length > 0) localStorage.setItem('bgroup_procesos', JSON.stringify(procData));
+      } catch {}
+
+      setAreas(areaData);
+      try {
+        if (areaData.length > 0) localStorage.setItem('bgroup_areas', JSON.stringify(areaData));
+      } catch {}
+
+      setSolicitudes(resSol.items);
+      setCursorUltimaSolicitud(resSol.ultimoDoc);
+      setHayMasSolicitudesNube(resSol.hayMas);
+
+      setEvaluaciones(evalData);
+      setInventarioEpp(eppData);
+      setSolicitudesEpp(solEppData);
+      setUsuariosList(usrData);
 
       // Verificación de configuración de la empresa bajo demanda (sin listener continuo)
       try {
@@ -176,12 +205,16 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } catch (err) {
-        console.debug('Configuración empresa cargada desde caché local.');
+        console.debug('Configuración empresa verificada.');
       }
 
       setCloudSynced(true);
-    } catch (err) {
+      setCloudError(null);
+    } catch (err: any) {
       console.warn('Advertencia en sincronización bajo demanda:', err);
+      setCloudSynced(false);
+      const codeStr = err?.code ? `[${err.code}] ` : '';
+      setCloudError(`${codeStr}${err?.message || 'Error de conexión con Cloud Firestore backend'}`);
     } finally {
       setCargandoNube(false);
     }
@@ -318,56 +351,102 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleAddArea = async (area: AreaOrganizacion) => {
-    setAreas(prev => [...prev, area]);
+    setAreas(prev => {
+      const idx = prev.findIndex(a => a.id === area.id);
+      const updated = idx >= 0 ? prev.map(a => a.id === area.id ? area : a) : [...prev, area];
+      try {
+        localStorage.setItem('bgroup_areas', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     try {
-      await guardarAreaFB(area);
+      await guardarAreaFB(area, currentUser);
     } catch (err) {
       console.warn('Error al guardar área en Firestore:', err);
+      throw err;
     }
   };
 
   const handleUpdateArea = async (area: AreaOrganizacion) => {
-    setAreas(prev => prev.map(a => a.id === area.id ? area : a));
+    setAreas(prev => {
+      const updated = prev.map(a => a.id === area.id ? area : a);
+      try {
+        localStorage.setItem('bgroup_areas', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     try {
-      await guardarAreaFB(area);
+      await guardarAreaFB(area, currentUser);
     } catch (err) {
       console.warn('Error al actualizar área en Firestore:', err);
+      throw err;
     }
   };
 
   const handleDeleteArea = async (id: string) => {
-    setAreas(prev => prev.filter(a => a.id !== id));
+    const victima = areas.find(a => a.id === id);
+    setAreas(prev => {
+      const updated = prev.filter(a => a.id !== id);
+      try {
+        localStorage.setItem('bgroup_areas', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     try {
-      await eliminarAreaFB(id);
+      await eliminarAreaFB(id, victima?.nombre, currentUser);
     } catch (err) {
       console.warn('Error al eliminar área en Firestore:', err);
+      throw err;
     }
   };
 
   const handleAddProceso = async (proceso: ProcesoOrganizacion) => {
-    setProcesos(prev => [...prev, proceso]);
+    setProcesos(prev => {
+      const idx = prev.findIndex(p => p.id === proceso.id);
+      const updated = idx >= 0 ? prev.map(p => p.id === proceso.id ? proceso : p) : [...prev, proceso];
+      try {
+        localStorage.setItem('bgroup_procesos', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     try {
-      await guardarProcesoFB(proceso);
+      await guardarProcesoFB(proceso, currentUser);
     } catch (err) {
       console.warn('Error al guardar proceso en Firestore:', err);
+      throw err;
     }
   };
 
   const handleUpdateProceso = async (proceso: ProcesoOrganizacion) => {
-    setProcesos(prev => prev.map(p => p.id === proceso.id ? proceso : p));
+    setProcesos(prev => {
+      const updated = prev.map(p => p.id === proceso.id ? proceso : p);
+      try {
+        localStorage.setItem('bgroup_procesos', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     try {
-      await guardarProcesoFB(proceso);
+      await guardarProcesoFB(proceso, currentUser);
     } catch (err) {
       console.warn('Error al actualizar proceso en Firestore:', err);
+      throw err;
     }
   };
 
   const handleDeleteProceso = async (id: string) => {
-    setProcesos(prev => prev.filter(p => p.id !== id));
+    const victima = procesos.find(p => p.id === id);
+    setProcesos(prev => {
+      const updated = prev.filter(p => p.id !== id);
+      try {
+        localStorage.setItem('bgroup_procesos', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     try {
-      await eliminarProcesoFB(id);
+      await eliminarProcesoFB(id, victima?.nombre, currentUser);
     } catch (err) {
       console.warn('Error al eliminar proceso en Firestore:', err);
+      throw err;
     }
   };
 
@@ -388,12 +467,20 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleUpdateEstadoSolicitud = async (id: string, nuevoEstado: 'Aprobada' | 'Rechazada', comentario: string) => {
+    // Protección RBAC estricta: un colaborador o usuario no administrador no puede aprobar o rechazar solicitudes
+    const isAuthorized = currentUser?.rol === 'superadmin' || currentUser?.rol === 'admin_gh' || currentUser?.permisos?.includes('solicitudes');
+    if (!isAuthorized) {
+      console.warn('[Seguridad RBAC] Intento no autorizado de cambiar estado de solicitud bloqueado:', currentUser?.email);
+      throw new Error('No tiene permisos para aprobar o rechazar solicitudes laborales.');
+    }
+
     const solicitudModificada = solicitudes.find(s => s.id === id);
     if (!solicitudModificada) return;
 
     const actualizada: Solicitud = {
       ...solicitudModificada,
       estado: nuevoEstado,
+      decisorId: currentUser?.id || null,
       comentario,
       fechaDecision: new Date().toISOString().slice(0, 10)
     };
@@ -514,6 +601,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         solicitudesEpp,
         usuariosList,
         cloudSynced,
+        cloudError,
         esLimpio,
         setEsLimpio,
         handleAddEmpleado,

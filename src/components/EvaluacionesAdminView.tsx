@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { EvaluacionDesempeno, Empleado, Cargo, EstadoEvaluacion } from '../types';
+import { EvaluacionDesempeno, Empleado, Cargo, EstadoEvaluacion, Role, UsuarioSistema } from '../types';
 import {
   Award,
   Plus,
@@ -12,7 +12,8 @@ import {
   ChevronRight,
   TrendingUp,
   ShieldAlert,
-  FileSpreadsheet
+  FileSpreadsheet,
+  UserCheck
 } from 'lucide-react';
 import { EvaluacionFormModal } from './EvaluacionFormModal';
 import { EvaluacionDetalleModal } from './EvaluacionDetalleModal';
@@ -21,6 +22,9 @@ interface EvaluacionesAdminViewProps {
   evaluaciones: EvaluacionDesempeno[];
   empleados: Empleado[];
   cargos: Cargo[];
+  userRole?: Role;
+  currentEmpleadoId?: string;
+  currentUser?: UsuarioSistema | null;
   onSaveEvaluacion: (evaluacion: EvaluacionDesempeno) => void;
   onDeleteEvaluacion: (evaluacionId: string) => void;
 }
@@ -29,12 +33,18 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
   evaluaciones,
   empleados,
   cargos,
+  userRole = 'admin',
+  currentEmpleadoId,
+  currentUser,
   onSaveEvaluacion,
   onDeleteEvaluacion,
 }) => {
   const [selectedEvaluacionForDetail, setSelectedEvaluacionForDetail] = useState<EvaluacionDesempeno | null>(null);
   const [selectedEvaluacionForEdit, setSelectedEvaluacionForEdit] = useState<EvaluacionDesempeno | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  const esEmpleado = userRole === 'empleado';
+  const effectiveEmpleadoId = currentEmpleadoId || currentUser?.empleadoId || '';
 
   // Filters
   const [filterEstado, setFilterEstado] = useState<string>('TODOS');
@@ -43,8 +53,17 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
   const getEmpleado = (id: string) => empleados.find(e => e.id === id);
   const getCargo = (id: string) => cargos.find(c => c.id === id);
 
-  // Filtered evaluations
-  const filtered = evaluaciones.filter(ev => {
+  // Filtered evaluations: if employee, filter to own evaluations
+  const baseEvaluaciones = esEmpleado && effectiveEmpleadoId
+    ? evaluaciones.filter(ev => {
+        if (ev.empleadoId === effectiveEmpleadoId) return true;
+        const emp = getEmpleado(ev.empleadoId);
+        if (currentUser?.email && emp?.email === currentUser.email) return true;
+        return false;
+      })
+    : evaluaciones;
+
+  const filtered = baseEvaluaciones.filter(ev => {
     const emp = getEmpleado(ev.empleadoId);
     const cg = getCargo(ev.cargoId);
     const matchesEstado = filterEstado === 'TODOS' || ev.estado === filterEstado;
@@ -57,12 +76,12 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
   });
 
   // Calculate high-level stats
-  const totalEvals = evaluaciones.length;
+  const totalEvals = baseEvaluaciones.length;
   const promedioPuntaje = totalEvals > 0
-    ? Math.round((evaluaciones.reduce((acc, curr) => acc + curr.puntajeFinal, 0) / totalEvals) * 10) / 10
+    ? Math.round((baseEvaluaciones.reduce((acc, curr) => acc + curr.puntajeFinal, 0) / totalEvals) * 10) / 10
     : 0;
-  const totalSesgos = evaluaciones.reduce((acc, curr) => acc + (curr.sesgosYAlertas?.length || 0), 0);
-  const planesActivos = evaluaciones.reduce((acc, curr) => acc + (curr.planDesarrollo?.length || 0), 0);
+  const totalSesgos = baseEvaluaciones.reduce((acc, curr) => acc + (curr.sesgosYAlertas?.length || 0), 0);
+  const planesActivos = baseEvaluaciones.reduce((acc, curr) => acc + (curr.planDesarrollo?.length || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -71,64 +90,68 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#8FA7D6/20] text-[#18235C] border border-[#18235C]/20">
-              Metodología Técnica Documentada
+              {esEmpleado ? 'Portal del Colaborador' : 'Metodología Técnica Documentada'}
             </span>
           </div>
           <h1 className="font-bold tracking-tight text-3xl font-medium text-[#18235C]">
-            Evaluación Técnica de Desempeño
+            {esEmpleado ? 'Mi Evaluación Técnica de Desempeño' : 'Evaluación Técnica de Desempeño'}
           </h1>
           <p className="text-sm text-[#282829] mt-1 max-w-3xl">
-            Modelo objetivo de 100 puntos derivado de la ficha del cargo: Resultados (50%) + Competencias (25%) + SG-SST y Procedimientos (15%) + Desarrollo y Mejora (10%).
+            {esEmpleado
+              ? 'Consulta tu expediente oficial de desempeño laboral, resultados por metas (50%), competencias observables (25%), SG-SST y procedimientos (15%) y plan de desarrollo concertado (10%).'
+              : 'Modelo objetivo de 100 puntos derivado de la ficha del cargo: Resultados (50%) + Competencias (25%) + SG-SST y Procedimientos (15%) + Desarrollo y Mejora (10%).'}
           </p>
         </div>
 
-        <button
-          onClick={() => setIsCreating(true)}
-          className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded flex items-center gap-2 shadow-xs transition-colors whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nueva Evaluación Técnica</span>
-        </button>
+        {!esEmpleado && (
+          <button
+            onClick={() => setIsCreating(true)}
+            className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded flex items-center gap-2 shadow-xs transition-colors whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva Evaluación Técnica</span>
+          </button>
+        )}
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded border border-[#8FA7D6] shadow-xs">
           <div className="flex items-center justify-between text-[#282829] mb-1">
-            <span className="text-xs font-semibold">Total Evaluaciones</span>
+            <span className="text-xs font-semibold">{esEmpleado ? 'Mis Evaluaciones' : 'Total Evaluaciones'}</span>
             <Layers className="w-4 h-4 text-[#18235C]" />
           </div>
           <div className="font-bold tracking-tight text-2xl font-bold text-[#18235C]">{totalEvals}</div>
-          <span className="text-[11px] text-[#282829]">Ciclos en curso y cerrados</span>
+          <span className="text-[11px] text-[#282829]">{esEmpleado ? 'Periodos evaluados' : 'Ciclos en curso y cerrados'}</span>
         </div>
 
         <div className="bg-white p-4 rounded border border-[#8FA7D6] shadow-xs">
           <div className="flex items-center justify-between text-[#282829] mb-1">
-            <span className="text-xs font-semibold">Promedio Consolidado</span>
+            <span className="text-xs font-semibold">{esEmpleado ? 'Mi Calificación Actual' : 'Promedio Consolidado'}</span>
             <TrendingUp className="w-4 h-4 text-[#18235C]" />
           </div>
           <div className="font-bold tracking-tight text-2xl font-bold text-[#18235C]">{promedioPuntaje} / 100</div>
-          <span className="text-[11px] text-[#282829]">Nivel medio de la organización</span>
+          <span className="text-[11px] text-[#282829]">{esEmpleado ? 'Calificación ponderada' : 'Nivel medio de la organización'}</span>
         </div>
 
         <div className="bg-white p-4 rounded border border-[#8FA7D6] shadow-xs">
           <div className="flex items-center justify-between text-[#282829] mb-1">
-            <span className="text-xs font-semibold">Alertas de Auditoría</span>
+            <span className="text-xs font-semibold">{esEmpleado ? 'Estado del Expediente' : 'Alertas de Auditoría'}</span>
             <ShieldAlert className="w-4 h-4 text-[#B5842A]" />
           </div>
           <div className={`font-bold tracking-tight text-2xl font-bold ${totalSesgos > 0 ? 'text-[#B5842A]' : 'text-[#18235C]'}`}>
-            {totalSesgos}
+            {esEmpleado ? (totalEvals > 0 ? 'Vigente' : 'Pendiente') : totalSesgos}
           </div>
-          <span className="text-[11px] text-[#282829]">Falta evidencia / Sesgo detectado</span>
+          <span className="text-[11px] text-[#282829]">{esEmpleado ? 'Certificación institucional' : 'Falta evidencia / Sesgo detectado'}</span>
         </div>
 
         <div className="bg-white p-4 rounded border border-[#8FA7D6] shadow-xs">
           <div className="flex items-center justify-between text-[#282829] mb-1">
-            <span className="text-xs font-semibold">Compromisos de Mejora</span>
+            <span className="text-xs font-semibold">{esEmpleado ? 'Compromisos de Mejora' : 'Planes de Desarrollo'}</span>
             <CheckCircle2 className="w-4 h-4 text-[#18235C]" />
           </div>
           <div className="font-bold tracking-tight text-2xl font-bold text-[#18235C]">{planesActivos}</div>
-          <span className="text-[11px] text-[#282829]">Planes de desarrollo concertados</span>
+          <span className="text-[11px] text-[#282829]">{esEmpleado ? 'Metas acordadas' : 'Planes concertados'}</span>
         </div>
       </div>
 
@@ -274,17 +297,19 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setSelectedEvaluacionForDetail(ev)}
-                          className="px-2 py-1 rounded bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold flex items-center gap-1 shadow-xs"
+                          className="px-2.5 py-1 rounded bg-[#18235C] hover:bg-[#101740] text-white text-xs font-semibold flex items-center gap-1 shadow-xs"
                         >
-                          <span>Expediente</span>
+                          <span>{esEmpleado ? 'Ver Mi Expediente' : 'Expediente'}</span>
                           <ChevronRight className="w-3 h-3" />
                         </button>
-                        <button
-                          onClick={() => setSelectedEvaluacionForEdit(ev)}
-                          className="px-2 py-1 rounded border border-[#8FA7D6] hover:bg-[#F8FAFC] text-[#282829] text-xs font-semibold"
-                        >
-                          Calificar / Editar
-                        </button>
+                        {!esEmpleado && (
+                          <button
+                            onClick={() => setSelectedEvaluacionForEdit(ev)}
+                            className="px-2 py-1 rounded border border-[#8FA7D6] hover:bg-[#F8FAFC] text-[#282829] text-xs font-semibold"
+                          >
+                            Calificar / Editar
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -293,7 +318,17 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={10} className="py-8 text-center text-[#282829]">
-                    No se encontraron evaluaciones con los filtros seleccionados.
+                    {esEmpleado ? (
+                      <div className="max-w-md mx-auto space-y-1">
+                        <Award className="w-8 h-8 text-[#18235C] mx-auto opacity-40 mb-2" />
+                        <div className="font-bold text-sm text-[#18235C]">No tienes evaluaciones registradas</div>
+                        <p className="text-xs text-[#282829]">
+                          Tu líder de área o la Dirección de Gestión Humana te notificarán formalmente cuando se aperture el ciclo de concertación de metas y evaluación de competencias de tu cargo.
+                        </p>
+                      </div>
+                    ) : (
+                      'No se encontraron evaluaciones con los filtros seleccionados.'
+                    )}
                   </td>
                 </tr>
               )}
