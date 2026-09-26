@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import {
+  collection,
+  query,
+  where,
+  getDocs
+} from 'firebase/firestore';
 import {
   LogAuditoriaUsuario,
   Role,
@@ -11,6 +17,7 @@ import {
   MODULOS_SISTEMA
 } from '../data/usuariosYVotacionesData';
 import {
+  db,
   guardarUsuarioFB,
   eliminarUsuarioFB,
   registrarUsuarioEnAuth,
@@ -123,7 +130,22 @@ export function UsuariosView({
 
   useEffect(() => {
     if (propsUsuarios && propsUsuarios.length > 0) {
-      setUsuarios(propsUsuarios);
+      // Deduplicar estrictamente por correo y por ID para garantizar consistencia sin redundancia
+      const mapa = new Map<string, UsuarioSistema>();
+      propsUsuarios.forEach(u => {
+        const emailKey = (u.email || '').trim().toLowerCase();
+        const key = emailKey || u.id;
+        if (!mapa.has(key)) {
+          mapa.set(key, u);
+        } else {
+          const actual = mapa.get(key)!;
+          // Si el actual es ID temporal y el nuevo tiene UID de Firebase Auth, preferir el UID oficial
+          if (actual.id.startsWith('usr-') && !u.id.startsWith('usr-')) {
+            mapa.set(key, u);
+          }
+        }
+      });
+      setUsuarios(Array.from(mapa.values()));
     }
   }, [propsUsuarios]);
 
@@ -136,6 +158,12 @@ export function UsuariosView({
   const [modalCrearOpen, setModalCrearOpen] = useState(false);
   const [modalEditarOpen, setModalEditarOpen] = useState(false);
   const [usuarioEditando, setUsuarioEditando] = useState<UsuarioSistema | null>(null);
+
+  // Estados de control para evitar envíos redundantes
+  const [guardandoUsuario, setGuardandoUsuario] = useState(false);
+  const guardandoRef = useRef(false);
+  const [errorFormulario, setErrorFormulario] = useState<string | null>(null);
+  const [depurandoAccesos, setDepurandoAccesos] = useState(false);
 
   // Formulario nuevo usuario
   const [nuevoUsuario, setNuevoUsuario] = useState<Partial<UsuarioSistema>>({
@@ -198,114 +226,172 @@ export function UsuariosView({
     return { total, activos, adminCount, con2FA };
   }, [usuarios]);
 
-  // Guardar nuevo usuario
+  // Guardar nuevo usuario con prevención estricta de redundancia
   const handleGuardarNuevo = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorFormulario(null);
+
+    // 1. Bloqueo inmediato síncrono para evitar múltiples ejecuciones por doble clic o pulsaciones rápidas
+    if (guardandoRef.current) return;
+
     if (!nuevoUsuario.nombre || !nuevoUsuario.email || !nuevoUsuario.documento) {
-      alert('Por favor complete todos los campos obligatorios.');
+      setErrorFormulario('Por favor complete todos los campos obligatorios marcados con (*).');
       return;
     }
 
     const emailLimpio = (nuevoUsuario.email || '').trim().toLowerCase();
-    const claveAsignada = passwordTemporal.trim() || 'BGroup2026*';
+    const docLimpio = (nuevoUsuario.documento || '').trim();
 
-    // 1. Crear o asegurar la cuenta en Firebase Authentication para obtener su UID oficial
-    let authUid = '';
-    try {
-      const resAuth = await registrarUsuarioEnAuth(
-        emailLimpio,
-        claveAsignada,
-        (nuevoUsuario.nombre || '').trim()
-      );
-      if (resAuth.uid) {
-        authUid = resAuth.uid;
+    if (!emailLimpio.includes('@') || !emailLimpio.includes('.')) {
+      setErrorFormulario('El correo electrónico ingresado no tiene un formato válido.');
+      return;
+    }
+
+    // 2. Verificación de duplicados en el estado local actual
+    const yaExisteEmail = usuarios.some(u => (u.email || '').trim().toLowerCase() === emailLimpio);
+    if (yaExisteEmail) {
+      setErrorFormulario(`Ya existe un usuario registrado con el correo "${emailLimpio}". Para editar sus roles o permisos, búsquelo en el directorio.`);
+      return;
+    }
+
+    if (docLimpio && docLimpio !== '—') {
+      const yaExisteDoc = usuarios.some(u => (u.documento || '').trim() === docLimpio);
+      if (yaExisteDoc) {
+        setErrorFormulario(`Ya existe un usuario registrado con el documento de identidad "${docLimpio}".`);
+        return;
       }
-    } catch (errAuth) {
-      console.warn('Registro en Firebase Auth secundario:', errAuth);
     }
 
-    const finalId = authUid || `usr-${Date.now()}`;
-    const nuevo: UsuarioSistema = {
-      id: finalId,
-      nombre: (nuevoUsuario.nombre || '').trim(),
-      documento: (nuevoUsuario.documento || '').trim(),
-      email: emailLimpio,
-      rol: (nuevoUsuario.rol as RolSistema) || 'empleado',
-      cargoNombre: (nuevoUsuario.cargoNombre || 'Colaborador').trim(),
-      estado: (nuevoUsuario.estado as any) || 'activo',
-      ultimoAcceso: 'Nunca',
-      fechaCreacion: new Date().toISOString().split('T')[0],
-      dobleFactorHabilitado: Boolean(nuevoUsuario.dobleFactorHabilitado),
-      password: claveAsignada,
-      permisos: nuevoUsuario.permisos && nuevoUsuario.permisos.length > 0
-        ? nuevoUsuario.permisos
-        : ['dashboard', 'solicitudes', 'capacitaciones']
-    };
+    guardandoRef.current = true;
+    setGuardandoUsuario(true);
 
-    // 2. Guardar en Firestore con su ID enlazado al UID de Authentication
     try {
+      // 3. Verificación de seguridad directa en Firestore contra escrituras duplicadas
+      try {
+        const qExist = query(collection(db, 'usuarios'), where('email', '==', emailLimpio));
+        const snapExist = await getDocs(qExist);
+        if (!snapExist.empty) {
+          setErrorFormulario(`Ya existe una cuenta con el correo "${emailLimpio}" en la base de datos de usuarios. Creación redundante prevenida.`);
+          return;
+        }
+      } catch (errQ) {
+        console.debug('Verificación de duplicado en Firestore completada:', errQ);
+      }
+
+      const claveAsignada = passwordTemporal.trim() || 'BGroup2026*';
+
+      // 4. Crear cuenta en Firebase Authentication
+      let authUid = '';
+      try {
+        const resAuth = await registrarUsuarioEnAuth(
+          emailLimpio,
+          claveAsignada,
+          (nuevoUsuario.nombre || '').trim()
+        );
+        if (resAuth.uid) {
+          authUid = resAuth.uid;
+        } else if (resAuth.code === 'auth/email-already-in-use') {
+          console.warn('Correo ya presente en Firebase Auth:', emailLimpio);
+        }
+      } catch (errAuth) {
+        console.warn('Registro en Firebase Auth:', errAuth);
+      }
+
+      // ID determinista: si no hay UID de auth, deriva del correo para que nunca se dupliquen documentos
+      const finalId = authUid || `usr-${emailLimpio.replace(/[^a-z0-9]/g, '_')}`;
+
+      const nuevo: UsuarioSistema = {
+        id: finalId,
+        nombre: (nuevoUsuario.nombre || '').trim(),
+        documento: docLimpio,
+        email: emailLimpio,
+        rol: (nuevoUsuario.rol as RolSistema) || 'empleado',
+        cargoNombre: (nuevoUsuario.cargoNombre || 'Colaborador').trim(),
+        estado: (nuevoUsuario.estado as any) || 'activo',
+        ultimoAcceso: 'Nunca',
+        fechaCreacion: new Date().toISOString().split('T')[0],
+        dobleFactorHabilitado: Boolean(nuevoUsuario.dobleFactorHabilitado),
+        password: claveAsignada,
+        empresaId: nuevoUsuario.empresaId || 'empresa-a',
+        empleadoId: nuevoUsuario.empleadoId,
+        permisos: nuevoUsuario.permisos && nuevoUsuario.permisos.length > 0
+          ? nuevoUsuario.permisos
+          : ['dashboard', 'solicitudes', 'capacitaciones']
+      };
+
+      // 5. Guardar en Firestore de forma atómica
       await guardarUsuarioFB(nuevo);
-    } catch (err) {
-      console.warn('Error al guardar usuario en Firestore:', err);
-    }
 
-    // 3. Guardar en estado local
-    setUsuarios(prev => [nuevo, ...prev]);
-    onActualizarUsuarios?.([nuevo, ...usuarios]);
-
-    // 4. Despachar notificación al correo creado si está seleccionado
-    let resultadoEnvio: { success: boolean; message: string; method?: string; errorDetalle?: string } = {
-      success: true,
-      message: 'Cuenta creada y activada con éxito en Firebase Authentication.'
-    };
-    if (enviarNotificacionEmail) {
-      resultadoEnvio = await enviarNotificacionCorreoNuevoUsuario(
-        nuevo.email,
-        nuevo.nombre,
-        nuevo.rol,
-        claveAsignada
-      );
-    }
-
-    // 4. Registrar log de auditoría
-    const nuevoLog: LogAuditoriaUsuario = {
-      id: `log-${Date.now()}`,
-      usuarioId: 'usr-admin',
-      usuarioNombre: 'Administrador GH',
-      accion: `Creación de usuario: ${nuevo.nombre} (${nuevo.email}) con rol ${nuevo.rol}. ${enviarNotificacionEmail ? `Notificación despachada: ${resultadoEnvio.message}` : 'Sin notificación por correo'}`,
-      modulo: 'Gestión de Usuarios',
-      ip: '190.158.42.12',
-      fechaHora: new Date().toLocaleString('es-CO'),
-      tipo: 'MODIFICACION'
-    };
-    setLogs(prev => [nuevoLog, ...prev]);
-
-    setModalCrearOpen(false);
-
-    // 5. Presentar comprobante de notificación al correo
-    if (enviarNotificacionEmail) {
-      setNotificacionModalData({
-        usuario: nuevo,
-        passwordTemporal: claveAsignada,
-        asunto: generarAsuntoBienvenida(nuevo),
-        cuerpo: generarCartaBienvenida(nuevo, claveAsignada),
-        fechaEnvio: new Date().toLocaleString('es-CO'),
-        resultadoFirebase: resultadoEnvio
+      // 6. Actualizar estado local deduplicado y sincronizar con App.tsx
+      setUsuarios(prev => {
+        const sinDuplicados = prev.filter(u => u.id !== finalId && (u.email || '').trim().toLowerCase() !== emailLimpio);
+        const actualizados = [nuevo, ...sinDuplicados];
+        onActualizarUsuarios?.(actualizados);
+        return actualizados;
       });
+
+      // 7. Notificación por correo
+      let resultadoEnvio: { success: boolean; message: string; method?: string; errorDetalle?: string } = {
+        success: true,
+        message: 'Cuenta creada y activada con éxito en la plataforma.'
+      };
+      if (enviarNotificacionEmail) {
+        try {
+          resultadoEnvio = await enviarNotificacionCorreoNuevoUsuario(
+            nuevo.email,
+            nuevo.nombre,
+            nuevo.rol,
+            claveAsignada
+          );
+        } catch (errEmail) {
+          console.warn('Error al despachar correo:', errEmail);
+        }
+      }
+
+      // 8. Registro de Auditoría
+      const nuevoLog: LogAuditoriaUsuario = {
+        id: `log-${Date.now()}`,
+        usuarioId: currentUser?.id || 'usr-admin',
+        usuarioNombre: currentUser?.nombre || 'Administrador GH',
+        accion: `Creación de usuario: ${nuevo.nombre} (${nuevo.email}) con rol ${nuevo.rol}. ID asignado: ${finalId}. ${enviarNotificacionEmail ? `Notificación despachada: ${resultadoEnvio.message}` : 'Sin notificación por correo'}`,
+        modulo: 'Gestión de Usuarios',
+        ip: '190.158.42.12',
+        fechaHora: new Date().toLocaleString('es-CO'),
+        tipo: 'MODIFICACION'
+      };
+      setLogs(prev => [nuevoLog, ...prev]);
+
+      setModalCrearOpen(false);
+
+      if (enviarNotificacionEmail) {
+        setNotificacionModalData({
+          usuario: nuevo,
+          passwordTemporal: claveAsignada,
+          asunto: generarAsuntoBienvenida(nuevo),
+          cuerpo: generarCartaBienvenida(nuevo, claveAsignada),
+          fechaEnvio: new Date().toLocaleString('es-CO'),
+          resultadoFirebase: resultadoEnvio
+        });
+      }
+
+      setNuevoUsuario({
+        nombre: '',
+        documento: '',
+        email: '',
+        rol: 'empleado',
+        cargoNombre: '',
+        estado: 'activo',
+        dobleFactorHabilitado: false,
+        permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'sst', 'documentos']
+      });
+
+      mostrarNotificacion(`Usuario ${nuevo.nombre} creado con éxito.`);
+    } catch (err: any) {
+      setErrorFormulario(`Error al registrar el usuario: ${err?.message || err}`);
+    } finally {
+      guardandoRef.current = false;
+      setGuardandoUsuario(false);
     }
-
-    setNuevoUsuario({
-      nombre: '',
-      documento: '',
-      email: '',
-      rol: 'empleado',
-      cargoNombre: '',
-      estado: 'activo',
-      dobleFactorHabilitado: false,
-      permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'sst', 'documentos']
-    });
-
-    mostrarNotificacion(`Usuario ${nuevo.nombre} creado. Notificación despachada a ${nuevo.email}`);
   };
 
   // Guardar cambios usuario existente
@@ -319,14 +405,16 @@ export function UsuariosView({
       console.warn('Error al actualizar usuario en Firestore:', err);
     }
 
-    setUsuarios(prev =>
-      prev.map(u => (u.id === usuarioEditando.id ? usuarioEditando : u))
-    );
+    setUsuarios(prev => {
+      const actualizados = prev.map(u => (u.id === usuarioEditando.id ? usuarioEditando : u));
+      onActualizarUsuarios?.(actualizados);
+      return actualizados;
+    });
 
     const nuevoLog: LogAuditoriaUsuario = {
       id: `log-${Date.now()}`,
-      usuarioId: 'usr-admin',
-      usuarioNombre: 'Administrador GH',
+      usuarioId: currentUser?.id || 'usr-admin',
+      usuarioNombre: currentUser?.nombre || 'Administrador GH',
       accion: `Actualización de perfil y permisos del usuario ${usuarioEditando.nombre}`,
       modulo: 'Gestión de Usuarios',
       ip: '190.158.42.12',
@@ -343,16 +431,19 @@ export function UsuariosView({
   // Alternar estado activo/inactivo/bloqueado
   const handleToggleEstado = async (usuarioId: string) => {
     let usuarioActualizado: UsuarioSistema | null = null;
-    setUsuarios(prev =>
-      prev.map(u => {
+    setUsuarios(prev => {
+      const actualizados = prev.map(u => {
         if (u.id === usuarioId) {
           const nuevoEstado = u.estado === 'activo' ? 'inactivo' : 'activo';
           usuarioActualizado = { ...u, estado: nuevoEstado };
           return usuarioActualizado;
         }
         return u;
-      })
-    );
+      });
+      onActualizarUsuarios?.(actualizados);
+      return actualizados;
+    });
+
     if (usuarioActualizado) {
       try {
         await guardarUsuarioFB(usuarioActualizado);
@@ -369,8 +460,11 @@ export function UsuariosView({
     const tempPass = 'BGroup' + Math.floor(1000 + Math.random() * 9000) + '*';
     if (usr) {
       const actualizado = { ...usr, password: tempPass };
-      setUsuarios(prev => prev.map(u => (u.id === usr.id ? actualizado : u)));
-      onActualizarUsuarios?.(usuarios.map(u => (u.id === usr.id ? actualizado : u)));
+      setUsuarios(prev => {
+        const actualizados = prev.map(u => (u.id === usr.id ? actualizado : u));
+        onActualizarUsuarios?.(actualizados);
+        return actualizados;
+      });
       guardarUsuarioFB(actualizado).catch(() => {});
     }
 
@@ -378,9 +472,9 @@ export function UsuariosView({
 
     const nuevoLog: LogAuditoriaUsuario = {
       id: `log-${Date.now()}`,
-      usuarioId: 'usr-admin-principal',
-      usuarioNombre: 'Super Administrador',
-      accion: `Envío de enlace y credenciales de restablecimiento a ${email} (${resultado.message})`,
+      usuarioId: currentUser?.id || 'usr-admin-principal',
+      usuarioNombre: currentUser?.nombre || 'Super Administrador',
+      accion: `Envío de credenciales de restablecimiento a ${email} (${resultado.message})`,
       modulo: 'Seguridad / Usuarios',
       ip: '190.158.42.12',
       fechaHora: new Date().toLocaleString('es-CO'),
@@ -437,55 +531,130 @@ export function UsuariosView({
     setTimeout(() => setCopiadoFeedback(false), 3000);
   };
 
-  // Eliminar usuario individual
+  // Eliminar usuario individual de forma definitiva
   const handleEliminarUsuario = async (usuarioId: string, nombre: string) => {
-    if (confirm(`¿Desea eliminar permanentemente la cuenta de usuario "${nombre}"? Esta acción no se puede deshacer.`)) {
+    if (confirm(`¿Desea eliminar permanentemente la cuenta de usuario "${nombre}"? Esta acción no se puede deshacer y se borrará de la base de datos.`)) {
       try {
         await eliminarUsuarioFB(usuarioId);
       } catch (err) {
         console.warn('Error al eliminar usuario en Firestore:', err);
       }
-      setUsuarios(prev => prev.filter(u => u.id !== usuarioId));
+      setUsuarios(prev => {
+        const filtrados = prev.filter(u => u.id !== usuarioId);
+        onActualizarUsuarios?.(filtrados);
+        return filtrados;
+      });
       const nuevoLog: LogAuditoriaUsuario = {
         id: `log-${Date.now()}`,
-        usuarioId: 'usr-admin-principal',
-        usuarioNombre: 'Super Administrador',
-        accion: `Eliminación de la cuenta de usuario ${nombre}`,
+        usuarioId: currentUser?.id || 'usr-admin-principal',
+        usuarioNombre: currentUser?.nombre || 'Super Administrador',
+        accion: `Eliminación definitiva de la cuenta de usuario ${nombre} (ID: ${usuarioId})`,
         modulo: 'Gestión de Usuarios',
         ip: '190.158.42.10',
         fechaHora: new Date().toLocaleString('es-CO'),
         tipo: 'SEGURIDAD'
       };
       setLogs(prev => [nuevoLog, ...prev]);
-      mostrarNotificacion(`Usuario "${nombre}" eliminado del sistema.`);
+      mostrarNotificacion(`Usuario "${nombre}" eliminado definitivamente.`);
     }
   };
 
-  // Depurar masivamente todos los usuarios de prueba
-  const handleDepurarUsuariosPrueba = () => {
-    const usuariosPrueba = usuarios.filter(
-      u => u.email.endsWith('@empresa.com') || u.email.endsWith('@consultoria-sst.co') || (u.id.startsWith('usr-') && u.id !== 'usr-admin-principal')
-    );
-    if (usuariosPrueba.length === 0) {
-      mostrarNotificacion('No se detectaron usuarios de prueba. La base de datos está limpia.');
-      return;
-    }
-    if (confirm(`Se encontraron ${usuariosPrueba.length} cuentas de prueba. ¿Desea eliminarlas permanentemente para dejar la base de datos limpia en producción?`)) {
-      setUsuarios(prev => prev.filter(
-        u => !u.email.endsWith('@empresa.com') && !u.email.endsWith('@consultoria-sst.co') && (u.id === 'usr-admin-principal' || !u.id.startsWith('usr-'))
-      ));
-      const nuevoLog: LogAuditoriaUsuario = {
+  // Depuración y normalización de accesos y eliminación de duplicados
+  const handleDepurarDuplicadosYAccesos = async () => {
+    if (depurandoAccesos) return;
+    setDepurandoAccesos(true);
+    try {
+      // 1. Obtener todos los documentos directamente de Firestore
+      const snap = await getDocs(collection(db, 'usuarios'));
+      const todosDocs: UsuarioSistema[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as UsuarioSistema));
+
+      let eliminadosCount = 0;
+      let normalizadosCount = 0;
+      const correosVistos = new Map<string, string>();
+      const docsAEliminar: string[] = [];
+
+      for (const u of todosDocs) {
+        const emailLower = (u.email || '').trim().toLowerCase();
+        const nombreLower = (u.nombre || '').trim().toLowerCase();
+
+        // Purgar definitivamente usuarios de prueba conocidos o asignados solicitados
+        if (
+          nombreLower.includes('anibal luna') ||
+          nombreLower.includes('manuel castro prueba') ||
+          emailLower === 'anibalf3000@gmail.com' ||
+          emailLower === 'manuelfcastrom@gmail.com'
+        ) {
+          docsAEliminar.push(u.id);
+          eliminadosCount++;
+          continue;
+        }
+
+        // Purgar duplicados redundantes por email
+        if (emailLower) {
+          if (correosVistos.has(emailLower)) {
+            docsAEliminar.push(u.id);
+            eliminadosCount++;
+            continue;
+          } else {
+            correosVistos.set(emailLower, u.id);
+          }
+        }
+
+        // Normalizar accesos y permisos modulares según rol institucional
+        let permisosRequeridos = ['dashboard'];
+        const rol = u.rol || 'empleado';
+        if (rol === 'superadmin' || rol === 'admin_gh') {
+          permisosRequeridos = MODULOS_SISTEMA.map(m => m.id);
+        } else if (rol === 'lider_area') {
+          permisosRequeridos = ['dashboard', 'empleados', 'evaluaciones', 'solicitudes', 'capacitaciones', 'documentos'];
+        } else if (rol === 'responsable_sst') {
+          permisosRequeridos = ['dashboard', 'cargos', 'capacitaciones', 'sst', 'epps', 'documentos'];
+        } else {
+          permisosRequeridos = ['dashboard', 'solicitudes', 'capacitaciones', 'sst', 'documentos'];
+        }
+
+        const actualStr = (u.permisos || []).slice().sort().join(',');
+        const nuevoStr = permisosRequeridos.slice().sort().join(',');
+
+        if (actualStr !== nuevoStr) {
+          const uActualizado = { ...u, permisos: permisosRequeridos };
+          await guardarUsuarioFB(uActualizado);
+          normalizadosCount++;
+        }
+      }
+
+      // Ejecutar borrado físico en Firestore
+      for (const uid of docsAEliminar) {
+        try {
+          await eliminarUsuarioFB(uid);
+        } catch (errDel) {
+          console.warn('Error eliminando doc redundante:', uid, errDel);
+        }
+      }
+
+      // Actualizar estado en memoria
+      const limpios = todosDocs.filter(u => !docsAEliminar.includes(u.id));
+      setUsuarios(limpios);
+      onActualizarUsuarios?.(limpios);
+
+      const logAuditoria: LogAuditoriaUsuario = {
         id: `log-${Date.now()}`,
-        usuarioId: 'usr-admin-principal',
-        usuarioNombre: 'Super Administrador',
-        accion: `Depuración masiva de ${usuariosPrueba.length} usuarios de prueba`,
+        usuarioId: currentUser?.id || 'usr-admin-principal',
+        usuarioNombre: currentUser?.nombre || 'Super Administrador',
+        accion: `Depuración y auditoría de accesos completada: ${eliminadosCount} cuentas redundantes/prueba eliminadas, ${normalizadosCount} perfiles de acceso normalizados.`,
         modulo: 'Gestión de Usuarios',
         ip: '190.158.42.10',
         fechaHora: new Date().toLocaleString('es-CO'),
         tipo: 'SEGURIDAD'
       };
-      setLogs(prev => [nuevoLog, ...prev]);
-      mostrarNotificacion(`Se eliminaron exitosamente ${usuariosPrueba.length} usuarios de prueba.`);
+      setLogs(prev => [logAuditoria, ...prev]);
+
+      mostrarNotificacion(`Depuración completada: ${eliminadosCount} cuentas redundantes eliminadas, ${normalizadosCount} accesos normalizados.`);
+    } catch (err: any) {
+      console.warn('Error durante la depuración de accesos:', err);
+      mostrarNotificacion(`Error en depuración: ${err?.message || err}`);
+    } finally {
+      setDepurandoAccesos(false);
     }
   };
 
@@ -577,18 +746,24 @@ export function UsuariosView({
           </div>
 
           <div className="flex items-center gap-2 self-start md:self-auto">
-            {isSuperAdmin && (
-              <button
-                onClick={handleDepurarUsuariosPrueba}
-                className="px-3 py-2 text-xs font-bold bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
-                title="Eliminar todos los usuarios de prueba (Exclusivo Superadministrador)"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                <span>Depurar Usuarios de Prueba</span>
-              </button>
-            )}
             <button
-              onClick={() => setModalCrearOpen(true)}
+              onClick={handleDepurarDuplicadosYAccesos}
+              disabled={depurandoAccesos}
+              className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs border ${
+                depurandoAccesos
+                  ? 'bg-slate-100 text-slate-400 border-slate-300 cursor-not-allowed'
+                  : 'bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-300 hover:border-emerald-400'
+              }`}
+              title="Auditar y depurar cuentas duplicadas y normalizar matriz de accesos en Firestore"
+            >
+              <ShieldCheck className={`w-3.5 h-3.5 text-emerald-600 ${depurandoAccesos ? 'animate-spin' : ''}`} />
+              <span>{depurandoAccesos ? 'Depurando Accesos...' : 'Depurar Accesos y Duplicados'}</span>
+            </button>
+            <button
+              onClick={() => {
+                setErrorFormulario(null);
+                setModalCrearOpen(true);
+              }}
               className="px-4 py-2 text-xs font-bold bg-[#18235C] hover:bg-[#101740] text-white rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
             >
               <UserPlus className="w-4 h-4 text-[#00FF00]" />
@@ -1289,6 +1464,16 @@ export function UsuariosView({
             </div>
 
             <form onSubmit={handleGuardarNuevo} className="p-6 space-y-4 text-xs overflow-y-auto flex-1 bg-[#FFFFFF]">
+              {/* Alerta de validación o prevención de duplicidad */}
+              {errorFormulario && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl flex items-start gap-2 shadow-2xs">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="text-xs leading-relaxed font-semibold">
+                    {errorFormulario}
+                  </div>
+                </div>
+              )}
+
               {/* Opción rápida: vincular con colaborador existente */}
               {empleados.length > 0 && (
                 <div className="p-3 bg-white rounded-xl border border-[#8FA7D6]">
@@ -1296,6 +1481,7 @@ export function UsuariosView({
                     Vincular con Colaborador del Censo (Opcional):
                   </label>
                   <select
+                    disabled={guardandoUsuario}
                     onChange={e => handleSelectEmpleadoExistente(e.target.value)}
                     className="w-full bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg px-2.5 py-1.5 text-xs text-[#282829] font-medium focus:ring-1 focus:ring-[#18235C]"
                   >
@@ -1306,6 +1492,17 @@ export function UsuariosView({
                       </option>
                     ))}
                   </select>
+
+                  {/* Advertencia si el colaborador seleccionado ya tiene cuenta */}
+                  {Boolean(
+                    nuevoUsuario.email &&
+                    usuarios.some(u => (u.email || '').trim().toLowerCase() === (nuevoUsuario.email || '').trim().toLowerCase())
+                  ) && (
+                    <div className="mt-2 p-2 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg text-[11px] flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Este colaborador ya cuenta con una credencial registrada. Edite el usuario existente desde la tabla para evitar duplicados.</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1538,17 +1735,32 @@ export function UsuariosView({
               <div className="flex justify-end gap-2 pt-3 border-t border-[#8FA7D6]/30">
                 <button
                   type="button"
+                  disabled={guardandoUsuario}
                   onClick={() => setModalCrearOpen(false)}
-                  className="px-3.5 py-1.5 rounded-lg border border-[#8FA7D6] text-[#18235C] font-bold hover:bg-[#8FA7D6]/15 transition-colors"
+                  className="px-3.5 py-1.5 rounded-lg border border-[#8FA7D6] text-[#18235C] font-bold hover:bg-[#8FA7D6]/15 transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-[#18235C] text-white font-bold hover:bg-[#101740] shadow-sm transition-colors flex items-center gap-1.5"
+                  disabled={guardandoUsuario}
+                  className={`px-4 py-1.5 rounded-lg text-white font-bold shadow-sm transition-colors flex items-center gap-1.5 ${
+                    guardandoUsuario
+                      ? 'bg-slate-400 cursor-not-allowed opacity-80'
+                      : 'bg-[#18235C] hover:bg-[#101740]'
+                  }`}
                 >
-                  <UserPlus className="w-4 h-4 text-[#00FF00]" />
-                  <span>Crear Usuario & Despachar</span>
+                  {guardandoUsuario ? (
+                    <>
+                      <RotateCcw className="w-4 h-4 text-[#00FF00] animate-spin" />
+                      <span>Validando y Creando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4 text-[#00FF00]" />
+                      <span>Crear Usuario & Despachar</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

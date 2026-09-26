@@ -549,11 +549,41 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     email: 'marcela.rueda@empresa.com',
     telefono: '315 220 4411',
     cargoId: 'c1',
+    areaId: 'a1',
     formacion: 'Administradora de Empresas, Magíster en Dirección Estratégica',
     experiencia: '8 años en dirección y escalamiento de empresas de servicios.',
+    salarioBase: 9500000,
     contrato: { tipo: 'Término indefinido', inicio: '2019-03-01', fin: '—', salario: '$9.500.000' },
     familia: [{ nombre: 'Diego Rueda', parentesco: 'Hijo', nacimiento: '2012-05-14' }],
-    activo: true
+    activo: true,
+    sst: {
+      conceptoAptitudVigente: 'Apto',
+      restriccionesActivas: 'Ninguna',
+      examenesOcupacionales: [
+        {
+          id: 'ex-e1-2',
+          fecha: '2026-02-10',
+          tipoExamen: 'Periódico',
+          entidadIps: 'Colsanitas Medicina Ocupacional',
+          conceptoAptitud: 'Apto',
+          recomendaciones: 'Continuar pausas activas osteomusculares y control visual anual.',
+          fechaProximoExamen: '2027-02-10',
+          medicoEvaluador: 'Dr. Roberto Mendoza - Esp. SST',
+          licenciaSst: 'Lic. SST-44120-Bogotá',
+          enfasisExamen: 'Énfasis visual y cardiovascular ejecutivo',
+          confidencialMedico: true
+        },
+        {
+          id: 'ex-e1-1',
+          fecha: '2019-02-20',
+          tipoExamen: 'Ingreso',
+          entidadIps: 'IPS Médica Laboral del Oriente SAS',
+          conceptoAptitud: 'Apto',
+          recomendaciones: 'Apto para funciones de dirección general.',
+          confidencialMedico: true
+        }
+      ]
+    }
   },
   {
     id: 'e2',
@@ -562,11 +592,32 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     email: 'andres.pinilla@empresa.com',
     telefono: '300 552 1190',
     cargoId: 'c2',
+    areaId: 'a2',
     formacion: 'Administrador de Empresas con diplomado en Legislación Laboral',
     experiencia: '4 años coordinando áreas administrativas y gestión humana.',
+    salarioBase: 4800000,
     contrato: { tipo: 'Término fijo', inicio: '2022-01-10', fin: '2027-01-10', salario: '$4.800.000' },
     familia: [],
-    activo: true
+    activo: true,
+    sst: {
+      conceptoAptitudVigente: 'Apto con recomendaciones',
+      restriccionesActivas: 'Pausas visuales obligatorias por uso continuo de pantallas.',
+      examenesOcupacionales: [
+        {
+          id: 'ex-e2-1',
+          fecha: '2025-11-15',
+          tipoExamen: 'Periódico',
+          entidadIps: 'IPS Sanitas Ocupacional',
+          conceptoAptitud: 'Apto con recomendaciones',
+          recomendaciones: 'Uso de lentes con filtro antirreflejo durante jornada en pantalla y pausas activas.',
+          fechaProximoExamen: '2026-11-15',
+          medicoEvaluador: 'Dra. Claudia Marcela Gómez',
+          licenciaSst: 'Lic. SST-98234-Bogotá',
+          enfasisExamen: 'Optometría y ergonomía de puesto de oficina',
+          confidencialMedico: true
+        }
+      ]
+    }
   },
   {
     id: 'e3',
@@ -575,11 +626,31 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     email: 'laura.beltran@empresa.com',
     telefono: '311 908 7723',
     cargoId: 'c3',
+    areaId: 'a2',
     formacion: 'Contadora Pública con especialización en Auditoría y Revisoría Fiscal',
     experiencia: '3 años en contabilidad tributaria y conciliaciones bancarias.',
+    salarioBase: 3400000,
     contrato: { tipo: 'Término indefinido', inicio: '2023-06-01', fin: '—', salario: '$3.400.000' },
     familia: [{ nombre: 'Camilo Beltrán', parentesco: 'Cónyuge', nacimiento: '1990-02-20' }],
-    activo: true
+    activo: true,
+    sst: {
+      conceptoAptitudVigente: 'Apto',
+      restriccionesActivas: 'Ninguna',
+      examenesOcupacionales: [
+        {
+          id: 'ex-e3-1',
+          fecha: '2025-06-05',
+          tipoExamen: 'Periódico',
+          entidadIps: 'IPS Médica Laboral del Oriente SAS',
+          conceptoAptitud: 'Apto',
+          recomendaciones: 'Higiene postural y pausas cada 2 horas.',
+          fechaProximoExamen: '2026-06-05',
+          medicoEvaluador: 'Dra. Sandra Milena Pardo',
+          licenciaSst: 'Lic. SST-55102-Bogotá',
+          confidencialMedico: true
+        }
+      ]
+    }
   },
   {
     id: 'e4',
@@ -588,11 +659,31 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     email: 'julian.torres@empresa.com',
     telefono: '320 664 5502',
     cargoId: 'c4',
+    areaId: 'a2',
     formacion: 'Tecnólogo en Gestión Documental y Asistencia de Oficina',
     experiencia: '1 año en atención de recepción y trámites de correspondencia.',
+    salarioBase: 1950000,
     contrato: { tipo: 'Término fijo', inicio: '2024-02-15', fin: '2025-02-15', salario: '$1.950.000' },
     familia: [],
-    activo: true
+    activo: true,
+    sst: {
+      conceptoAptitudVigente: 'Apto',
+      restriccionesActivas: 'Ninguna',
+      examenesOcupacionales: [
+        {
+          id: 'ex-e4-1',
+          fecha: '2024-02-10',
+          tipoExamen: 'Ingreso',
+          entidadIps: 'Previsora Ocupacional SAS',
+          conceptoAptitud: 'Apto',
+          recomendaciones: 'Realizar examen periódico anual.',
+          fechaProximoExamen: '2025-02-10',
+          medicoEvaluador: 'Dr. Fernando Morales',
+          licenciaSst: 'Lic. SST-11200-Bogotá',
+          confidencialMedico: true
+        }
+      ]
+    }
   },
   {
     id: 'e5',
@@ -601,11 +692,31 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     email: 'camila.ospina@empresa.com',
     telefono: '312 887 4420',
     cargoId: 'c6',
+    areaId: 'a3',
     formacion: 'Profesional en Mercadeo y Negocios Internacionales',
     experiencia: '3 años en prospección de cuentas B2B de conectividad.',
+    salarioBase: 3500000,
     contrato: { tipo: 'Término indefinido', inicio: '2021-09-01', fin: '—', salario: '$3.500.000 + comisiones' },
     familia: [{ nombre: 'Sofía Ospina', parentesco: 'Hija', nacimiento: '2018-11-02' }],
-    activo: true
+    activo: true,
+    sst: {
+      conceptoAptitudVigente: 'Apto',
+      restriccionesActivas: 'Ninguna',
+      examenesOcupacionales: [
+        {
+          id: 'ex-e5-1',
+          fecha: '2025-10-20',
+          tipoExamen: 'Periódico',
+          entidadIps: 'Sinergia Salud Laboral',
+          conceptoAptitud: 'Apto',
+          recomendaciones: 'Acondicionamiento físico general y pausas ergonómicas.',
+          fechaProximoExamen: '2026-10-20',
+          medicoEvaluador: 'Dra. Claudia Marcela Gómez',
+          licenciaSst: 'Lic. SST-98234-Bogotá',
+          confidencialMedico: true
+        }
+      ]
+    }
   },
   {
     id: 'e6',
@@ -614,14 +725,93 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     email: 'carlos.mendivelso@empresa.com',
     telefono: '318 439 0021',
     cargoId: 'c7',
+    areaId: 'a4',
     formacion: 'Tecnólogo en Telecomunicaciones y Redes de Fibra Óptica',
     experiencia: '3 años en cuadrilla de instalación de última milla FTTH e infraestructura ISP.',
+    salarioBase: 2800000,
     contrato: { tipo: 'Término indefinido', inicio: '2022-04-15', fin: '—', salario: '$2.800.000 + bonificación técnica' },
     familia: [
       { nombre: 'Lucía Mendivelso', parentesco: 'Hija', nacimiento: '2020-08-19' },
       { nombre: 'Andrea Pérez', parentesco: 'Cónyuge', nacimiento: '1995-03-12' }
     ],
-    activo: true
+    activo: true,
+    sst: {
+      conceptoAptitudVigente: 'Apto con restricciones',
+      restriccionesActivas: 'No levantar cargas > 20 kg de forma unipersonal. Uso estricto de arnés certificado y línea de vida.',
+      examenesOcupacionales: [
+        {
+          id: 'ex-e6-2',
+          fecha: '2026-03-01',
+          tipoExamen: 'Periódico',
+          entidadIps: 'IPS Médica Laboral del Oriente SAS',
+          conceptoAptitud: 'Apto con restricciones',
+          recomendaciones: 'Mantener higiene postural en postes y escaleras. Capacitación anual obligatoria en trabajo seguro en alturas.',
+          restricciones: 'No levantar cargas > 20 kg sin ayuda mecánica o de un compañero.',
+          fechaProximoExamen: '2027-03-01',
+          medicoEvaluador: 'Dr. Roberto Mendoza - Esp. SST',
+          licenciaSst: 'Lic. SST-44120-Bogotá',
+          enfasisExamen: 'Trabajo en Alturas (Res. 4272/2021) y Audiometría Tonal',
+          confidencialMedico: true
+        },
+        {
+          id: 'ex-e6-1',
+          fecha: '2022-04-10',
+          tipoExamen: 'Ingreso',
+          entidadIps: 'IPS Médica Laboral del Oriente SAS',
+          conceptoAptitud: 'Apto',
+          recomendaciones: 'Apto para labor técnica en alturas con uso de equipo certificado.',
+          confidencialMedico: true
+        }
+      ]
+    }
+  },
+  {
+    id: 'e7',
+    nombre: 'Mateo Cárdenas Silva',
+    documento: '1.014.288.932',
+    email: 'mateo.cardenas@empresa.com',
+    telefono: '319 881 2244',
+    cargoId: 'c7',
+    areaId: 'a4',
+    formacion: 'Técnico en Instalación de Redes Inalámbricas y HFC',
+    experiencia: '2 años en tendido de cables y soporte en campo.',
+    salarioBase: 2600000,
+    contrato: { tipo: 'Término fijo', inicio: '2026-10-01', fin: '2027-09-30', salario: '$2.600.000' },
+    familia: [],
+    activo: true,
+    estadoLaboral: 'Preingreso',
+    laboral: {
+      codigoInterno: 'EMP-007',
+      fechaIngreso: '2026-10-01',
+      fechaInicioLaboral: '2026-10-01',
+      areaId: 'a4',
+      areaNombre: 'Operaciones',
+      cargoId: 'c7',
+      cargoNombre: 'Técnico de Instalaciones y Redes',
+      tipoContrato: 'Término fijo',
+      fechaInicioContrato: '2026-10-01',
+      jornadaLaboral: 'Tiempo completo (42 hrs semanales - Ley 2101)',
+      modalidadTrabajo: 'Presencial',
+      lugarTrabajo: 'Sede Operaciones - Bogotá',
+      estado: 'Preingreso'
+    },
+    sst: {
+      conceptoAptitudVigente: 'Pendiente',
+      restriccionesActivas: 'Ninguna',
+      examenesOcupacionales: [
+        {
+          id: 'ex-e7-1',
+          fecha: '2026-09-28',
+          tipoExamen: 'Ingreso',
+          entidadIps: 'IPS Médica Laboral del Oriente SAS',
+          conceptoAptitud: 'Pendiente',
+          estado: 'Programado',
+          recomendaciones: 'Programado para valoración de aptitud psicofísica y trabajo seguro en alturas previo a contratación.',
+          enfasisExamen: 'Trabajo en Alturas (Res. 4272/2021) y Audiometría Tonal',
+          confidencialMedico: true
+        }
+      ]
+    }
   }
 ];
 

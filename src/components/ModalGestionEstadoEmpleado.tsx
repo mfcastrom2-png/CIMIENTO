@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Empleado } from '../types';
+import { Empleado, EstadoColaborador, EventoHistorialLaboral, UsuarioSistema } from '../types';
 import {
   X,
   UserCheck,
@@ -7,14 +7,18 @@ import {
   UserX,
   AlertTriangle,
   Calendar,
-  FileText,
   ShieldAlert,
-  CheckCircle2
+  CheckCircle2,
+  Clock,
+  Palmtree,
+  FileText
 } from 'lucide-react';
+import { uid } from '../data/initialData';
 
 interface ModalGestionEstadoEmpleadoProps {
   empleado: Empleado;
   cargoNombre?: string;
+  currentUser?: UsuarioSistema | null;
   onClose: () => void;
   onGuardar: (empleadoActualizado: Empleado) => Promise<void> | void;
 }
@@ -46,13 +50,21 @@ const MOTIVOS_INACTIVACION = [
 export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProps> = ({
   empleado,
   cargoNombre = 'Colaborador',
+  currentUser,
   onClose,
   onGuardar
 }) => {
-  const estadoActualInicial: 'activo' | 'inactivo' | 'retirado' =
-    empleado.estadoLaboral || (empleado.activo === false ? 'inactivo' : 'activo');
+  const getEstadoInicial = (): EstadoColaborador => {
+    if (empleado.laboral?.estado) return empleado.laboral.estado;
+    if (empleado.estadoLaboral === 'retirado' || empleado.estadoLaboral === 'Retirado') return 'Retirado';
+    if (empleado.estadoLaboral === 'inactivo' || empleado.estadoLaboral === 'Inactivo') return 'Inactivo';
+    if (empleado.activo === false) return 'Inactivo';
+    return 'Activo';
+  };
 
-  const [nuevoEstado, setNuevoEstado] = useState<'activo' | 'inactivo' | 'retirado'>(estadoActualInicial);
+  const estadoActualInicial = getEstadoInicial();
+
+  const [nuevoEstado, setNuevoEstado] = useState<EstadoColaborador>(estadoActualInicial);
   const [fechaRetiro, setFechaRetiro] = useState(
     empleado.fechaRetiro || new Date().toISOString().slice(0, 10)
   );
@@ -74,25 +86,53 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
     e.preventDefault();
     setError(null);
 
-    if (nuevoEstado === 'retirado' && !fechaRetiro) {
+    if (nuevoEstado === 'Retirado' && !fechaRetiro) {
       setError('Debe indicar la fecha de retiro o desvinculación laboral.');
       return;
     }
 
     setGuardando(true);
     try {
+      const motivoFinal =
+        nuevoEstado === 'Retirado'
+          ? motivoRetiro
+          : nuevoEstado === 'Inactivo' || nuevoEstado === 'Suspensión' || nuevoEstado === 'Licencia'
+          ? motivoInactivacion
+          : observaciones.trim() || `Transición a estado ${nuevoEstado}`;
+
+      let accionHistorial: EventoHistorialLaboral['accion'] = 'CAMBIO_DATOS';
+      if (nuevoEstado === 'Retirado') accionHistorial = 'RETIRO';
+      else if (nuevoEstado === 'Inactivo') accionHistorial = 'INACTIVACION';
+      else if (nuevoEstado === 'Suspensión') accionHistorial = 'SUSPENSION';
+      else if (nuevoEstado === 'Vacaciones') accionHistorial = 'VACACIONES';
+      else if (nuevoEstado === 'Licencia') accionHistorial = 'LICENCIA';
+      else if (nuevoEstado === 'Activo' && estadoActualInicial !== 'Activo') accionHistorial = 'REINTEGRO';
+
+      const nuevoEvento: EventoHistorialLaboral = {
+        id: uid(),
+        fechaHora: new Date().toLocaleString('es-CO'),
+        usuario: currentUser?.nombre || 'Administrador de Talento Humano',
+        accion: accionHistorial,
+        titulo: `Cambio de Estado Laboral a ${nuevoEstado}`,
+        motivo: motivoFinal,
+        valorAnterior: `Estado: ${estadoActualInicial}`,
+        valorNuevo: `Estado: ${nuevoEstado}${nuevoEstado === 'Retirado' ? ` (Fecha: ${fechaRetiro})` : ''}`
+      };
+
       const empleadoActualizado: Empleado = {
         ...empleado,
-        activo: nuevoEstado === 'activo',
-        estadoLaboral: nuevoEstado,
-        fechaRetiro: nuevoEstado === 'retirado' ? fechaRetiro : (nuevoEstado === 'activo' ? undefined : empleado.fechaRetiro),
-        motivoRetiro:
-          nuevoEstado === 'retirado'
-            ? motivoRetiro
-            : nuevoEstado === 'inactivo'
-            ? motivoInactivacion
-            : undefined,
-        observacionesRetiro: observaciones.trim() || undefined
+        activo: nuevoEstado === 'Activo' || nuevoEstado === 'Vacaciones' || nuevoEstado === 'Licencia',
+        estadoLaboral: (nuevoEstado === 'Activo' ? 'activo' : nuevoEstado === 'Retirado' ? 'retirado' : 'inactivo') as any,
+        fechaRetiro: nuevoEstado === 'Retirado' ? fechaRetiro : undefined,
+        motivoRetiro: nuevoEstado === 'Retirado' ? motivoRetiro : (nuevoEstado === 'Inactivo' || nuevoEstado === 'Suspensión' ? motivoInactivacion : undefined),
+        observacionesRetiro: observaciones.trim() || undefined,
+        laboral: empleado.laboral
+          ? {
+              ...empleado.laboral,
+              estado: nuevoEstado
+            }
+          : undefined,
+        historialLaboral: [...(empleado.historialLaboral || []), nuevoEvento]
       };
 
       await onGuardar(empleadoActualizado);
@@ -104,23 +144,33 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
     }
   };
 
+  const estadosDisponibles: { valor: EstadoColaborador; label: string; desc: string; icon: any; color: string }[] = [
+    { valor: 'Activo', label: 'Activo', desc: 'En funciones ordinarias de su cargo.', icon: UserCheck, color: 'emerald' },
+    { valor: 'Preingreso', label: 'Preingreso', desc: 'En trámites de contratación o examen médico.', icon: Clock, color: 'blue' },
+    { valor: 'Vacaciones', label: 'Vacaciones', desc: 'Disfrutando período legal de descanso.', icon: Palmtree, color: 'indigo' },
+    { valor: 'Licencia', label: 'Licencia', desc: 'Licencia remunerada o no remunerada de ley.', icon: FileText, color: 'purple' },
+    { valor: 'Suspensión', label: 'Suspensión', desc: 'Medida disciplinaria reglamentaria temporal.', icon: AlertTriangle, color: 'amber' },
+    { valor: 'Inactivo', label: 'Inactivo', desc: 'Temporalmente inactivo o sin funciones asignadas.', icon: UserMinus, color: 'yellow' },
+    { valor: 'Retirado', label: 'Retirado', desc: 'Terminación formal y liquidación de contrato.', icon: UserX, color: 'rose' }
+  ];
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg border border-[#8FA7D6] shadow-xl max-w-lg w-full overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-lg border border-[#8FA7D6] shadow-xl max-w-xl w-full overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="px-5 py-4 bg-[#18235C] text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-[#8FA7D6]">
-              {nuevoEstado === 'activo' && <UserCheck className="w-4 h-4 text-emerald-400" />}
-              {nuevoEstado === 'inactivo' && <UserMinus className="w-4 h-4 text-amber-400" />}
-              {nuevoEstado === 'retirado' && <UserX className="w-4 h-4 text-rose-400" />}
+              {nuevoEstado === 'Activo' && <UserCheck className="w-4 h-4 text-emerald-400" />}
+              {nuevoEstado === 'Retirado' && <UserX className="w-4 h-4 text-rose-400" />}
+              {nuevoEstado !== 'Activo' && nuevoEstado !== 'Retirado' && <AlertTriangle className="w-4 h-4 text-amber-400" />}
             </div>
             <div>
               <h3 className="font-bold text-sm leading-tight">
                 Gestión de Estado Laboral y Novedades
               </h3>
               <p className="text-[11px] text-[#8FA7D6] leading-tight">
-                {empleado.nombre} · {cargoNombre}
+                {empleado.nombre} · {cargoNombre} (Actual: {estadoActualInicial})
               </p>
             </div>
           </div>
@@ -143,89 +193,45 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
           {/* Selector de Estado */}
           <div>
             <label className="block font-bold text-[#18235C] mb-2">
-              Seleccionar Estado Laboral del Colaborador *
+              Seleccionar Nuevo Estado Laboral del Colaborador *
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {/* Opción 1: Activo */}
-              <button
-                type="button"
-                onClick={() => setNuevoEstado('activo')}
-                className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                  nuevoEstado === 'activo'
-                    ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20 shadow-xs'
-                    : 'border-slate-200 hover:border-slate-300 bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-bold text-emerald-800 text-xs flex items-center gap-1.5">
-                    <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    Activo
-                  </span>
-                  {nuevoEstado === 'activo' && (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-600 leading-tight">
-                  Colaborador en funciones ordinarias de su cargo.
-                </p>
-              </button>
-
-              {/* Opción 2: Inactivo */}
-              <button
-                type="button"
-                onClick={() => setNuevoEstado('inactivo')}
-                className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                  nuevoEstado === 'inactivo'
-                    ? 'border-amber-600 bg-amber-50/80 ring-2 ring-amber-500/20 shadow-xs'
-                    : 'border-slate-200 hover:border-slate-300 bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-bold text-amber-800 text-xs flex items-center gap-1.5">
-                    <UserMinus className="w-3.5 h-3.5 text-amber-600" />
-                    Inactivo
-                  </span>
-                  {nuevoEstado === 'inactivo' && (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-600 leading-tight">
-                  Suspensión temporal o licencia. Mantiene contrato.
-                </p>
-              </button>
-
-              {/* Opción 3: Retirado */}
-              <button
-                type="button"
-                onClick={() => setNuevoEstado('retirado')}
-                className={`p-3 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                  nuevoEstado === 'retirado'
-                    ? 'border-rose-600 bg-rose-50/80 ring-2 ring-rose-500/20 shadow-xs'
-                    : 'border-slate-200 hover:border-slate-300 bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-bold text-rose-800 text-xs flex items-center gap-1.5">
-                    <UserX className="w-3.5 h-3.5 text-rose-600" />
-                    Retirado
-                  </span>
-                  {nuevoEstado === 'retirado' && (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-rose-600" />
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-600 leading-tight">
-                  Terminación y liquidación definitiva del contrato.
-                </p>
-              </button>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {estadosDisponibles.map(st => {
+                const IconComponent = st.icon;
+                const isSelected = nuevoEstado === st.valor;
+                return (
+                  <button
+                    key={st.valor}
+                    type="button"
+                    onClick={() => setNuevoEstado(st.valor)}
+                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-[#18235C] bg-[#F8FAFC] ring-2 ring-[#18235C]/20 shadow-xs'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                        <IconComponent className="w-3.5 h-3.5 text-[#18235C]" />
+                        {st.label}
+                      </span>
+                      {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-[#18235C]" />}
+                    </div>
+                    <p className="text-[10px] text-slate-500 line-clamp-2 leading-tight">
+                      {st.desc}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Formulario condicional según el estado seleccionado */}
-          {nuevoEstado === 'retirado' && (
-            <div className="p-3.5 bg-rose-50/60 rounded-lg border border-rose-200 space-y-3 animate-in fade-in">
+          {nuevoEstado === 'Retirado' && (
+            <div className="p-3.5 bg-rose-50/70 rounded-lg border border-rose-200 space-y-3 animate-in fade-in">
               <div className="flex items-center gap-1.5 text-rose-900 font-bold text-xs">
                 <ShieldAlert className="w-4 h-4 text-rose-600" />
-                <span>Datos de Retiro y Desvinculación Laboral</span>
+                <span>Datos de Retiro y Desvinculación Laboral (CST)</span>
               </div>
 
               <div>
@@ -246,7 +252,7 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
 
               <div>
                 <label className="block font-semibold text-rose-950 mb-1">
-                  Causa / Motivo Legal de Terminación (CST) *
+                  Causa / Motivo Legal de Terminación *
                 </label>
                 <select
                   value={motivoRetiro}
@@ -263,33 +269,33 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
 
               <div>
                 <label className="block font-semibold text-rose-950 mb-1">
-                  Observaciones de Liquidación / Paz y Salvo (Opcional)
+                  Observaciones de Liquidación / Paz y Salvo
                 </label>
                 <textarea
                   value={observaciones}
                   onChange={e => setObservaciones(e.target.value)}
-                  placeholder="Detalles sobre entrega de activos, liquidación final de cesantías, examen médico de egreso, etc."
+                  placeholder="Detalles sobre entrega de activos, liquidación de prestaciones, examen de egreso, etc."
                   rows={2}
                   className="w-full p-2 bg-white border border-rose-300 rounded text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-rose-500"
                 />
               </div>
 
               <div className="text-[11px] text-rose-800 bg-white p-2.5 rounded border border-rose-200">
-                <strong>Efecto en el sistema:</strong> El colaborador no figurará en las listas de personal activo ni en procesos de nómina corriente. Su historial laboral, dotaciones y evaluaciones se conservarán de forma inmutable.
+                <strong>Regla de negocio:</strong> El expediente no se eliminará físicamente. Se conservará la bitácora inmutable en su historial laboral para fines de auditoría ante el Ministerio de Trabajo y UGPP.
               </div>
             </div>
           )}
 
-          {nuevoEstado === 'inactivo' && (
-            <div className="p-3.5 bg-amber-50/60 rounded-lg border border-amber-200 space-y-3 animate-in fade-in">
+          {(nuevoEstado === 'Inactivo' || nuevoEstado === 'Suspensión' || nuevoEstado === 'Licencia') && (
+            <div className="p-3.5 bg-amber-50/70 rounded-lg border border-amber-200 space-y-3 animate-in fade-in">
               <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <span>Datos de la Novedad de Suspensión Temporal</span>
+                <span>Datos de la Novedad Laboral ({nuevoEstado})</span>
               </div>
 
               <div>
                 <label className="block font-semibold text-amber-950 mb-1">
-                  Motivo de la Suspensión o Inactivación *
+                  Motivo de la Novedad *
                 </label>
                 <select
                   value={motivoInactivacion}
@@ -306,31 +312,27 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
 
               <div>
                 <label className="block font-semibold text-amber-950 mb-1">
-                  Detalle / Justificación de la Novedad (Opcional)
+                  Detalle / Justificación de la Novedad
                 </label>
                 <textarea
                   value={observaciones}
                   onChange={e => setObservaciones(e.target.value)}
-                  placeholder="Ej: Radicado de incapacidad EPS No. 89234 o período autorizado de licencia..."
+                  placeholder="Ej: Radicado de incapacidad médica EPS No. 129384, período autorizado, o sanción..."
                   rows={2}
                   className="w-full p-2 bg-white border border-amber-300 rounded text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                 />
               </div>
-
-              <div className="text-[11px] text-amber-800 bg-white p-2.5 rounded border border-amber-200">
-                <strong>Efecto en el sistema:</strong> El colaborador mantiene su contrato vigente pero se marca en suspensión temporal de actividades. Podrá reactivarse en cualquier momento cuando retome labores.
-              </div>
             </div>
           )}
 
-          {nuevoEstado === 'activo' && estadoActualInicial !== 'activo' && (
+          {nuevoEstado === 'Activo' && estadoActualInicial !== 'Activo' && (
             <div className="p-3.5 bg-emerald-50 rounded-lg border border-emerald-200 space-y-2 animate-in fade-in">
               <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-xs">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 <span>Reincorporación a Estado Activo</span>
               </div>
               <p className="text-[11px] text-emerald-800">
-                El colaborador será habilitado nuevamente como personal plenamente activo en la organización y podrá participar en solicitudes, dotaciones y evaluaciones periódicas.
+                El colaborador será habilitado como personal plenamente activo en la organización y podrá participar en nómina, dotaciones, capacitaciones y evaluaciones técnicas.
               </p>
             </div>
           )}

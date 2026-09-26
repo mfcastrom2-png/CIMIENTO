@@ -175,24 +175,261 @@ export interface ContratoEmpleado {
   salario: string;
 }
 
+// ==========================================
+// SUB-ENTIDADES CONCEPTUALES DEL EMPLEADO (EXPEDIENTE DIGITAL)
+// Persona → Empleado → Contrato → Cargo → Compensación → Seguridad Social → Documentos → Historial
+// ==========================================
+
+export interface PersonaEmpleado {
+  tipoDocumento: string; // CC, CE, Pasaporte, PPT, PEP
+  numeroDocumento: string;
+  primerNombre: string;
+  segundoNombre?: string;
+  primerApellido: string;
+  segundoApellido?: string;
+  fechaNacimiento: string;
+  lugarNacimiento?: string;
+  nacionalidad: string;
+  genero: string;
+  estadoCivil: string;
+  fotoUrl?: string;
+}
+
+export interface ContactoResidenciaEmpleado {
+  direccion: string;
+  departamento: string;
+  ciudad: string;
+  barrio?: string;
+  codigoPostal?: string;
+  telefonoFijo?: string;
+  celular: string;
+  correoPersonal: string;
+  correoCorporativo?: string;
+  contactoEmergenciaNombre: string;
+  contactoEmergenciaParentesco: string;
+  contactoEmergenciaTelefono: string;
+}
+
+export type EstadoColaborador =
+  | 'Preingreso'
+  | 'Activo'
+  | 'Vacaciones'
+  | 'Licencia'
+  | 'Suspensión'
+  | 'Inactivo'
+  | 'Retirado';
+
+export interface DatosLaboralesEmpleado {
+  codigoInterno: string;
+  fechaIngreso: string;
+  fechaInicioLaboral: string;
+  areaId: string;
+  areaNombre?: string;
+  cargoId: string;
+  cargoNombre?: string;
+  jefeInmediatoId?: string;
+  jefeInmediatoNombre?: string;
+  centroCostos?: string;
+  tipoContrato: string;
+  fechaInicioContrato: string;
+  fechaTerminacionContrato?: string;
+  jornadaLaboral: string;
+  modalidadTrabajo: 'Presencial' | 'Híbrida' | 'Trabajo remoto' | 'Teletrabajo';
+  lugarTrabajo: string;
+  estado: EstadoColaborador;
+}
+
+export interface HistorialCargoEmpleado {
+  id: string;
+  cargoId: string;
+  cargoNombre: string;
+  areaNombre: string;
+  fechaInicio: string;
+  fechaFin?: string;
+  motivoCambio: string;
+  usuarioRegistro?: string;
+}
+
+export interface VigenciaSalarialEmpleado {
+  id: string;
+  salarioAnterior: number;
+  nuevoSalario: number;
+  tipoSalario: 'Ordinario' | 'Integral' | 'Por comisión' | string;
+  fechaVigencia: string;
+  fechaRegistro: string;
+  motivoCambio: string;
+  usuarioRegistro?: string;
+  aplicaAuxilioTransporte: boolean;
+}
+
+export interface CompensacionEmpleado {
+  salarioBasico: number;
+  tipoSalario: 'Ordinario' | 'Integral' | 'Por comisión' | string;
+  periodicidadPago: 'Quincenal' | 'Mensual';
+  auxilioTransporte: boolean;
+  bonificaciones?: number;
+  comisiones?: number;
+  otrosConceptosSalariales?: number;
+  otrosConceptosNoSalariales?: number;
+  formaPago: 'Transferencia bancaria' | 'Cheque' | 'Efectivo';
+  banco: string;
+  tipoCuenta: 'Ahorros' | 'Corriente';
+  numeroCuenta: string;
+  historialVigencias: VigenciaSalarialEmpleado[];
+}
+
+export interface SeguridadSocialEmpleado {
+  eps: string;
+  fondoPensiones: string;
+  arl: string;
+  nivelRiesgoArl: 'I (0.522%)' | 'II (1.044%)' | 'III (2.436%)' | 'IV (4.350%)' | 'V (6.960%)';
+  cajaCompensacion: string;
+  fondoCesantias: string;
+  fechaAfiliacion: string;
+  estadoAfiliacion: 'Activa' | 'En trámite' | 'Retirada';
+  tipoAfiliacion: 'Cotizante Dependiente' | 'Aprendiz' | 'Practicante' | string;
+}
+
+export interface EstudioAcademicoEmpleado {
+  id: string;
+  nivelEducativo: 'Primaria' | 'Bachillerato' | 'Técnico' | 'Tecnólogo' | 'Profesional' | 'Especialización' | 'Maestría' | 'Doctorado' | string;
+  programa: string;
+  tituloObtenido: string;
+  institucion: string;
+  ciudad?: string;
+  fechaInicio: string;
+  fechaFin: string;
+  fechaGraduacion?: string;
+  estado: 'Graduado' | 'En curso' | 'Aplazado' | 'Incompleto';
+  tarjetaProfesional?: string;
+  soporteUrl?: string;
+}
+
+export interface ExperienciaLaboralEmpleado {
+  id: string;
+  empresa: string;
+  cargo: string;
+  fechaIngreso: string;
+  fechaRetiro: string;
+  mesesExperiencia?: number;
+  funcionesPrincipales: string;
+  tipoVinculo?: string;
+  contactoReferencia?: string;
+  soporteUrl?: string;
+}
+
+export interface ExamenOcupacionalEmpleado {
+  id: string;
+  fecha: string;
+  tipoExamen: 'Ingreso' | 'Periódico' | 'Egreso' | 'Posincapacidad' | 'Reubicación' | string;
+  entidadIps: string;
+  conceptoAptitud: 'Apto' | 'Apto con recomendaciones' | 'Apto con restricciones' | 'No apto' | 'Pendiente' | string;
+  restricciones?: string;
+  recomendaciones?: string;
+  fechaProximoExamen?: string;
+  confidencialMedico: boolean;
+  medicoEvaluador?: string;
+  licenciaSst?: string;
+  enfasisExamen?: string;
+  estado?: 'Programado' | 'Realizado' | 'Pendiente' | 'Cancelado';
+  observaciones?: string;
+  empleadoId?: string;
+  empleadoNombre?: string;
+  cargoNombre?: string;
+}
+
+export interface InfoSstEmpleado {
+  examenesOcupacionales: ExamenOcupacionalEmpleado[];
+  restriccionesActivas?: string;
+  conceptoAptitudVigente?: 'Apto' | 'Apto con recomendaciones' | 'Apto con restricciones' | 'No apto' | 'Pendiente' | string;
+  dotacionesEntregadasIds?: string[];
+  capacitacionesCompletadasIds?: string[];
+  incidentesRelacionadosIds?: string[];
+}
+
+export interface DocumentoExpedienteEmpleado {
+  id: string;
+  tipoDocumento:
+    | 'Documento de Identidad'
+    | 'Hoja de Vida'
+    | 'Contrato Laboral'
+    | 'Otrosí'
+    | 'Certificado Académico'
+    | 'Certificación Laboral'
+    | 'Afiliación EPS'
+    | 'Afiliación AFP'
+    | 'Afiliación ARL'
+    | 'Examen Ocupacional'
+    | 'Certificación Bancaria'
+    | 'Otro';
+  nombreArchivo: string;
+  fechaCarga: string;
+  fechaExpedicion?: string;
+  fechaVencimiento?: string;
+  usuarioCarga?: string;
+  urlArchivo: string;
+  observaciones?: string;
+  estado: 'Vigente' | 'Vencido' | 'Por Renovar';
+}
+
+export interface EventoHistorialLaboral {
+  id: string;
+  fechaHora: string;
+  usuario: string;
+  accion:
+    | 'CREACION'
+    | 'CAMBIO_CARGO'
+    | 'CAMBIO_SALARIO'
+    | 'CAMBIO_CONTRATO'
+    | 'CAMBIO_MODALIDAD'
+    | 'CAMBIO_DATOS'
+    | 'SUSPENSION'
+    | 'VACACIONES'
+    | 'LICENCIA'
+    | 'REINTEGRO'
+    | 'INACTIVACION'
+    | 'RETIRO';
+  titulo: string;
+  motivo?: string;
+  valorAnterior?: string;
+  valorNuevo?: string;
+}
+
 export interface Empleado {
   id: string;
   empresaId?: string; // Multi-Tenancy
+  codigo?: string;
+  codigoInterno?: string;
   nombre: string;
   documento: string;
+  tipoDocumento?: string;
   email: string;
   telefono: string;
   cargoId: string;
+  areaId?: string;
   formacion: string;
   experiencia: string;
   salarioBase?: number;
   contrato: ContratoEmpleado;
   familia: Familiar[];
   activo: boolean;
-  estadoLaboral?: 'activo' | 'inactivo' | 'retirado';
+  estadoLaboral?: 'activo' | 'inactivo' | 'retirado' | EstadoColaborador;
   fechaRetiro?: string;
   motivoRetiro?: string;
   observacionesRetiro?: string;
+
+  // Expediente Digital Normalizado en 10 Pestañas
+  persona?: PersonaEmpleado;
+  contacto?: ContactoResidenciaEmpleado;
+  laboral?: DatosLaboralesEmpleado;
+  historialCargos?: HistorialCargoEmpleado[];
+  compensacion?: CompensacionEmpleado;
+  seguridadSocial?: SeguridadSocialEmpleado;
+  estudios?: EstudioAcademicoEmpleado[];
+  experiencias?: ExperienciaLaboralEmpleado[];
+  sst?: InfoSstEmpleado;
+  documentos?: DocumentoExpedienteEmpleado[];
+  historialLaboral?: EventoHistorialLaboral[];
 }
 
 export interface Solicitud {

@@ -435,10 +435,30 @@ export const suscribirColeccion = <T>(
   return () => {};
 };
 
+// Función utilitaria para sanitizar objetos antes de persistir en Cloud Firestore
+// Elimina propiedades undefined recursivamente para evitar excepciones "Unsupported field value: undefined"
+export const limpiarParaFirestore = <T>(obj: T): T => {
+  if (obj === undefined) return null as any;
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj instanceof Date) return obj.toISOString() as any;
+  if (Array.isArray(obj)) {
+    return obj
+      .filter(item => item !== undefined)
+      .map(item => limpiarParaFirestore(item)) as any;
+  }
+  const limpio: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      limpio[key] = limpiarParaFirestore(value);
+    }
+  }
+  return limpio as T;
+};
+
 // 4. Operaciones de Escritura y Actualización
 export const guardarEmpleadoFB = async (empleado: Empleado, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'empleados', empleado.id);
-  const data = { ...empleado, empresaId: empleado.empresaId || 'empresa-a' };
+  const data = limpiarParaFirestore({ ...empleado, empresaId: empleado.empresaId || 'empresa-a' });
   await setDoc(docRef, data, { merge: true });
   await registrarEventoAuditoria(
     'ACTUALIZACION',
@@ -462,7 +482,7 @@ export const eliminarEmpleadoFB = async (id: string, nombreColaborador?: string,
 
 export const guardarCargoFB = async (cargo: Cargo, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'cargos', cargo.id);
-  const data = { ...cargo, empresaId: cargo.empresaId || 'empresa-a' };
+  const data = limpiarParaFirestore({ ...cargo, empresaId: cargo.empresaId || 'empresa-a' });
   await setDoc(docRef, data, { merge: true });
   await registrarEventoAuditoria(
     'ACTUALIZACION',
@@ -486,7 +506,7 @@ export const eliminarCargoFB = async (id: string, nombre?: string, autor?: Usuar
 
 export const guardarAreaFB = async (area: AreaOrganizacion, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'areas', area.id);
-  const data = { ...area, empresaId: area.empresaId || autor?.empresaId || 'empresa-a' };
+  const data = limpiarParaFirestore({ ...area, empresaId: area.empresaId || autor?.empresaId || 'empresa-a' });
   await setDoc(docRef, data, { merge: true });
   await registrarEventoAuditoria(
     'ACTUALIZACION',
@@ -510,7 +530,7 @@ export const eliminarAreaFB = async (id: string, nombre?: string, autor?: Usuari
 
 export const guardarProcesoFB = async (proceso: ProcesoOrganizacion, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'procesos', proceso.id);
-  const data = { ...proceso, empresaId: proceso.empresaId || autor?.empresaId || 'empresa-a' };
+  const data = limpiarParaFirestore({ ...proceso, empresaId: proceso.empresaId || autor?.empresaId || 'empresa-a' });
   await setDoc(docRef, data, { merge: true });
   await registrarEventoAuditoria(
     'ACTUALIZACION',

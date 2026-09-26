@@ -360,6 +360,8 @@ function AppLayout() {
                   <EmpleadosView
                     empleados={empleados}
                     cargos={cargos}
+                    areas={areas}
+                    procesos={procesos}
                     solicitudes={solicitudes}
                     evaluaciones={evaluaciones}
                     onAddEmpleado={handleAddEmpleado}
@@ -431,6 +433,23 @@ function AppLayout() {
                     userRole={userRole}
                     currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     empleados={empleados}
+                    cargos={cargos}
+                    areas={areas}
+                    onUpdateEmpleado={handleUpdateEmpleado}
+                  />
+                }
+              />
+              <Route
+                path="/sst-examenes"
+                element={
+                  <SstView
+                    userRole={userRole}
+                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
+                    empleados={empleados}
+                    cargos={cargos}
+                    areas={areas}
+                    initialTab="examenes"
+                    onUpdateEmpleado={handleUpdateEmpleado}
                   />
                 }
               />

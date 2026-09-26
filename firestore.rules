@@ -12,9 +12,16 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid));
     }
 
+    function isKnownSuperAdminEmail() {
+      return signedIn() && request.auth.token.email != null && (
+        request.auth.token.email in ['superadmin@test-cimiento.com', 'admin-a@test-cimiento.com', 'mf.castrom2@gmail.com']
+      );
+    }
+
     function hasRole(roles) {
       return signedIn() && (
         (request.auth.token.role != null && request.auth.token.role in roles) ||
+        (isKnownSuperAdminEmail() && 'superadmin' in roles) ||
         (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
          currentUser().data.rol in roles)
       );

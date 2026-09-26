@@ -15,8 +15,11 @@ import {
 } from '../data/sstData';
 import { VotacionesSstView } from './VotacionesSstView';
 import { EppInventarioView } from './EppInventarioView';
+import { ExamenesMedicosOcupacionalesView } from './ExamenesMedicosOcupacionalesView';
 import {
   Empleado,
+  Cargo,
+  AreaOrganizacion,
   Role
 } from '../types';
 import {
@@ -67,21 +70,33 @@ interface SstViewProps {
   userRole?: Role;
   currentEmpleadoId?: string;
   empleados?: Empleado[];
+  cargos?: Cargo[];
+  areas?: AreaOrganizacion[];
+  initialTab?: 'estandares' | 'gtc45' | 'comites' | 'epps' | 'votaciones' | 'indicadores' | 'planMejora' | 'examenes';
+  onUpdateEmpleado?: (empleado: Empleado) => Promise<void> | void;
 }
 
 export function SstView({
   userRole = 'admin',
   currentEmpleadoId = 'e6',
-  empleados = []
+  empleados = [],
+  cargos = [],
+  areas = [],
+  initialTab,
+  onUpdateEmpleado
 }: SstViewProps) {
   const [estandares, setEstandares] = useState<EstandarMinimoSST[]>(ESTANDARES_0312_2019_INICIALES);
   const [peligros, setPeligros] = useState<PeligroRiesgoGTC45[]>(PELIGROS_GTC45_INICIALES);
   const [actas, setActas] = useState<ActaComiteSST[]>(ACTAS_COMITES_INICIALES);
   const [estadisticas] = useState<EstadisticaSiniestralidadSST[]>(ESTADISTICAS_SINIESTRALIDAD_INICIALES);
 
-  const [activeTab, setActiveTab] = useState<'estandares' | 'gtc45' | 'comites' | 'epps' | 'votaciones' | 'indicadores' | 'planMejora'>(
-    userRole === 'empleado' ? 'votaciones' : 'estandares'
+  const [activeTab, setActiveTab] = useState<'estandares' | 'gtc45' | 'comites' | 'epps' | 'votaciones' | 'indicadores' | 'planMejora' | 'examenes'>(
+    initialTab || (userRole === 'empleado' ? 'votaciones' : 'estandares')
   );
+
+  const totalExamenesCount = useMemo(() => {
+    return empleados.reduce((acc, emp) => acc + (emp.sst?.examenesOcupacionales?.length || 0), 0);
+  }, [empleados]);
   const [filtroCiclo, setFiltroCiclo] = useState<string>('TODOS');
   const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
   const [searchEstandar, setSearchEstandar] = useState<string>('');
@@ -353,6 +368,20 @@ export function SstView({
                 {estandaresNoCumplen.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('examenes')}
+            className={`pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
+              activeTab === 'examenes'
+                ? 'border-[#18235C] text-[#18235C]'
+                : 'border-transparent text-[#282829] hover:text-[#18235C]'
+            }`}
+          >
+            <Stethoscope className="w-3.5 h-3.5 text-[#18235C]" />
+            Exámenes Médicos Ocupacionales
+            <span className="px-1.5 py-0.2 bg-[#18235C] text-white rounded-full text-[10px]">
+              {totalExamenesCount}
+            </span>
           </button>
         </div>
       </div>
@@ -949,6 +978,17 @@ export function SstView({
             </div>
           )}
         </div>
+      )}
+
+      {/* TAB 8: EXÁMENES MÉDICOS OCUPACIONALES */}
+      {activeTab === 'examenes' && (
+        <ExamenesMedicosOcupacionalesView
+          empleados={empleados}
+          cargos={cargos}
+          areas={areas}
+          userRole={userRole}
+          onUpdateEmpleado={onUpdateEmpleado}
+        />
       )}
     </div>
   );

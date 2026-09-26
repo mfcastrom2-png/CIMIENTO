@@ -419,6 +419,18 @@ export function CapacitacionesView({
   // Modal para ver Acta de Asistencia y Acreditación del curso (SG-SST)
   const [actaAsistenciaCap, setActaAsistenciaCap] = useState<Capacitacion | null>(null);
 
+  // Modal para consultar Cobertura y Tasa de Aprobación de una capacitación planificada
+  const [detalleIndicadorCap, setDetalleIndicadorCap] = useState<(Capacitacion & {
+    trimestre: string;
+    convocados: number;
+    asistentes: number;
+    pctCobertura: number;
+    evaluados: number;
+    aprobados: number;
+    pctAprobacion: number;
+    calificacionPromedio: number;
+  }) | null>(null);
+
   // Estado del Examen Interactivo
   const [activeExamCapacitacion, setActiveExamCapacitacion] = useState<Capacitacion | null>(null);
   const [examAnswers, setExamAnswers] = useState<Record<string, number>>({});
@@ -1195,6 +1207,18 @@ export function CapacitacionesView({
               </button>
             )}
 
+            {esAdmin && (
+              <button
+                type="button"
+                onClick={() => setModalConfigTiposOpen(true)}
+                className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-[#18235C] rounded-lg text-xs font-bold flex items-center gap-1.5 border border-[#8FA7D6] transition-colors shadow-2xs self-start sm:self-auto cursor-pointer"
+                title="Configurar y modificar los tipos / categorías de capacitación"
+              >
+                <Tag className="w-3.5 h-3.5 text-[#18235C]" />
+                <span>Tipos de Capacitación ({tiposCapacitacion.length})</span>
+              </button>
+            )}
+
             {/* Ficha del Colaborador o Selector Administrativo */}
             {userRole === 'empleado' ? (
               <div className="p-3 bg-white rounded-xl border border-[#8FA7D6]/40 text-xs min-w-[220px] shadow-2xs">
@@ -1640,7 +1664,7 @@ export function CapacitacionesView({
                   title="Configurar, agregar, editar o eliminar los tipos de capacitación"
                 >
                   <Settings className="w-3.5 h-3.5 text-[#18235C]" />
-                  <span>Configurar Tipos</span>
+                  <span>Modificar Tipos de Capacitación</span>
                 </button>
               )}
             </div>
@@ -1734,6 +1758,39 @@ export function CapacitacionesView({
                         </div>
 
                         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                          <button
+                            onClick={() => {
+                              const trimestre = obtenerTrimestre(cap.fechaProgramada);
+                              const convocados = cap.participantes.length;
+                              const asistentes = cap.participantes.filter(p => p.asistenciaConfirmada).length;
+                              const evaluados = cap.participantes.filter(p => p.evaluacionPresentada).length;
+                              const aprobados = cap.participantes.filter(p => p.aprobada).length;
+                              const pctCobertura = convocados > 0 ? Math.round((asistentes / convocados) * 100) : 0;
+                              const pctAprobacion = evaluados > 0 ? Math.round((aprobados / evaluados) * 100) : 0;
+                              const sumaNotas = cap.participantes
+                                .filter(p => p.evaluacionPresentada && typeof p.calificacionObtenida === 'number')
+                                .reduce((acc, p) => acc + (p.calificacionObtenida || 0), 0);
+                              const calificacionPromedio = evaluados > 0 ? Math.round(sumaNotas / evaluados) : 0;
+
+                              setDetalleIndicadorCap({
+                                ...cap,
+                                trimestre,
+                                convocados,
+                                asistentes,
+                                pctCobertura,
+                                evaluados,
+                                aprobados,
+                                pctAprobacion,
+                                calificacionPromedio
+                              });
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                            title="Consultar indicadores de Cobertura y Tasa de Aprobación de esta capacitación"
+                          >
+                            <TrendingUp className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>Indicadores</span>
+                          </button>
+
                           <button
                             onClick={() => setActaAsistenciaCap(cap)}
                             className="px-2.5 py-1.5 rounded-lg border border-[#8FA7D6] bg-white hover:bg-slate-100 text-[#18235C] text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
@@ -2154,6 +2211,18 @@ export function CapacitacionesView({
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
+
+                {esAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setModalConfigTiposOpen(true)}
+                    className="px-2.5 py-1.5 rounded-lg border border-[#8FA7D6] bg-white hover:bg-slate-50 text-[#18235C] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    title="Modificar los tipos de capacitación"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-[#18235C]" />
+                    <span>Modificar Tipos</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2259,6 +2328,14 @@ export function CapacitacionesView({
                           </td>
                           <td className="p-3 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => setDetalleIndicadorCap(c)}
+                                className="px-2.5 py-1 rounded bg-[#18235C] hover:bg-[#101740] text-white text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                title="Consultar ficha técnica de cobertura y tasa de aprobación"
+                              >
+                                <Eye className="w-3 h-3 text-[#00FF00]" />
+                                <span>Consultar</span>
+                              </button>
                               <button
                                 onClick={() => setActaAsistenciaCap(c)}
                                 className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[#18235C] text-[11px] font-bold border border-[#8FA7D6] transition-colors cursor-pointer"
@@ -3618,6 +3695,301 @@ export function CapacitacionesView({
               >
                 Cerrar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA CONSULTAR COBERTURA Y TASA DE APROBACIÓN DE LA CAPACITACIÓN PLANIFICADA */}
+      {detalleIndicadorCap && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-[#8FA7D6] max-w-4xl w-full p-6 sm:p-8 shadow-2xl relative my-8 print:border-none print:shadow-none space-y-6">
+            <button
+              onClick={() => setDetalleIndicadorCap(null)}
+              className="absolute top-4 right-4 text-[#282829] hover:text-[#18235C] font-bold p-1 print:hidden cursor-pointer text-lg"
+            >
+              ✕
+            </button>
+
+            {/* Encabezado Ficha Técnica */}
+            <div className="border-b border-[#8FA7D6] pb-4 space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#282829] flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded font-mono font-bold bg-[#18235C] text-white text-xs">
+                    Código: {detalleIndicadorCap.codigo}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                    {detalleIndicadorCap.tipo}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-[#18235C] border border-[#8FA7D6]">
+                    {detalleIndicadorCap.trimestre} (Fecha: {detalleIndicadorCap.fechaProgramada})
+                  </span>
+                </div>
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded border ${
+                  detalleIndicadorCap.estado === 'Finalizada' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
+                  detalleIndicadorCap.estado === 'En ejecución' ? 'bg-blue-50 text-blue-800 border-blue-300' :
+                  detalleIndicadorCap.estado === 'Cancelada' ? 'bg-rose-50 text-rose-800 border-rose-300' :
+                  'bg-amber-50 text-amber-800 border-amber-300'
+                }`}>
+                  Estado: {detalleIndicadorCap.estado || 'Programada'}
+                </span>
+              </div>
+
+              <h3 className="text-xl font-bold font-serif text-[#18235C]">
+                {detalleIndicadorCap.titulo}
+              </h3>
+              <p className="text-xs text-[#282829] leading-relaxed">
+                {detalleIndicadorCap.objetivo}
+              </p>
+
+              <div className="flex flex-wrap gap-4 text-xs text-[#282829] pt-1">
+                <span><strong>Facilitador:</strong> {detalleIndicadorCap.facilitador} ({detalleIndicadorCap.entidadFacilitadora || 'B GROUP'})</span>
+                <span><strong>Duración:</strong> {detalleIndicadorCap.duracionHoras} Horas</span>
+                <span><strong>Modalidad:</strong> {detalleIndicadorCap.modalidad}</span>
+                <span><strong>Horario:</strong> {detalleIndicadorCap.horaInicio}</span>
+              </div>
+            </div>
+
+            {/* Dos Grandes Indicadores de Gestión Cuantitativa */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Indicador 1: Cobertura de Asistencia */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-[#8FA7D6] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-[#18235C]">
+                    <UserCheck className="w-4 h-4 text-emerald-600" />
+                    <span>INDICADOR DE COBERTURA DE ASISTENCIA</span>
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                    detalleIndicadorCap.pctCobertura >= 85 ? 'bg-emerald-100 text-emerald-800' :
+                    detalleIndicadorCap.pctCobertura >= 60 ? 'bg-amber-100 text-amber-800' :
+                    'bg-rose-100 text-rose-800'
+                  }`}>
+                    Meta SG-SST: ≥ 85%
+                  </span>
+                </div>
+
+                <div className="flex items-baseline justify-between">
+                  <div className="text-3xl font-extrabold text-[#18235C]">
+                    {detalleIndicadorCap.pctCobertura}%
+                  </div>
+                  <span className={`text-xs font-bold ${
+                    detalleIndicadorCap.pctCobertura >= 85 ? 'text-emerald-700' :
+                    detalleIndicadorCap.pctCobertura >= 60 ? 'text-amber-700' :
+                    'text-rose-700'
+                  }`}>
+                    {detalleIndicadorCap.pctCobertura >= 85 ? '✓ Meta Cumplida' :
+                     detalleIndicadorCap.pctCobertura >= 60 ? '⚠ Alerta Cobertura Media' :
+                     '✕ Baja Cobertura'}
+                  </span>
+                </div>
+
+                <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-500 ${
+                      detalleIndicadorCap.pctCobertura >= 85 ? 'bg-emerald-600' :
+                      detalleIndicadorCap.pctCobertura >= 60 ? 'bg-amber-500' :
+                      'bg-rose-500'
+                    }`}
+                    style={{ width: `${Math.min(detalleIndicadorCap.pctCobertura, 100)}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#8FA7D6]/40 text-center text-xs">
+                  <div className="bg-white p-2 rounded-lg border border-[#8FA7D6]/40">
+                    <span className="text-[10px] text-[#282829] block">Convocados</span>
+                    <strong className="text-sm text-[#18235C]">{detalleIndicadorCap.convocados}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-[#8FA7D6]/40">
+                    <span className="text-[10px] text-[#282829] block">Asistentes</span>
+                    <strong className="text-sm text-emerald-700">{detalleIndicadorCap.asistentes}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-[#8FA7D6]/40">
+                    <span className="text-[10px] text-[#282829] block">Inasistentes</span>
+                    <strong className="text-sm text-rose-700">{Math.max(0, detalleIndicadorCap.convocados - detalleIndicadorCap.asistentes)}</strong>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-[#282829] italic bg-white p-2 rounded border border-[#8FA7D6]/30">
+                  <strong>Fórmula Res. 0312:</strong> (Colaboradores Asistentes / Colaboradores Convocados) × 100
+                </div>
+              </div>
+
+              {/* Indicador 2: Tasa de Aprobación */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-[#8FA7D6] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-[#18235C]">
+                    <Award className="w-4 h-4 text-blue-600" />
+                    <span>INDICADOR DE TASA DE APROBACIÓN TÉCNICA</span>
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                    detalleIndicadorCap.pctAprobacion >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                    detalleIndicadorCap.pctAprobacion >= 60 ? 'bg-amber-100 text-amber-800' :
+                    'bg-rose-100 text-rose-800'
+                  }`}>
+                    Meta SG-SST: ≥ 80%
+                  </span>
+                </div>
+
+                <div className="flex items-baseline justify-between">
+                  <div className="text-3xl font-extrabold text-[#18235C]">
+                    {detalleIndicadorCap.pctAprobacion}%
+                  </div>
+                  <span className={`text-xs font-bold ${
+                    detalleIndicadorCap.pctAprobacion >= 80 ? 'text-emerald-700' :
+                    detalleIndicadorCap.pctAprobacion >= 60 ? 'text-amber-700' :
+                    'text-rose-700'
+                  }`}>
+                    {detalleIndicadorCap.pctAprobacion >= 80 ? '✓ Competencia Asimilada' :
+                     detalleIndicadorCap.pctAprobacion >= 60 ? '⚠ Requiere Refuerzo' :
+                     '✕ Bajo Desempeño'}
+                  </span>
+                </div>
+
+                <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-500 ${
+                      detalleIndicadorCap.pctAprobacion >= 80 ? 'bg-emerald-600' :
+                      detalleIndicadorCap.pctAprobacion >= 60 ? 'bg-amber-500' :
+                      'bg-rose-500'
+                    }`}
+                    style={{ width: `${Math.min(detalleIndicadorCap.pctAprobacion, 100)}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#8FA7D6]/40 text-center text-xs">
+                  <div className="bg-white p-2 rounded-lg border border-[#8FA7D6]/40">
+                    <span className="text-[10px] text-[#282829] block">Evaluados</span>
+                    <strong className="text-sm text-[#18235C]">{detalleIndicadorCap.evaluados}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-[#8FA7D6]/40">
+                    <span className="text-[10px] text-[#282829] block">Aprobados</span>
+                    <strong className="text-sm text-emerald-700">{detalleIndicadorCap.aprobados}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-[#8FA7D6]/40">
+                    <span className="text-[10px] text-[#282829] block">Nota Promedio</span>
+                    <strong className="text-sm text-blue-700">{detalleIndicadorCap.calificacionPromedio}%</strong>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-[#282829] italic bg-white p-2 rounded border border-[#8FA7D6]/30">
+                  <strong>Fórmula Res. 0312:</strong> (Colaboradores Aprobados / Colaboradores Evaluados) × 100 (Exigencia: {detalleIndicadorCap.examenConocimiento?.notaMinimaAprobatoria || 80}%)
+                </div>
+              </div>
+            </div>
+
+            {/* Listado Nominal de Colaboradores de esta capacitación */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-[#18235C] flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-[#18235C]" />
+                  Población Convocada y Resultados Individuales ({detalleIndicadorCap.participantes.length} trabajadores)
+                </span>
+                <span className="text-[11px] text-[#282829]">
+                  {detalleIndicadorCap.asistentes} asistieron • {detalleIndicadorCap.aprobados} certificados
+                </span>
+              </div>
+
+              <div className="overflow-x-auto border border-[#8FA7D6] rounded-xl max-h-60 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#18235C] text-white text-[11px] sticky top-0">
+                    <tr>
+                      <th className="p-2.5">Colaborador</th>
+                      <th className="p-2.5">Documento</th>
+                      <th className="p-2.5">Cargo</th>
+                      <th className="p-2.5 text-center">Asistencia</th>
+                      <th className="p-2.5 text-center">Calificación</th>
+                      <th className="p-2.5 text-right">Resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#8FA7D6]/40">
+                    {detalleIndicadorCap.participantes.map(p => {
+                      const emp = empleados.find(e => e.id === p.empleadoId);
+                      const cargo = cargos.find(c => c.id === p.cargoId);
+                      return (
+                        <tr key={p.empleadoId} className="hover:bg-slate-50">
+                          <td className="p-2 font-bold text-[#18235C]">{emp?.nombre || 'Colaborador'}</td>
+                          <td className="p-2 font-mono text-[11px] text-[#282829]">{emp?.documento || '—'}</td>
+                          <td className="p-2 text-[11px] text-[#282829]">{cargo?.nombre || '—'}</td>
+                          <td className="p-2 text-center">
+                            {p.asistenciaConfirmada ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                ✓ Asistió
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                Sin Asistir
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2 text-center font-bold">
+                            {p.evaluacionPresentada ? (
+                              <span className={p.aprobada ? 'text-emerald-700' : 'text-rose-700'}>
+                                {p.calificacionObtenida}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-[10px]">Pendiente</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-right">
+                            {p.aprobada ? (
+                              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                                Acreditado
+                              </span>
+                            ) : p.evaluacionPresentada ? (
+                              <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
+                                Reprobado
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-500">Por Evaluar</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Acciones y Cierre */}
+            <div className="flex justify-between items-center pt-4 border-t border-[#8FA7D6] print:hidden flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActaAsistenciaCap(detalleIndicadorCap)}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-[#18235C] font-bold text-xs rounded-lg border border-[#8FA7D6] flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#18235C]" />
+                  <span>Ver Acta Oficial SG-SST</span>
+                </button>
+                {esAdmin && (
+                  <button
+                    onClick={() => {
+                      setGestionParticipantesCap(detalleIndicadorCap);
+                      setDetalleIndicadorCap(null);
+                    }}
+                    className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-bold text-xs rounded-lg border border-indigo-200 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <UserCheck className="w-3.5 h-3.5 text-indigo-700" />
+                    <span>Gestionar Asistencias</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5 text-[#00FF00]" />
+                  <span>Imprimir Ficha de Indicadores</span>
+                </button>
+                <button
+                  onClick={() => setDetalleIndicadorCap(null)}
+                  className="px-4 py-2 border border-[#8FA7D6] text-[#282829] hover:bg-slate-50 text-xs font-semibold rounded-lg cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>

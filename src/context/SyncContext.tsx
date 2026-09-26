@@ -126,6 +126,13 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [cargos, setCargos] = useState<Cargo[]>(() => shouldOmitMocks ? [] : initialCargos);
   const [empleados, setEmpleados] = useState<Empleado[]>(() => {
+    try {
+      const cached = localStorage.getItem('bgroup_empleados_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
     return shouldOmitMocks ? [] : initialEmpleados;
   });
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>(() => {
@@ -170,7 +177,22 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         obtenerColeccionDirecta<AreaOrganizacion>('areas')
       ]);
 
-      setEmpleados(resEmp.items);
+      if (resEmp.items && resEmp.items.length > 0) {
+        setEmpleados(resEmp.items);
+        try {
+          localStorage.setItem('bgroup_empleados_cache', JSON.stringify(resEmp.items));
+        } catch {}
+      } else {
+        try {
+          const cached = localStorage.getItem('bgroup_empleados_cache');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setEmpleados(parsed);
+            }
+          }
+        } catch {}
+      }
       setCursorUltimoEmpleado(resEmp.ultimoDoc);
       setHayMasEmpleadosNube(resEmp.hayMas);
 
@@ -291,7 +313,13 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Handlers con Trazabilidad Inmutable
   const handleAddEmpleado = async (empleado: Empleado) => {
-    setEmpleados(prev => [...prev, empleado]);
+    setEmpleados(prev => {
+      const updated = [...prev.filter(e => e.id !== empleado.id), empleado];
+      try {
+        localStorage.setItem('bgroup_empleados_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     try {
       await guardarEmpleadoFB(empleado, currentUser);
     } catch (err) {
@@ -300,7 +328,13 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleUpdateEmpleado = async (empleado: Empleado) => {
-    setEmpleados(prev => prev.map(e => e.id === empleado.id ? empleado : e));
+    setEmpleados(prev => {
+      const updated = prev.map(e => e.id === empleado.id ? empleado : e);
+      try {
+        localStorage.setItem('bgroup_empleados_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     try {
       await guardarEmpleadoFB(empleado, currentUser);
     } catch (err) {
@@ -310,7 +344,13 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleDeleteEmpleado = async (id: string) => {
     const victima = empleados.find(e => e.id === id);
-    setEmpleados(prev => prev.filter(e => e.id !== id));
+    setEmpleados(prev => {
+      const updated = prev.filter(e => e.id !== id);
+      try {
+        localStorage.setItem('bgroup_empleados_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     try {
       await eliminarEmpleadoFB(id, victima?.nombre, currentUser);
     } catch (err) {
