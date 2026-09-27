@@ -73,7 +73,8 @@ export const EppInventarioView: React.FC<EppInventarioViewProps> = ({
       setModalDepurarEppOpen(false);
       setTimeout(() => setMensajeDepurarEpp(null), 5000);
     } catch (e: any) {
-      alert("Error al depurar EPPs: " + e.message);
+      setMensajeDepurarEpp("Error al depurar EPPs: " + (e?.message || 'Error en servidor'));
+      setTimeout(() => setMensajeDepurarEpp(null), 5000);
     } finally {
       setDepurandoEpp(false);
     }
@@ -227,6 +228,16 @@ export const EppInventarioView: React.FC<EppInventarioViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Notificación */}
+      {mensajeDepurarEpp && (
+        <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-semibold flex items-center justify-between shadow-xs">
+          <span>{mensajeDepurarEpp}</span>
+          <button onClick={() => setMensajeDepurarEpp(null)} className="text-blue-600 hover:text-blue-800 font-bold ml-2">
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Top Banner & Action Header */}
       <div className="bg-white rounded-xl border border-[#8FA7D6] p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

@@ -14,9 +14,12 @@ import {
   ExamenOcupacionalEmpleado,
   DocumentoExpedienteEmpleado,
   EventoHistorialLaboral,
-  ProcesoOrganizacion
+  ProcesoOrganizacion,
+  ConfiguracionEmpresa,
+  CentroTrabajo
 } from '../types';
-import { obtenerParametrosConfigurados } from '../services/payrollEngine';
+import { obtenerParametrosConfigurados, esContratoSinNominaLaboral } from '../services/payrollEngine';
+import { initialEmpresa } from '../data/initialData';
 import {
   DEPARTAMENTOS_COLOMBIA,
   TIPOS_DOCUMENTO_COLOMBIA,
@@ -63,13 +66,19 @@ import {
   Check,
   X,
   Stethoscope,
-  Edit3
+  Edit3,
+  HardDrive,
+  ExternalLink
 } from 'lucide-react';
 import { uid } from '../data/initialData';
+import { DriveLinkField } from './common/DriveLinkField';
+import { formatDriveDirectUrl, formatDriveViewUrl, isGoogleDriveUrl } from '../utils/driveUtils';
 
 interface ModalNuevoEmpleadoWizardProps {
   cargos: Cargo[];
   empleados: Empleado[];
+  empresa?: ConfiguracionEmpresa;
+  centrosTrabajo?: CentroTrabajo[];
   areas?: AreaOrganizacion[];
   procesos?: ProcesoOrganizacion[];
   currentUser?: UsuarioSistema | null;
@@ -85,6 +94,8 @@ interface ModalNuevoEmpleadoWizardProps {
 export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> = ({
   cargos,
   empleados,
+  empresa,
+  centrosTrabajo,
   areas = [],
   procesos = [],
   currentUser,
@@ -94,6 +105,9 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
   onVerExpediente
 }) => {
   const isEditing = Boolean(empleadoAEditar);
+  const centrosTrabajoDisponibles = useMemo(() => {
+    return empresa?.centrosTrabajo || centrosTrabajo || initialEmpresa.centrosTrabajo || [];
+  }, [empresa, centrosTrabajo]);
 
   // Pestaña activa (1 a 10)
   const [tabActual, setTabActual] = useState<number>(1);
@@ -474,6 +488,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
   // Nuevo documento temporal
   const [nuevoDocTipo, setNuevoDocTipo] = useState(TIPOS_DOCUMENTOS_EXPEDIENTE[0]);
   const [nuevoDocNombre, setNuevoDocNombre] = useState('');
+  const [nuevoDocUrlDrive, setNuevoDocUrlDrive] = useState('');
   const [nuevoDocObs, setNuevoDocObs] = useState('');
 
   // Creación simultánea de usuario de sistema
@@ -802,12 +817,13 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
       nombreArchivo: nuevoDocNombre.trim(),
       fechaCarga: new Date().toISOString().slice(0, 10),
       usuarioCarga: currentUser?.nombre || 'Admin GH',
-      urlArchivo: '#',
+      urlArchivo: nuevoDocUrlDrive.trim() || '#',
       estado: 'Vigente',
       observaciones: nuevoDocObs.trim() || undefined
     };
     setDocumentos(prev => [nuevo, ...prev]);
     setNuevoDocNombre('');
+    setNuevoDocUrlDrive('');
     setNuevoDocObs('');
   };
 
@@ -990,7 +1006,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
         )}
 
         {/* Cuerpo del Formulario por Pestañas */}
-        <form onSubmit={handleSubmitFinal} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 text-xs">
+        <form noValidate onSubmit={handleSubmitFinal} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 text-xs">
           {/* ========================================================================= */}
           {/* PESTAÑA 1: IDENTIFICACIÓN */}
           {/* ========================================================================= */}
@@ -1141,15 +1157,50 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                   </select>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-[#18235C] mb-1">Foto o Avatar URL</label>
-                  <input
-                    type="text"
-                    placeholder="https://... o en blanco para avatar oficial"
-                    value={fotoUrl}
-                    onChange={e => setFotoUrl(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-mono text-[11px]"
-                  />
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-[#18235C] text-xs">Foto del Colaborador</label>
+                    {fotoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setFotoUrl('')}
+                        className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold"
+                      >
+                        Quitar foto
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-[#8FA7D6] rounded-lg text-xs font-semibold text-[#18235C] cursor-pointer flex items-center gap-1 shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Cargar</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              setFotoUrl(ev.target?.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="O enlace Drive / URL de foto..."
+                      value={fotoUrl}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        setFotoUrl(isGoogleDriveUrl(raw) ? formatDriveDirectUrl(raw) : raw);
+                      }}
+                      className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-[#8FA7D6] rounded-lg font-mono text-[11px]"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1213,6 +1264,9 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     {DEPARTAMENTOS_COLOMBIA.map(d => (
                       <option key={d.nombre} value={d.nombre}>{d.nombre}</option>
                     ))}
+                    {departamento && !DEPARTAMENTOS_COLOMBIA.some(d => d.nombre === departamento) && (
+                      <option value={departamento}>{departamento}</option>
+                    )}
                   </select>
                 </div>
 
@@ -1223,6 +1277,9 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     onChange={e => setCiudad(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-semibold"
                   >
+                    {ciudad && !municipiosDisponibles.includes(ciudad) && (
+                      <option value={ciudad}>{ciudad}</option>
+                    )}
                     {municipiosDisponibles.map(m => (
                       <option key={m} value={m}>{m}</option>
                     ))}
@@ -1357,7 +1414,6 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                   <label className="block font-bold text-[#18235C] mb-1">Código Interno de Empleado *</label>
                   <input
                     type="text"
-                    required
                     placeholder="EMP-001"
                     value={codigoInterno}
                     onChange={e => setCodigoInterno(e.target.value)}
@@ -1378,7 +1434,6 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                   <label className="block font-bold text-[#18235C] mb-1">Fecha de Ingreso a la Empresa *</label>
                   <input
                     type="date"
-                    required
                     value={fechaIngreso}
                     onChange={e => {
                       setFechaIngreso(e.target.value);
@@ -1495,7 +1550,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                   <select
                     value={tipoContrato}
                     onChange={e => setTipoContrato(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-semibold"
+                    className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold text-[#18235C]"
                   >
                     {TIPOS_CONTRATO_COLOMBIA.map(tc => (
                       <option key={tc} value={tc}>{tc}</option>
@@ -1504,10 +1559,41 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                 </div>
 
                 <div>
+                  <label className="block font-bold text-[#18235C] mb-1">Centro de Trabajo / Lugar Asignado *</label>
+                  <select
+                    value={lugarTrabajo}
+                    onChange={e => setLugarTrabajo(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-semibold text-[#18235C]"
+                  >
+                    {centrosTrabajoDisponibles.map(ct => (
+                      <option key={ct.id} value={ct.nombre}>
+                        {ct.nombre} {ct.codigo ? `(${ct.codigo})` : ''} — Riesgo ARL {ct.claseRiesgoARL} ({ct.ciudad})
+                      </option>
+                    ))}
+                    {lugarTrabajo && !centrosTrabajoDisponibles.some(ct => ct.nombre === lugarTrabajo) && (
+                      <option value={lugarTrabajo}>{lugarTrabajo}</option>
+                    )}
+                  </select>
+                </div>
+
+                {esContratoSinNominaLaboral(tipoContrato) && (
+                  <div className="sm:col-span-2 md:col-span-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start gap-2 animate-fade-in shadow-2xs">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block text-amber-950 font-bold">
+                        Efecto en Nómina y Prestaciones Sociales:
+                      </strong>
+                      <span>
+                        El tipo de vinculación <strong>"{tipoContrato}"</strong> no genera relación laboral dependiente CST. En el módulo de nómina no causará prestaciones sociales patronales (cesantías, prima, vacaciones) ni cotización a aportes de nómina ordinaria.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div>
                   <label className="block font-bold text-[#18235C] mb-1">Fecha Inicio Contrato *</label>
                   <input
                     type="date"
-                    required
                     value={fechaInicioContrato}
                     onChange={e => setFechaInicioContrato(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold"
@@ -1753,7 +1839,6 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                   <input
                     type="number"
                     min={0}
-                    required
                     value={salarioBasico}
                     onChange={e => {
                       const val = parseInt(e.target.value, 10) || 0;
@@ -1958,6 +2043,9 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     onChange={e => setCajaCompensacion(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-semibold"
                   >
+                    {cajaCompensacion && !CCF_COLOMBIA.includes(cajaCompensacion) && (
+                      <option value={cajaCompensacion}>{cajaCompensacion}</option>
+                    )}
                     {CCF_COLOMBIA.map(item => (
                       <option key={item} value={item}>{item}</option>
                     ))}
@@ -2445,7 +2533,6 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                         </div>
                         <input
                           type="text"
-                          required
                           placeholder="Ej: IPS Médica Laboral del Oriente SAS, Colsanitas Ocupacional..."
                           value={formExamenIps}
                           onChange={e => setFormExamenIps(e.target.value)}
@@ -2459,7 +2546,6 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                         </label>
                         <textarea
                           rows={2}
-                          required
                           placeholder="Pausas activas cada 2 horas, hábitos posturales saludables, uso continuo de EPP, examen optométrico periódico..."
                           value={formExamenRecomendaciones}
                           onChange={e => setFormExamenRecomendaciones(e.target.value)}
@@ -2663,6 +2749,15 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     />
                   </div>
                 </div>
+
+                <DriveLinkField
+                  label="Enlace a Google Drive del Soporte Documental (Sin costo de hosting)"
+                  value={nuevoDocUrlDrive}
+                  onChange={setNuevoDocUrlDrive}
+                  placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                  helpText="Pegue la URL del archivo almacenado en Google Drive de su organización."
+                />
+
                 <div className="flex justify-end">
                   <button
                     type="button"
@@ -2670,7 +2765,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     disabled={!nuevoDocNombre.trim()}
                     className="px-3 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white rounded text-xs font-bold disabled:opacity-50 cursor-pointer"
                   >
-                    + Vincular Documento
+                    + Vincular Documento al Expediente
                   </button>
                 </div>
               </div>

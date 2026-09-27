@@ -31,6 +31,7 @@ import { AuditoriaView } from './components/AuditoriaView';
 import { EvaluacionDetalleModal } from './components/EvaluacionDetalleModal';
 import { LoginView } from './components/LoginView';
 import { GestionDatosModal } from './components/GestionDatosModal';
+import { EmpresaConfigView } from './components/EmpresaConfigView';
 
 import {
   Bell,
@@ -42,7 +43,8 @@ import {
   ShieldCheck,
   Lock,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Building2
 } from 'lucide-react';
 
 function AppLayout() {
@@ -88,7 +90,9 @@ function AppLayout() {
     handleLimpiarCapacitaciones,
     handleLimpiarEstructura,
     handleCatalogoCargado,
-    handleEmpleadosImportados
+    handleEmpleadosImportados,
+    empresa,
+    handleUpdateEmpresa
   } = useCompanySync();
 
   const navigate = useNavigate();
@@ -122,6 +126,7 @@ function AppLayout() {
         pendingRequestsCount={pendientesCount}
         currentUser={currentUser}
         onLogout={logout}
+        empresa={empresa}
       />
 
       {/* Main Content Area */}
@@ -132,6 +137,26 @@ function AppLayout() {
             <span className="hidden sm:inline-block text-xs font-semibold px-2.5 py-1 rounded-md bg-[#101740] text-[#8FA7D6] border border-[#8FA7D6]/30">
               {new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </span>
+
+            {/* Empresa Activa Badge */}
+            {empresa?.nombreComercial && (
+              <button
+                type="button"
+                onClick={() => (isSuperAdmin || currentUser?.rol === 'admin_gh') ? navigate('/empresa') : null}
+                className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#101740] border border-emerald-500/30 text-xs transition-colors shadow-2xs ${
+                  (isSuperAdmin || currentUser?.rol === 'admin_gh') ? 'hover:bg-[#18235C] cursor-pointer text-emerald-300' : 'cursor-default text-emerald-300'
+                }`}
+                title={empresa.razonSocial || 'Empresa Activa'}
+              >
+                <Building2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="font-bold text-white max-w-[180px] truncate">{empresa.nombreComercial}</span>
+                {empresa.nit && (
+                  <span className="text-[10px] text-emerald-400 font-mono">
+                    NIT {empresa.nit}{empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Botón de Refresco Bajo Demanda (eliminando onSnapshot) */}
             <button
@@ -306,6 +331,17 @@ function AppLayout() {
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route
+                path="/empresa"
+                element={
+                  <EmpresaConfigView
+                    empresa={empresa}
+                    onUpdateEmpresa={handleUpdateEmpresa}
+                    currentUser={currentUser}
+                    isSuperAdmin={isSuperAdmin}
+                  />
+                }
+              />
+              <Route
                 path="/dashboard"
                 element={
                   <DashboardView
@@ -349,7 +385,14 @@ function AppLayout() {
                 element={
                   <ManualCargosView
                     cargos={cargos}
+                    empresa={empresa}
                     onUpdateCargo={handleUpdateCargo}
+                    onUpdateCargoFicha={(cargoId, updatedFicha) => {
+                      const cargoActual = cargos.find(c => c.id === cargoId);
+                      if (cargoActual) {
+                        handleUpdateCargo({ ...cargoActual, ficha: updatedFicha });
+                      }
+                    }}
                     onAddCargo={handleAddCargo}
                   />
                 }
@@ -360,6 +403,7 @@ function AppLayout() {
                   <EmpleadosView
                     empleados={empleados}
                     cargos={cargos}
+                    empresa={empresa}
                     areas={areas}
                     procesos={procesos}
                     solicitudes={solicitudes}
@@ -405,6 +449,7 @@ function AppLayout() {
                   <SolicitudesView
                     solicitudes={solicitudes}
                     empleados={empleados}
+                    cargos={cargos}
                     onAddSolicitud={handleAddSolicitud}
                     onUpdateEstado={handleUpdateEstadoSolicitud}
                     userRole={userRole}
@@ -423,6 +468,7 @@ function AppLayout() {
                     rolSistema={currentUser?.rol}
                     currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     currentUser={currentUser}
+                    empresa={empresa}
                   />
                 }
               />
@@ -460,6 +506,7 @@ function AppLayout() {
                     userRole={userRole}
                     currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     empleados={empleados}
+                    empresa={empresa}
                   />
                 }
               />
@@ -557,6 +604,7 @@ function AppLayout() {
                     empleados={empleados}
                     evaluaciones={evaluaciones}
                     onOpenEvaluacionDetalle={(evalId) => setActiveEvaluacionDetalleId(evalId)}
+                    empresa={empresa}
                   />
                 }
               />

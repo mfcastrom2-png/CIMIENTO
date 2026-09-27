@@ -22,9 +22,10 @@ import {
   Warehouse,
   Scale,
   ShieldAlert,
-  Stethoscope
+  Stethoscope,
+  Building2
 } from 'lucide-react';
-import { Role, UsuarioSistema, RolSistema } from '../types';
+import { Role, UsuarioSistema, RolSistema, ConfiguracionEmpresa } from '../types';
 
 interface SidebarProps {
   currentRole?: Role;
@@ -35,6 +36,7 @@ interface SidebarProps {
   userSubtitle?: string;
   currentUser?: UsuarioSistema | null;
   onLogout?: () => void;
+  empresa?: ConfiguracionEmpresa;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,7 +47,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userName = 'Dirección de Gestión Humana',
   userSubtitle = 'B GROUP INGENIERIA S.A.S.',
   currentUser,
-  onLogout
+  onLogout,
+  empresa
 }) => {
   // Rol institucional real verificado desde el perfil de base de datos
   const rolReal: RolSistema = currentUser?.rol || 'empleado';
@@ -76,18 +79,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className="w-64 bg-[#18235C] text-white flex flex-col shrink-0 min-h-screen p-5 select-none border-r border-[#101740]">
       {/* Brand Header */}
-      <div className="flex items-center gap-3 pb-5 border-b border-[#8FA7D6]/20 mb-4">
-        <div className="w-9 h-9 rounded-lg bg-[#101740] border border-[#8FA7D6]/60 flex items-center justify-center shrink-0 shadow-xs">
-          <span className="font-bold text-lg text-[#00FF00]">B</span>
-        </div>
-        <div>
-          <span className="text-base font-bold tracking-wide text-white block leading-tight">
-            B GROUP
-          </span>
-          <span className="text-[10px] text-[#8FA7D6] tracking-wider font-semibold block leading-tight">
-            INGENIERIA S.A.S.
-          </span>
-        </div>
+      <div className="pb-4 border-b border-[#8FA7D6]/20 mb-4">
+        {empresa?.identidadVisual?.logoUrl ? (
+          <div className="flex flex-col gap-2">
+            <div className="bg-white/10 p-1.5 rounded-lg border border-[#8FA7D6]/40 flex items-center justify-center max-h-14 overflow-hidden">
+              <img
+                src={empresa.identidadVisual.logoUrl}
+                alt={empresa.nombreComercial || 'Logo'}
+                className="max-h-11 w-auto max-w-full object-contain"
+                onError={(e) => {
+                  (e.target as any).style.display = 'none';
+                }}
+              />
+            </div>
+            <div className="min-w-0">
+              <span className="text-sm font-bold tracking-wide text-white block leading-tight truncate" title={empresa?.nombreComercial || 'B GROUP'}>
+                {empresa?.nombreComercial || 'B GROUP'}
+              </span>
+              <span className="text-[10px] text-[#8FA7D6] tracking-wider font-semibold block leading-tight truncate" title={empresa?.razonSocial || 'INGENIERIA S.A.S.'}>
+                {empresa?.razonSocial || 'INGENIERIA S.A.S.'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-[#101740] border border-[#8FA7D6]/60 flex items-center justify-center shrink-0 shadow-xs">
+              <span className="font-bold text-lg text-[#00FF00]">
+                {empresa?.nombreComercial ? empresa.nombreComercial.charAt(0).toUpperCase() : 'B'}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <span className="text-base font-bold tracking-wide text-white block leading-tight truncate" title={empresa?.nombreComercial || 'B GROUP'}>
+                {empresa?.nombreComercial || 'B GROUP'}
+              </span>
+              <span className="text-[10px] text-[#8FA7D6] tracking-wider font-semibold block leading-tight truncate" title={empresa?.razonSocial || 'INGENIERIA S.A.S.'}>
+                {empresa?.razonSocial || 'INGENIERIA S.A.S.'}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation Links based on RBAC */}
@@ -109,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }`}
           >
             <LayoutDashboard className={`w-4 h-4 ${currentView === 'dashboard' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-            <span>{esEmpleado ? 'Mi Tablero de Resumen' : 'Tablero de control'}</span>
+            <span>{esEmpleado ? 'Mi Dashboard' : 'Dashboard'}</span>
           </button>
         )}
 
@@ -225,11 +255,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {!esEmpleado && (
           <>
             {/* SECCIÓN ORGANIZACIÓN */}
-            {(tienePermiso('estructura') || tienePermiso('cargos')) && (
+            {(tienePermiso('estructura') || tienePermiso('cargos') || rol === 'superadmin' || rol === 'admin_gh') && (
               <>
                 <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
                   Organización
                 </div>
+                {(rol === 'superadmin' || rol === 'admin_gh') && (
+                  <button
+                    id="nav-empresa"
+                    onClick={() => onNavigate('empresa')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'empresa'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <Building2 className={`w-4 h-4 ${currentView === 'empresa' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                    <span>Datos de la Empresa</span>
+                  </button>
+                )}
                 {tienePermiso('estructura') && (
                   <button
                     id="nav-estructura"

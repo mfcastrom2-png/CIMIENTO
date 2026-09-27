@@ -21,9 +21,7 @@ import {
   guardarUsuarioFB,
   eliminarUsuarioFB,
   registrarUsuarioEnAuth,
-  enviarNotificacionCorreoNuevoUsuario,
-  migrarDocumentosConEmpresaId,
-  CUENTAS_PRUEBA_OFICIALES
+  enviarNotificacionCorreoNuevoUsuario
 } from '../lib/firebase';
 import {
   ComprobanteNotificacionModal,
@@ -104,50 +102,140 @@ export function UsuariosView({
     );
   }
 
-  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>(propsUsuarios || INITIAL_USUARIOS_SISTEMA);
-  const [logs, setLogs] = useState<LogAuditoriaUsuario[]>(INITIAL_LOGS_AUDITORIA);
-  const [activeTab, setActiveTab] = useState<'usuarios' | 'rolesMatriz' | 'auditoria' | 'aislamiento'>('usuarios');
-  const [migrandoAislamiento, setMigrandoAislamiento] = useState(false);
-  const [resultadoMigracion, setResultadoMigracion] = useState<{
-    documentosActualizados: number;
-    coleccionesProcesadas: string[];
-    usuariosCreados: string[];
-    detalles: string[];
-  } | null>(null);
-
-  const handleEjecutarMigracion = async () => {
-    setMigrandoAislamiento(true);
+  // Helper para verificar usuarios eliminados definitivamente
+  const getEliminadosSet = (): Set<string> => {
     try {
-      const res = await migrarDocumentosConEmpresaId('empresa-a');
-      setResultadoMigracion(res);
-      mostrarNotificacion(`Migración finalizada: ${res.documentosActualizados} docs actualizados con empresaId="empresa-a"`);
-    } catch (err: any) {
-      mostrarNotificacion(`Error en migración: ${err?.message || err}`);
-    } finally {
-      setMigrandoAislamiento(false);
-    }
+      const raw = localStorage.getItem('bgroup_usuarios_eliminados');
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return new Set(arr.map(x => String(x).toLowerCase()));
+      }
+    } catch {}
+    return new Set<string>();
   };
 
-  useEffect(() => {
+  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>(() => {
+    const mapa = new Map<string, UsuarioSistema>();
+    const eliminadosSet = getEliminadosSet();
+    
+    // 1. Cargar usuarios iniciales del sistema si no han sido eliminados
+    INITIAL_USUARIOS_SISTEMA.forEach(u => {
+      const emailKey = (u.email || '').trim().toLowerCase();
+      if (!eliminadosSet.has(u.id.toLowerCase()) && (!emailKey || !eliminadosSet.has(emailKey))) {
+        mapa.set(emailKey || u.id, u);
+      }
+    });
+
+    // 2. Si vienen usuarios por props, fusionarlos
     if (propsUsuarios && propsUsuarios.length > 0) {
-      // Deduplicar estrictamente por correo y por ID para garantizar consistencia sin redundancia
-      const mapa = new Map<string, UsuarioSistema>();
+      propsUsuarios.forEach(u => {
+        const emailKey = (u.email || '').trim().toLowerCase();
+        if (!eliminadosSet.has(u.id.toLowerCase()) && (!emailKey || !eliminadosSet.has(emailKey))) {
+          mapa.set(emailKey || u.id, u);
+        }
+      });
+    }
+
+    // 3. Asegurar que los empleados con correo corporativo tengan representación en el directorio de usuarios
+    (empleados || []).forEach(emp => {
+      if (emp.email) {
+        const emailKey = emp.email.trim().toLowerCase();
+        if (!eliminadosSet.has(emailKey) && !eliminadosSet.has(`usr-${emp.id}`.toLowerCase()) && !mapa.has(emailKey)) {
+          const cargoObj = cargos.find(c => c.id === emp.cargoId);
+          mapa.set(emailKey, {
+            id: `usr-${emp.id}`,
+            nombre: emp.nombre,
+            documento: emp.documento || '—',
+            email: emp.email,
+            rol: 'empleado',
+            cargoNombre: emp.laboral?.cargoNombre || cargoObj?.nombre || 'Colaborador',
+            estado: emp.activo ? 'activo' : 'inactivo',
+            ultimoAcceso: 'Nunca',
+            fechaCreacion: emp.laboral?.fechaIngreso || new Date().toISOString().split('T')[0],
+            dobleFactorHabilitado: false,
+            empleadoId: emp.id,
+            permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
+          });
+        }
+      }
+    });
+
+    // 4. Asegurar el usuario actualmente autenticado
+    if (currentUser?.email) {
+      const emailKey = currentUser.email.trim().toLowerCase();
+      if (!eliminadosSet.has(emailKey) && !mapa.has(emailKey)) {
+        mapa.set(emailKey, currentUser);
+      }
+    }
+
+    return Array.from(mapa.values());
+  });
+
+  const [logs, setLogs] = useState<LogAuditoriaUsuario[]>(INITIAL_LOGS_AUDITORIA);
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'rolesMatriz' | 'auditoria'>('usuarios');
+
+  useEffect(() => {
+    const mapa = new Map<string, UsuarioSistema>();
+    const eliminadosSet = getEliminadosSet();
+
+    // Cargar usuarios existentes
+    INITIAL_USUARIOS_SISTEMA.forEach(u => {
+      const emailKey = (u.email || '').trim().toLowerCase();
+      if (!eliminadosSet.has(u.id.toLowerCase()) && (!emailKey || !eliminadosSet.has(emailKey))) {
+        mapa.set(emailKey || u.id, u);
+      }
+    });
+
+    if (propsUsuarios && propsUsuarios.length > 0) {
       propsUsuarios.forEach(u => {
         const emailKey = (u.email || '').trim().toLowerCase();
         const key = emailKey || u.id;
-        if (!mapa.has(key)) {
-          mapa.set(key, u);
-        } else {
-          const actual = mapa.get(key)!;
-          // Si el actual es ID temporal y el nuevo tiene UID de Firebase Auth, preferir el UID oficial
-          if (actual.id.startsWith('usr-') && !u.id.startsWith('usr-')) {
+        if (!eliminadosSet.has(u.id.toLowerCase()) && (!emailKey || !eliminadosSet.has(emailKey))) {
+          if (!mapa.has(key)) {
             mapa.set(key, u);
+          } else {
+            const actual = mapa.get(key)!;
+            if (actual.id.startsWith('usr-') && !u.id.startsWith('usr-')) {
+              mapa.set(key, u);
+            }
           }
         }
       });
-      setUsuarios(Array.from(mapa.values()));
     }
-  }, [propsUsuarios]);
+
+    // Integrar colaboradores con correo
+    (empleados || []).forEach(emp => {
+      if (emp.email) {
+        const emailKey = emp.email.trim().toLowerCase();
+        if (!eliminadosSet.has(emailKey) && !eliminadosSet.has(`usr-${emp.id}`.toLowerCase()) && !mapa.has(emailKey)) {
+          const cargoObj = cargos.find(c => c.id === emp.cargoId);
+          mapa.set(emailKey, {
+            id: `usr-${emp.id}`,
+            nombre: emp.nombre,
+            documento: emp.documento || '—',
+            email: emp.email,
+            rol: 'empleado',
+            cargoNombre: emp.laboral?.cargoNombre || cargoObj?.nombre || 'Colaborador',
+            estado: emp.activo ? 'activo' : 'inactivo',
+            ultimoAcceso: 'Nunca',
+            fechaCreacion: emp.laboral?.fechaIngreso || new Date().toISOString().split('T')[0],
+            dobleFactorHabilitado: false,
+            empleadoId: emp.id,
+            permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
+          });
+        }
+      }
+    });
+
+    if (currentUser?.email) {
+      const emailKey = currentUser.email.trim().toLowerCase();
+      if (!eliminadosSet.has(emailKey) && !mapa.has(emailKey)) {
+        mapa.set(emailKey, currentUser);
+      }
+    }
+
+    setUsuarios(Array.from(mapa.values()));
+  }, [propsUsuarios, empleados, cargos, currentUser]);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -158,6 +246,8 @@ export function UsuariosView({
   const [modalCrearOpen, setModalCrearOpen] = useState(false);
   const [modalEditarOpen, setModalEditarOpen] = useState(false);
   const [usuarioEditando, setUsuarioEditando] = useState<UsuarioSistema | null>(null);
+  const [usuarioAEliminar, setUsuarioAEliminar] = useState<UsuarioSistema | null>(null);
+  const [eliminandoUsuario, setEliminandoUsuario] = useState(false);
 
   // Estados de control para evitar envíos redundantes
   const [guardandoUsuario, setGuardandoUsuario] = useState(false);
@@ -312,7 +402,7 @@ export function UsuariosView({
         fechaCreacion: new Date().toISOString().split('T')[0],
         dobleFactorHabilitado: Boolean(nuevoUsuario.dobleFactorHabilitado),
         password: claveAsignada,
-        empresaId: nuevoUsuario.empresaId || 'empresa-a',
+        empresaId: 'empresa-principal',
         empleadoId: nuevoUsuario.empleadoId,
         permisos: nuevoUsuario.permisos && nuevoUsuario.permisos.length > 0
           ? nuevoUsuario.permisos
@@ -531,31 +621,68 @@ export function UsuariosView({
     setTimeout(() => setCopiadoFeedback(false), 3000);
   };
 
-  // Eliminar usuario individual de forma definitiva
-  const handleEliminarUsuario = async (usuarioId: string, nombre: string) => {
-    if (confirm(`¿Desea eliminar permanentemente la cuenta de usuario "${nombre}"? Esta acción no se puede deshacer y se borrará de la base de datos.`)) {
+  // Abrir modal de confirmación de eliminación
+  const handleSolicitarEliminarUsuario = (usuario: UsuarioSistema) => {
+    setUsuarioAEliminar(usuario);
+  };
+
+  // Confirmar y ejecutar eliminación permanente sin dialogs nativos
+  const handleConfirmarEliminacionUsuario = async () => {
+    if (!usuarioAEliminar || eliminandoUsuario) return;
+    const victima = usuarioAEliminar;
+    const usuarioId = victima.id;
+    const emailLower = (victima.email || '').trim().toLowerCase();
+
+    setEliminandoUsuario(true);
+
+    try {
+      // 1. Guardar en lista de exclusión definitiva para evitar resurrección por mocks/empleados
+      try {
+        const raw = localStorage.getItem('bgroup_usuarios_eliminados');
+        const arr: string[] = raw ? JSON.parse(raw) : [];
+        if (!arr.includes(usuarioId)) arr.push(usuarioId);
+        if (emailLower && !arr.includes(emailLower)) arr.push(emailLower);
+        localStorage.setItem('bgroup_usuarios_eliminados', JSON.stringify(arr));
+      } catch (errStorage) {
+        console.warn('Error al guardar exclusión de usuario:', errStorage);
+      }
+
+      // 2. Eliminar en Firestore
       try {
         await eliminarUsuarioFB(usuarioId);
       } catch (err) {
         console.warn('Error al eliminar usuario en Firestore:', err);
       }
+
+      // 3. Actualizar estado local y sincronizar con SyncContext
       setUsuarios(prev => {
-        const filtrados = prev.filter(u => u.id !== usuarioId);
+        const filtrados = prev.filter(u => u.id !== usuarioId && (u.email || '').trim().toLowerCase() !== emailLower);
         onActualizarUsuarios?.(filtrados);
+        try {
+          localStorage.setItem('bgroup_usuarios_cache', JSON.stringify(filtrados));
+        } catch {}
         return filtrados;
       });
+
+      // 4. Registro de Auditoría
       const nuevoLog: LogAuditoriaUsuario = {
         id: `log-${Date.now()}`,
         usuarioId: currentUser?.id || 'usr-admin-principal',
         usuarioNombre: currentUser?.nombre || 'Super Administrador',
-        accion: `Eliminación definitiva de la cuenta de usuario ${nombre} (ID: ${usuarioId})`,
+        accion: `Eliminación definitiva de la cuenta de usuario ${victima.nombre} (${victima.email}) - ID: ${usuarioId}`,
         modulo: 'Gestión de Usuarios',
         ip: '190.158.42.10',
         fechaHora: new Date().toLocaleString('es-CO'),
         tipo: 'SEGURIDAD'
       };
       setLogs(prev => [nuevoLog, ...prev]);
-      mostrarNotificacion(`Usuario "${nombre}" eliminado definitivamente.`);
+
+      mostrarNotificacion(`Usuario "${victima.nombre}" eliminado definitivamente.`);
+      setUsuarioAEliminar(null);
+    } catch (errorGeneral: any) {
+      mostrarNotificacion(`Error al eliminar usuario: ${errorGeneral?.message || errorGeneral}`);
+    } finally {
+      setEliminandoUsuario(false);
     }
   };
 
@@ -576,18 +703,6 @@ export function UsuariosView({
       for (const u of todosDocs) {
         const emailLower = (u.email || '').trim().toLowerCase();
         const nombreLower = (u.nombre || '').trim().toLowerCase();
-
-        // Purgar definitivamente usuarios de prueba conocidos o asignados solicitados
-        if (
-          nombreLower.includes('anibal luna') ||
-          nombreLower.includes('manuel castro prueba') ||
-          emailLower === 'anibalf3000@gmail.com' ||
-          emailLower === 'manuelfcastrom@gmail.com'
-        ) {
-          docsAEliminar.push(u.id);
-          eliminadosCount++;
-          continue;
-        }
 
         // Purgar duplicados redundantes por email
         if (emailLower) {
@@ -849,17 +964,6 @@ export function UsuariosView({
             <Clock className="w-3.5 h-3.5" />
             Auditoría de Accesos & Eventos ({logs.length})
           </button>
-          <button
-            onClick={() => setActiveTab('aislamiento')}
-            className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 ${
-              activeTab === 'aislamiento'
-                ? 'border-[#18235C] text-[#18235C]'
-                : 'border-transparent text-[#282829]/70 hover:text-[#18235C]'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            Aislamiento Multi-Tenant & Cuentas Oficiales
-          </button>
         </div>
       </div>
 
@@ -1051,8 +1155,8 @@ export function UsuariosView({
                           </button>
 
                           <button
-                            onClick={() => handleEliminarUsuario(u.id, u.nombre)}
-                            className="p-1.5 text-rose-700 hover:bg-rose-50 rounded-md border border-transparent hover:border-rose-300 transition-colors"
+                            onClick={() => handleSolicitarEliminarUsuario(u)}
+                            className="p-1.5 text-rose-700 hover:bg-rose-50 rounded-md border border-transparent hover:border-rose-300 transition-colors cursor-pointer"
                             title="Eliminar usuario permanentemente"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1232,213 +1336,7 @@ export function UsuariosView({
         </div>
       )}
 
-      {/* TAB 4: AISLAMIENTO MULTI-TENANT & CUENTAS OFICIALES */}
-      {activeTab === 'aislamiento' && (
-        <div className="space-y-6">
-          {/* Tarjeta de estado de seguridad */}
-          <div className="bg-white p-6 rounded-2xl border border-[#8FA7D6] shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#8FA7D6]/40">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black text-[#18235C]">
-                    Aislamiento Multi-Tenant & Endurecimiento de Seguridad
-                  </h2>
-                  <p className="text-xs text-[#282829] mt-0.5">
-                    Garantiza la separación estricta de datos por empresaId y la inmutabilidad de roles en cumplimiento normativo y de auditoría.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleEjecutarMigracion}
-                disabled={migrandoAislamiento}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm shrink-0 ${
-                  migrandoAislamiento
-                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                    : 'bg-[#18235C] hover:bg-[#101740] text-white'
-                }`}
-              >
-                {migrandoAislamiento ? (
-                  <>
-                    <RotateCcw className="w-4 h-4 animate-spin text-[#00FF00]" />
-                    <span>Migrando Documentos...</span>
-                  </>
-                ) : (
-                  <>
-                    <Shield className="w-4 h-4 text-[#00FF00]" />
-                    <span>Ejecutar Migración de Aislamiento & Sincronizar</span>
-                  </>
-                )}
-              </button>
-            </div>
 
-            {/* Resultado de migración si ya se ejecutó */}
-            {resultadoMigracion && (
-              <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs">
-                <div className="font-bold flex items-center gap-1.5 mb-1">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                  Migración y sincronización ejecutada exitosamente:
-                </div>
-                <div className="text-[11px] text-emerald-800 space-y-0.5">
-                  <p>• <strong>{resultadoMigracion.documentosActualizados}</strong> documentos sin empresaId fueron etiquetados con "empresa-a".</p>
-                  <p>• Colecciones validadas: {resultadoMigracion.coleccionesProcesadas.join(', ')}.</p>
-                  <p>• Cuentas de prueba sincronizadas en Firestore: {resultadoMigracion.usuariosCreados.join(', ')}.</p>
-                </div>
-              </div>
-            )}
-
-            {/* Fases del plan de auditoría */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">✓</span>
-                  <span className="text-xs font-black text-[#18235C]">Fase 1: Eliminación de Bypass</span>
-                </div>
-                <p className="text-[11px] text-[#282829]/80 leading-relaxed">
-                  Bypass de localStorage y credenciales fijas eliminados. Acceso 100% regulado por tokens criptográficos de Firebase Auth.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">✓</span>
-                  <span className="text-xs font-black text-[#18235C]">Fase 2: Reglas Firestore Estrictas</span>
-                </div>
-                <p className="text-[11px] text-[#282829]/80 leading-relaxed">
-                  Reglas desplegadas con función <code>sameCompany()</code>. Usuarios comunes tienen prohibido modificar su rol, permisos y empresaId.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center">3</span>
-                  <span className="text-xs font-black text-[#18235C]">Fase 3: Cuentas Reales de Prueba</span>
-                </div>
-                <p className="text-[11px] text-[#282829]/80 leading-relaxed">
-                  5 cuentas oficiales creadas con roles diferenciados entre Empresa A y Empresa B para testeo de aislamiento multi-tenant.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Las 5 Cuentas Oficiales de Prueba */}
-          <div className="bg-white p-6 rounded-2xl border border-[#8FA7D6] shadow-sm">
-            <h3 className="text-sm font-black text-[#18235C] uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Users className="w-4 h-4 text-[#18235C]" />
-              Cuentas Oficiales de Prueba (Multi-Tenant)
-            </h3>
-            <p className="text-xs text-[#282829] mb-4">
-              Credenciales requeridas por la auditoría para validar que ningún usuario de Empresa A acceda a Empresa B y que los colaboradores solo vean su propia información:
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {CUENTAS_PRUEBA_OFICIALES.map((cuenta, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-[#8FA7D6] transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="font-bold text-xs text-[#18235C]">{cuenta.nombre}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      cuenta.empresaId === 'empresa-a'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-purple-100 text-purple-800'
-                    }`}>
-                      {cuenta.empresaId}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5 text-xs">
-                    <div>
-                      <span className="text-[10px] text-[#282829]/60 block">Correo:</span>
-                      <code className="text-[11px] font-mono font-bold text-[#18235C] bg-white px-1.5 py-0.5 rounded border border-slate-200 block truncate">
-                        {cuenta.email}
-                      </code>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] text-[#282829]/60 block">Contraseña:</span>
-                      <code className="text-[11px] font-mono text-slate-700 bg-white px-1.5 py-0.5 rounded border border-slate-200 block">
-                        {cuenta.pass}
-                      </code>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-[11px] font-semibold text-slate-600">
-                        Rol: <strong className="text-[#18235C]">{cuenta.rol}</strong>
-                      </span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(`${cuenta.email}\n${cuenta.pass}`);
-                          mostrarNotificacion(`Credenciales copiadas para ${cuenta.email}`);
-                        }}
-                        className="text-[10px] text-blue-700 hover:text-blue-900 font-bold flex items-center gap-1"
-                      >
-                        <Copy className="w-3 h-3" />
-                        Copiar
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Matriz de Pruebas de Aislamiento Obligatorias */}
-          <div className="bg-white p-6 rounded-2xl border border-[#8FA7D6] shadow-sm">
-            <h3 className="text-sm font-black text-[#18235C] uppercase tracking-wider mb-3 flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-[#18235C]" />
-              Matriz de Pruebas de Aislamiento Obligatorias
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500 uppercase text-[10px]">
-                    <th className="py-2.5 px-3">Cuenta de Prueba</th>
-                    <th className="py-2.5 px-3">Operación Permitida</th>
-                    <th className="py-2.5 px-3">Operación Bloqueada (Firestore Rules)</th>
-                    <th className="py-2.5 px-3 text-center">Estado Regla</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  <tr>
-                    <td className="py-2.5 px-3 font-bold text-[#18235C]">empleado-a@test-cimiento.com</td>
-                    <td className="py-2.5 px-3 text-slate-700">Lectura de su perfil y de sus solicitudes</td>
-                    <td className="py-2.5 px-3 text-rose-700">Perfil de empleado B, nóminas, modificar su rol o empresaId</td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        Bloqueo Activo
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-3 font-bold text-[#18235C]">admin-a@test-cimiento.com</td>
-                    <td className="py-2.5 px-3 text-slate-700">Gestionar empleados y usuarios de empresa-a</td>
-                    <td className="py-2.5 px-3 text-rose-700">Lectura de empleados de empresa-b, nómina de otra empresa</td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        Bloqueo Activo
-                      </span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-3 font-bold text-[#18235C]">superadmin@test-cimiento.com</td>
-                    <td className="py-2.5 px-3 text-slate-700">Administrar empresas autorizadas, roles, auditoría inmutable</td>
-                    <td className="py-2.5 px-3 text-rose-700">Modificar o borrar registros de logs_auditoria (inmutabilidad legal)</td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        Bloqueo Activo
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL CREAR NUEVO USUARIO */}
       {modalCrearOpen && (
@@ -1596,19 +1494,7 @@ export function UsuariosView({
                   </select>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-[#18235C] mb-1">
-                    Empresa Asignada *
-                  </label>
-                  <select
-                    value={nuevoUsuario.empresaId || 'empresa-a'}
-                    onChange={e => setNuevoUsuario({ ...nuevoUsuario, empresaId: e.target.value })}
-                    className="w-full bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg px-2.5 py-1.5 text-xs text-[#282829] font-medium"
-                  >
-                    <option value="empresa-a">Empresa A (Principal)</option>
-                    <option value="empresa-b">Empresa B (Secundaria)</option>
-                  </select>
-                </div>
+
 
                 <div>
                   <label className="block font-bold text-[#18235C] mb-1">
@@ -1832,17 +1718,7 @@ export function UsuariosView({
                   </select>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-[#18235C] mb-1">Empresa Asignada</label>
-                  <select
-                    value={usuarioEditando.empresaId || 'empresa-a'}
-                    onChange={e => setUsuarioEditando({ ...usuarioEditando, empresaId: e.target.value })}
-                    className="w-full bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg px-2.5 py-1.5 text-xs text-[#282829] font-medium"
-                  >
-                    <option value="empresa-a">Empresa A (Principal)</option>
-                    <option value="empresa-b">Empresa B (Secundaria)</option>
-                  </select>
-                </div>
+
 
                 <div>
                   <label className="block font-bold text-[#18235C] mb-1">Estado de la Cuenta</label>
@@ -1916,6 +1792,60 @@ export function UsuariosView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMACIÓN DE ELIMINACIÓN DE USUARIO */}
+      {usuarioAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-[#FFFFFF] rounded-2xl max-w-md w-full p-6 shadow-2xl border border-rose-200">
+            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4 mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-[#18235C] text-center">
+              ¿Eliminar Usuario Definitivamente?
+            </h3>
+            <p className="text-xs text-[#282829] text-center mt-2">
+              Está a punto de eliminar permanentemente la cuenta de <strong className="text-[#18235C]">{usuarioAEliminar.nombre}</strong> (<span className="text-[#282829] font-mono">{usuarioAEliminar.email}</span>).
+            </p>
+            <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900">
+              <p className="font-bold flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                Acción Irreversible
+              </p>
+              <p className="mt-1 text-[11px] text-rose-800">
+                Se revocarán inmediatamente sus credenciales, perfil institucional y permisos de acceso en Firestore y en el aplicativo.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setUsuarioAEliminar(null)}
+                disabled={eliminandoUsuario}
+                className="px-4 py-2 text-xs font-bold text-[#18235C] bg-[#FFFFFF] border border-[#8FA7D6] hover:bg-[#8FA7D6]/15 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarEliminacionUsuario}
+                disabled={eliminandoUsuario}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
+              >
+                {eliminandoUsuario ? (
+                  <>
+                    <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Sí, Eliminar Permanentemente
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -6,7 +6,7 @@ export type Criticidad = 'Alta' | 'Media' | 'Baja';
 export type NivelCompetencia = 'Básico' | 'Intermedio' | 'Alto';
 export type TipoCompetencia = 'Corporativa' | 'Técnica';
 export type TipoSolicitud = 'Vacaciones' | 'Permiso' | 'Licencia' | 'Incapacidad' | 'Cesantías' | 'Certificado';
-export type EstadoSolicitud = 'Pendiente' | 'Aprobada' | 'Rechazada';
+export type EstadoSolicitud = 'Radicada' | 'En Revisión' | 'Aprobada' | 'Rechazada' | 'Requiere Corrección' | 'Autogenerada' | 'Pendiente';
 
 export type TipoProceso = 'Estratégico' | 'Misional / Operativo' | 'Apoyo' | 'Control y Evaluación';
 
@@ -437,7 +437,9 @@ export interface Solicitud {
   empresaId?: string; // Multi-Tenancy
   empleadoId: string;
   empleadoNombre?: string;
+  empleadoDocumento?: string;
   empleadoEmail?: string;
+  cargoNombre?: string;
   tipo: TipoSolicitud;
   inicio: string;
   fin: string;
@@ -447,6 +449,45 @@ export interface Solicitud {
   fechaDecision: string | null;
   comentario: string;
   fechaCreacion?: string;
+
+  // CAMPOS NORMADOS COLOMBIA (CST & LEYES VIGENTES)
+  // 1. Cesantías (Retiro Parcial de Cesantías Ley 50/90 & Dec 1072/15)
+  subtipoCesantias?:
+    | 'Vivienda - Compra / Lote'
+    | 'Vivienda - Construcción / Mejora'
+    | 'Liberación de Gravámenes / Hipoteca'
+    | 'Educación Superior / Técnica / Tecnológica'
+    | 'Acciones del Estado';
+  montoSolicitadoCOP?: number;
+
+  // 2. Licencias de Ley (CST & Leyes especiales)
+  subtipoLicencia?:
+    | 'Maternidad (18 semanas - Ley 2114)'
+    | 'Paternidad (2 semanas - Ley 2114)'
+    | 'Luto (5 días hábiles - Ley 1280)'
+    | 'Calamidad Doméstica (Remunerada)'
+    | 'Sufragio / Voto (Media jornada - Ley 403)';
+
+  // 3. Permisos Remunerados con exclusión de Festivos/Fines de Semana
+  diasCantidad?: number;
+  diasFestivosInvolucrados?: string[];
+
+  // 4. Certificados Laborales (Evasión de aprobación humana / Autogenerados)
+  subtipoCertificado?: 'Bancario' | 'Arrendamiento' | 'Trámite Personal' | 'Entidad Específica';
+  entidadDestino?: string;
+  codigoVerificacionCertificado?: string;
+  certificadoGeneradoData?: any;
+
+  // Soportes y Trazabilidad en Google Drive / Buzón RRHH
+  soporteUrlDrive?: string;
+  observacionRRHH?: string;
+  historialRespuestas?: {
+    fecha: string;
+    usuarioNombre: string;
+    estadoAnterior: string;
+    estadoNuevo: string;
+    comentario: string;
+  }[];
 }
 
 export interface PreguntaEncuesta {
@@ -1207,3 +1248,79 @@ export interface AnuncioSlide {
   textoBoton?: string;
   destacado?: boolean;
 }
+
+export interface CentroTrabajo {
+  id: string;
+  nombre: string;
+  codigo?: string;
+  claseRiesgoARL: 'I' | 'II' | 'III' | 'IV' | 'V';
+  departamento: string;
+  ciudad: string;
+  direccion: string;
+  telefono?: string;
+  esSedePrincipal?: boolean;
+}
+
+export interface ConfiguracionEmpresa {
+  id: string;
+  razonSocial: string;
+  nombreComercial: string;
+  nit: string;
+  digitoVerificacion: string;
+  tipoDocumento: string;
+  tipoPersona: 'Jurídica' | 'Natural';
+  tipoSociedad: string;
+  matriculaMercantil?: string;
+  camaraComercio?: string;
+  fechaConstitucion?: string;
+  representanteLegal: {
+    nombre: string;
+    tipoDocumento: string;
+    numeroDocumento: string;
+    email: string;
+    telefono: string;
+    cargo: string;
+  };
+  actividadEconomica: string;
+  codigoCiiu: string;
+  sector: string;
+  contacto: {
+    direccion: string;
+    ciudad: string;
+    departamento: string;
+    pais: string;
+    codigoPostal: string;
+    telefonoFijo: string;
+    celular: string;
+    emailCorporativo: string;
+    emailContactoGH: string;
+    sitioWeb: string;
+  };
+  seguridadSocial: {
+    arl: string;
+    nivelRiesgoPrincipal: 'I' | 'II' | 'III' | 'IV' | 'V';
+    codigoArl?: string;
+    cajaCompensacion: string;
+    epsPrincipal?: string;
+    fondoCesantiasPrincipal?: string;
+  };
+  sst: {
+    responsableSST: string;
+    numeroLicenciaSST: string;
+    vigenciaLicenciaSST: string;
+    contactoEmergenciaSST: string;
+    estandaresAplicables: '7' | '21' | '60';
+  };
+  identidadVisual: {
+    logoUrl?: string;
+    colorPrimario?: string;
+    lemaInstitucional?: string;
+    mision?: string;
+    vision?: string;
+    politicaSST?: string;
+  };
+  centrosTrabajo?: CentroTrabajo[];
+  fechaActualizacion?: string;
+  actualizadoPor?: string;
+}
+

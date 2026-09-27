@@ -6,7 +6,8 @@ import {
   EvaluacionDesempeno,
   FichaCargo,
   ProcesoOrganizacion,
-  Solicitud
+  Solicitud,
+  ConfiguracionEmpresa
 } from '../types';
 
 export function uid(prefix: string = 'id'): string {
@@ -812,6 +813,56 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
         }
       ]
     }
+  },
+  {
+    id: 'e-manuel-castro',
+    nombre: 'Manuel Castro',
+    documento: '80.892.411',
+    email: 'manuelfcastrom@gmail.com',
+    telefono: '310 445 8821',
+    cargoId: 'c7',
+    areaId: 'a3',
+    formacion: 'Técnico Profesional en Telecomunicaciones y Redes Ópticas',
+    experiencia: '5 años en tendido de fibra óptica, configuración GPON y trabajo seguro en alturas.',
+    salarioBase: 2800000,
+    contrato: { tipo: 'Término indefinido', inicio: '2024-01-15', fin: '—', salario: '$2.800.000' },
+    familia: [],
+    activo: true,
+    laboral: {
+      codigoInterno: 'EMP-008',
+      fechaIngreso: '2024-01-15',
+      fechaInicioLaboral: '2024-01-15',
+      areaId: 'a3',
+      areaNombre: 'Operaciones y Redes',
+      cargoId: 'c7',
+      cargoNombre: 'Técnico de Redes y Operaciones ISP',
+      tipoContrato: 'Término indefinido',
+      fechaInicioContrato: '2024-01-15',
+      jornadaLaboral: 'Completa (42h/semana)',
+      modalidadTrabajo: 'Presencial',
+      lugarTrabajo: 'Sede Principal / Nodos de Red Bogotá',
+      centroCostos: 'CC-OPERACIONES-RED',
+      estado: 'Activo'
+    },
+    sst: {
+      conceptoAptitudVigente: 'Apto',
+      restriccionesActivas: 'Ninguna',
+      examenesOcupacionales: [
+        {
+          id: 'ex-mc-1',
+          fecha: '2026-01-10',
+          tipoExamen: 'Periódico',
+          entidadIps: 'Colsanitas Medicina Ocupacional',
+          conceptoAptitud: 'Apto',
+          recomendaciones: 'Apto para trabajo seguro en alturas y conducción de vehículo técnico.',
+          fechaProximoExamen: '2027-01-10',
+          medicoEvaluador: 'Dr. Roberto Mendoza - Esp. SST',
+          licenciaSst: 'Lic. SST-44120-Bogotá',
+          enfasisExamen: 'Énfasis en Alturas (Res. 4272/2021) y Audiometría',
+          confidencialMedico: true
+        }
+      ]
+    }
   }
 ];
 
@@ -1411,4 +1462,124 @@ export const initialAreas: AreaOrganizacion[] = [
     descripcion: 'Estructuración de ofertas técnicas, cotizaciones y relaciones comerciales.'
   }
 ];
+
+export const initialEmpresa: ConfiguracionEmpresa = {
+  id: 'empresa-principal',
+  razonSocial: 'B GROUP INGENIERIA S.A.S.',
+  nombreComercial: 'B GROUP INGENIERIA',
+  nit: '901.458.789',
+  digitoVerificacion: '3',
+  tipoDocumento: 'NIT',
+  tipoPersona: 'Jurídica',
+  tipoSociedad: 'Sociedad por Acciones Simplificada (S.A.S.)',
+  matriculaMercantil: '03456789',
+  camaraComercio: 'Cámara de Comercio de Bogotá',
+  fechaConstitucion: '2019-03-15',
+  representanteLegal: {
+    nombre: 'Mauricio Castro Mendoza',
+    tipoDocumento: 'C.C.',
+    numeroDocumento: '79.845.120',
+    email: 'gerencia@bgroup.com.co',
+    telefono: '+57 (601) 745-8900',
+    cargo: 'Gerente General y Representante Legal'
+  },
+  actividadEconomica: 'Actividades de ingeniería, telecomunicaciones y transmisión de datos',
+  codigoCiiu: '6110',
+  sector: 'Telecomunicaciones y Servicios de Ingeniería',
+  contacto: {
+    direccion: 'Carrera 7 No. 71-21, Torre B, Piso 8',
+    ciudad: 'Bogotá D.C.',
+    departamento: 'Cundinamarca',
+    pais: 'Colombia',
+    codigoPostal: '110221',
+    telefonoFijo: '+57 (601) 745-8900',
+    celular: '+57 310 892 4567',
+    emailCorporativo: 'contacto@bgroup.com.co',
+    emailContactoGH: 'gestionhumana@bgroup.com.co',
+    sitioWeb: 'https://www.bgroup.com.co'
+  },
+  seguridadSocial: {
+    arl: 'Seguros Bolívar',
+    nivelRiesgoPrincipal: 'V',
+    codigoArl: 'ARL-BOLIVAR-01',
+    cajaCompensacion: 'Compensar',
+    epsPrincipal: 'Sanitas EPS',
+    fondoCesantiasPrincipal: 'Protección'
+  },
+  sst: {
+    responsableSST: 'Ing. Sandra Patricia Gómez',
+    numeroLicenciaSST: 'SST-BOG-2022-8941',
+    vigenciaLicenciaSST: '2028-11-30',
+    contactoEmergenciaSST: '+57 320 456 7890',
+    estandaresAplicables: '21'
+  },
+  identidadVisual: {
+    logoUrl: '',
+    colorPrimario: '#18235C',
+    lemaInstitucional: 'Ingeniería y Conectividad con Excelencia Humana',
+    mision: 'Proveer soluciones integrales de infraestructura, telecomunicaciones e ingeniería con los más altos estándares de calidad, seguridad y desarrollo humano.',
+    vision: 'Ser la organización líder en Colombia y la región en servicios especializados de ingeniería de telecomunicaciones, reconocida por su solvencia técnica y bienestar integral.',
+    politicaSST: 'B GROUP INGENIERIA S.A.S. se compromete con la protección integral de la seguridad y salud de todos sus colaboradores y contratistas, identificando peligros, evaluando riesgos y aplicando controles continuos.'
+  },
+  centrosTrabajo: [
+    {
+      id: 'ct_1',
+      codigo: 'CT-BOG-01',
+      nombre: 'Sede Principal Bogotá',
+      claseRiesgoARL: 'I',
+      departamento: 'Cundinamarca',
+      ciudad: 'Bogotá D.C.',
+      direccion: 'Carrera 7 No. 71-21, Torre B, Piso 8',
+      telefono: '+57 (601) 745-8900',
+      esSedePrincipal: true
+    },
+    {
+      id: 'ct_2',
+      codigo: 'CT-BOG-02',
+      nombre: 'Centro Operativo y Laboratorio FTTH Bogotá',
+      claseRiesgoARL: 'V',
+      departamento: 'Cundinamarca',
+      ciudad: 'Bogotá D.C.',
+      direccion: 'Calle 13 No. 68-45, Zona Industrial',
+      telefono: '+57 (601) 745-8950',
+      esSedePrincipal: false
+    },
+    {
+      id: 'ct_3',
+      codigo: 'CT-MDE-01',
+      nombre: 'Sede Regional Antioquia - Medellín',
+      claseRiesgoARL: 'V',
+      departamento: 'Antioquia',
+      ciudad: 'Medellín',
+      direccion: 'Carrera 43A No. 1-50, El Poblado',
+      telefono: '+57 (604) 444-1234',
+      esSedePrincipal: false
+    },
+    {
+      id: 'ct_4',
+      codigo: 'CT-BAQ-01',
+      nombre: 'Frente de Trabajo Costa - Barranquilla',
+      claseRiesgoARL: 'V',
+      departamento: 'Atlántico',
+      ciudad: 'Barranquilla',
+      direccion: 'Calle 76 No. 54-11, Alto Prado',
+      telefono: '+57 (605) 350-9800',
+      esSedePrincipal: false
+    },
+    {
+      id: 'ct_5',
+      codigo: 'CT-CLO-01',
+      nombre: 'Frente de Trabajo Occidente - Cali',
+      claseRiesgoARL: 'V',
+      departamento: 'Valle del Cauca',
+      ciudad: 'Cali',
+      direccion: 'Avenida 6N No. 28N-35, Menga',
+      telefono: '+57 (602) 660-4500',
+      esSedePrincipal: false
+    }
+  ],
+  fechaActualizacion: new Date().toISOString().slice(0, 10),
+  actualizadoPor: 'Administrador del Sistema'
+};
+
 

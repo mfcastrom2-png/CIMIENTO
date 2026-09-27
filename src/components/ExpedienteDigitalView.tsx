@@ -6,7 +6,9 @@ import {
   UsuarioSistema,
   Solicitud,
   EvaluacionDesempeno,
-  DocumentoExpedienteEmpleado
+  DocumentoExpedienteEmpleado,
+  ConfiguracionEmpresa,
+  CentroTrabajo
 } from '../types';
 import {
   ArrowLeft,
@@ -33,15 +35,21 @@ import {
   Lock,
   Calendar,
   Building,
+  Building2,
   CheckCircle2,
   Clock,
-  Award
+  Award,
+  HardDrive
 } from 'lucide-react';
-import { uid } from '../data/initialData';
+import { uid, initialEmpresa } from '../data/initialData';
+import { DriveLinkField } from './common/DriveLinkField';
+import { formatDriveViewUrl, isGoogleDriveUrl } from '../utils/driveUtils';
 
 interface ExpedienteDigitalViewProps {
   empleado: Empleado;
   cargos: Cargo[];
+  empresa?: ConfiguracionEmpresa;
+  centrosTrabajo?: CentroTrabajo[];
   areas?: AreaOrganizacion[];
   currentUser?: UsuarioSistema | null;
   solicitudes?: Solicitud[];
@@ -59,6 +67,8 @@ interface ExpedienteDigitalViewProps {
 export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
   empleado,
   cargos,
+  empresa,
+  centrosTrabajo,
   areas = [],
   currentUser,
   solicitudes = [],
@@ -77,7 +87,21 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
   const [modalSubirDoc, setModalSubirDoc] = useState(false);
   const [nuevoDocTipo, setNuevoDocTipo] = useState<any>('Documento de Identidad');
   const [nuevoDocNombre, setNuevoDocNombre] = useState('');
+  const [nuevoDocUrlDrive, setNuevoDocUrlDrive] = useState('');
   const [nuevoDocObs, setNuevoDocObs] = useState('');
+
+  const handleDescargarDocumento = (nombreArchivo: string, tipo: string = 'Documento') => {
+    const contenido = `EXPEDIENTE DIGITAL DE TALENTO HUMANO\nB GROUP INGENIERIA S.A.S.\n---------------------------------------\nColaborador: ${empleado.nombre}\nDocumento: ${empleado.documento}\nTipo de Archivo: ${tipo}\nNombre del Documento: ${nombreArchivo}\nFecha de Emisión: ${new Date().toLocaleDateString('es-CO')}\nEstado: Documento Válido y Certificado en Plataforma`;
+    const blob = new Blob([contenido], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nombreArchivo.endsWith('.txt') || nombreArchivo.endsWith('.pdf') ? nombreArchivo : `${nombreArchivo}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const cargoNombre = cargos.find(c => c.id === empleado.cargoId)?.nombre || 'Cargo no definido';
   const areaNombre = areas.find(a => a.id === empleado.areaId)?.nombre || empleado.laboral?.areaNombre || 'Operaciones';
@@ -118,7 +142,7 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
       nombreArchivo: nuevoDocNombre.trim(),
       fechaCarga: new Date().toISOString().slice(0, 10),
       usuarioCarga: currentUser?.nombre || 'Administrador GH',
-      urlArchivo: '#',
+      urlArchivo: nuevoDocUrlDrive.trim() || '#',
       estado: 'Vigente',
       observaciones: nuevoDocObs.trim() || undefined
     };
@@ -133,6 +157,7 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
       await onActualizarEmpleado(empleadoActualizado);
     }
     setNuevoDocNombre('');
+    setNuevoDocUrlDrive('');
     setNuevoDocObs('');
     setModalSubirDoc(false);
   };
@@ -390,9 +415,39 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                 <span className="text-slate-500 block font-semibold">Jornada Laboral:</span>
                 <span className="text-slate-800 font-semibold">{empleado.laboral?.jornadaLaboral || 'Tiempo completo ordinario'}</span>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Sede / Lugar de Trabajo:</span>
-                <span className="text-slate-800 font-semibold">{empleado.laboral?.lugarTrabajo || 'Sede Central - Bogotá'}</span>
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 col-span-1 sm:col-span-2">
+                {(() => {
+                  const centrosDisponibles = empresa?.centrosTrabajo || centrosTrabajo || initialEmpresa.centrosTrabajo || [];
+                  const ctAsignado = centrosDisponibles.find(
+                    ct => ct.nombre === empleado.laboral?.lugarTrabajo || (ct.codigo && ct.codigo === empleado.laboral?.lugarTrabajo)
+                  );
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-slate-500 font-semibold flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                          <span>Sede / Centro de Trabajo (SG-SST):</span>
+                        </span>
+                        {ctAsignado && (
+                          <span className="px-2 py-0.5 bg-emerald-800 text-[#00FF00] font-mono text-[10px] font-bold rounded">
+                            Riesgo ARL {ctAsignado.claseRiesgoARL}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[#18235C] font-bold text-sm block">
+                        {empleado.laboral?.lugarTrabajo || ctAsignado?.nombre || 'Sede Central - Bogotá'}
+                      </span>
+                      {ctAsignado ? (
+                        <div className="mt-1 text-[11px] text-slate-600 space-y-0.5 border-t border-slate-200 pt-1">
+                          <div>Código: <span className="font-mono font-bold text-slate-800">{ctAsignado.codigo || 'Sede'}</span></div>
+                          <div>Ubicación: <span className="font-semibold text-slate-800">{ctAsignado.direccion} — {ctAsignado.ciudad}, {ctAsignado.departamento}</span></div>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 block mt-0.5">Ubicación operativa registrada</span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                 <span className="text-slate-500 block font-semibold">Centro de Costos:</span>
@@ -599,12 +654,26 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                       </span>
                     </div>
                     <p className="text-slate-700 font-semibold">{est.institucion} {est.ciudad ? `· ${est.ciudad}` : ''}</p>
-                    <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
                       <span>Período: {est.fechaInicio} al {est.fechaFin}</span>
                       {est.tarjetaProfesional && (
                         <span className="text-slate-800 font-bold">TP: {est.tarjetaProfesional}</span>
                       )}
                     </div>
+                    {est.soporteUrl && (
+                      <div className="pt-1">
+                        <a
+                          href={formatDriveViewUrl(est.soporteUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200"
+                        >
+                          <HardDrive className="w-3 h-3 text-emerald-600" />
+                          <span>Ver soporte en Google Drive</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -636,6 +705,20 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                     <p className="text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200">
                       {exp.funcionesPrincipales}
                     </p>
+                    {exp.soporteUrl && (
+                      <div className="pt-1">
+                        <a
+                          href={formatDriveViewUrl(exp.soporteUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200"
+                        >
+                          <HardDrive className="w-3 h-3 text-emerald-600" />
+                          <span>Ver certificación laboral en Google Drive</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -716,6 +799,7 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                   <tr className="border-b border-slate-200 text-slate-600 bg-slate-50">
                     <th className="py-2.5 px-3 font-semibold">Tipo Documental</th>
                     <th className="py-2.5 px-3 font-semibold">Archivo</th>
+                    <th className="py-2.5 px-3 font-semibold">Enlace Nube (Drive)</th>
                     <th className="py-2.5 px-3 font-semibold">Fecha Carga</th>
                     <th className="py-2.5 px-3 font-semibold">Estado</th>
                     <th className="py-2.5 px-3 font-semibold text-right">Acciones</th>
@@ -726,6 +810,23 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                     <tr key={doc.id || idx} className="hover:bg-slate-50/60">
                       <td className="py-3 px-3 font-bold text-[#18235C]">{doc.tipoDocumento}</td>
                       <td className="py-3 px-3 text-slate-700 font-mono text-[11px]">{doc.nombreArchivo}</td>
+                      <td className="py-3 px-3">
+                        {doc.urlArchivo && doc.urlArchivo !== '#' ? (
+                          <a
+                            href={formatDriveViewUrl(doc.urlArchivo)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
+                            title="Abrir documento en Google Drive"
+                          >
+                            <HardDrive className="w-3 h-3 text-emerald-600" />
+                            <span>Abrir en Drive</span>
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 text-[10px] italic">Sin enlace en nube</span>
+                        )}
+                      </td>
                       <td className="py-3 px-3 text-slate-500 font-mono">{doc.fechaCarga}</td>
                       <td className="py-3 px-3">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -734,19 +835,30 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                       </td>
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {doc.urlArchivo && doc.urlArchivo !== '#' && (
+                            <a
+                              href={formatDriveViewUrl(doc.urlArchivo)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 text-blue-700 hover:bg-blue-50 rounded cursor-pointer"
+                              title="Abrir en Google Drive"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
                           <button
                             type="button"
                             onClick={() => setDocModalPreview(doc)}
                             className="p-1 text-[#18235C] hover:bg-slate-100 rounded cursor-pointer"
-                            title="Visualizar documento"
+                            title="Visualizar ficha de radicación"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => alert(`Descargando ${doc.nombreArchivo}...`)}
+                            onClick={() => handleDescargarDocumento(doc.nombreArchivo, doc.tipoDocumento)}
                             className="p-1 text-[#18235C] hover:bg-slate-100 rounded cursor-pointer"
-                            title="Descargar documento"
+                            title="Descargar constancia documental"
                           >
                             <Download className="w-4 h-4" />
                           </button>
@@ -756,7 +868,7 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                   ))}
                   {(empleado.documentos || []).length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-500">
+                      <td colSpan={6} className="py-8 text-center text-slate-500">
                         No hay documentos adjuntos en el expediente.
                       </td>
                     </tr>
@@ -883,6 +995,15 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                 />
               </div>
 
+              {/* Enlace de Google Drive */}
+              <DriveLinkField
+                label="Enlace al Archivo en Google Drive / Nube (Recomendado)"
+                value={nuevoDocUrlDrive}
+                onChange={setNuevoDocUrlDrive}
+                placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                helpText="Pega el enlace de Google Drive institucional. Esto evita costos de almacenamiento de archivos en el aplicativo."
+              />
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Observaciones</label>
                 <textarea
@@ -927,6 +1048,21 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
               <p><strong>Fecha de Carga:</strong> {docModalPreview.fechaCarga}</p>
               <p><strong>Usuario Responsable:</strong> {docModalPreview.usuarioCarga}</p>
               <p><strong>Estado:</strong> {docModalPreview.estado}</p>
+              {docModalPreview.urlArchivo && docModalPreview.urlArchivo !== '#' && (
+                <p className="flex items-center gap-1.5 pt-1">
+                  <strong>Enlace Nube:</strong>
+                  <a
+                    href={formatDriveViewUrl(docModalPreview.urlArchivo)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-700 hover:underline font-bold inline-flex items-center gap-1"
+                  >
+                    <HardDrive className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Ver en Google Drive</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </p>
+              )}
               {docModalPreview.observaciones && <p><strong>Observaciones:</strong> {docModalPreview.observaciones}</p>}
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -937,13 +1073,24 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
               >
                 Cerrar
               </button>
+              {docModalPreview.urlArchivo && docModalPreview.urlArchivo !== '#' && (
+                <a
+                  href={formatDriveViewUrl(docModalPreview.urlArchivo)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Abrir en Drive</span>
+                </a>
+              )}
               <button
                 type="button"
-                onClick={() => alert(`Descargando ${docModalPreview.nombreArchivo}...`)}
-                className="px-4 py-1.5 rounded bg-[#18235C] hover:bg-[#101740] text-white font-bold flex items-center gap-1.5"
+                onClick={() => handleDescargarDocumento(docModalPreview.nombreArchivo, docModalPreview.tipoDocumento)}
+                className="px-4 py-1.5 rounded bg-[#18235C] hover:bg-[#101740] text-white font-bold flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Descargar</span>
+                <span>Descargar Ficha</span>
               </button>
             </div>
           </div>

@@ -14,6 +14,7 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
+  initializeFirestore,
   collection,
   doc,
   getDoc,
@@ -50,7 +51,8 @@ import {
   EventoAuditoria,
   AccionAuditoria,
   AnuncioSlide,
-  Capacitacion
+  Capacitacion,
+  ConfiguracionEmpresa
 } from '../types';
 
 // 1. Inicialización de Firebase con soporte de Long Polling para proxies y contenedores
@@ -77,8 +79,10 @@ if (typeof window !== 'undefined' && recaptchaSiteKey) {
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Inicialización de Firestore según directriz de la habilidad firebase-integration
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Inicialización de Firestore según directriz de la habilidad firebase-integration con AutoDetectLongPolling para máxima resiliencia en red
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true
+}, firebaseConfig.firestoreDatabaseId);
 
 // Estructuras de Error y Diagnóstico según directriz SKILL.md
 export enum OperationType {
@@ -127,12 +131,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.warn('Diagnóstico Firestore: ', JSON.stringify(errInfo));
 }
 
-// Validación de conectividad (no bloqueante y tolerante a reconexión)
+// Validación de conectividad con timeout y tolerancia a modo offline/caché
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDoc(doc(db, 'test', 'connection'));
-    return true;
+    const timeoutPromise = new Promise<boolean>((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timeout')), 4000)
+    );
+    const docPromise = getDocFromServer(doc(db, 'test', 'connection')).then(() => true);
+    return await Promise.race([docPromise, timeoutPromise]);
   } catch (error) {
+    console.info('[Firestore] Cliente operando en modo offline / caché local.');
     return false;
   }
 }
@@ -277,13 +285,13 @@ export const obtenerPerfilUsuario = async (uid: string, emailOpcional?: string):
             documento: empData.documento || '—',
             rol: 'empleado',
             cargoNombre: empData.cargo || 'Colaborador',
-            empresaId: empData.empresaId || 'empresa-a',
+            empresaId: empData.empresaId || 'empresa-principal',
             empleadoId: empDoc.id,
             estado: 'activo',
             ultimoAcceso: new Date().toISOString(),
             fechaCreacion: new Date().toISOString().split('T')[0],
             dobleFactorHabilitado: false,
-            permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones']
+            permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
           };
           await setDoc(userDocRef, perfilEmpleado);
           return perfilEmpleado;
@@ -300,12 +308,12 @@ export const obtenerPerfilUsuario = async (uid: string, emailOpcional?: string):
         documento: '—',
         rol: 'empleado',
         cargoNombre: 'Colaborador Institucional',
-        empresaId: 'empresa-a',
+        empresaId: 'empresa-principal',
         estado: 'activo',
         ultimoAcceso: new Date().toISOString(),
         fechaCreacion: new Date().toISOString().split('T')[0],
         dobleFactorHabilitado: false,
-        permisos: ['dashboard', 'solicitudes', 'capacitaciones']
+        permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
       };
       await setDoc(userDocRef, perfilColaboradorDefault);
       return perfilColaboradorDefault;
@@ -577,6 +585,34 @@ export const obtenerParametrosNominaFB = async (): Promise<ParametrosLegalesNomi
     return null;
   }
 };
+
+export const guardarEmpresaFB = async (empresa: ConfiguracionEmpresa, autor?: UsuarioSistema | null) => {
+  const docRef = doc(db, 'configuracion_empresa', 'principal');
+  const data = limpiarParaFirestore(empresa);
+  await setDoc(docRef, data, { merge: true });
+  await registrarEventoAuditoria(
+    'ACTUALIZACION',
+    'configuracion_empresa',
+    `Actualizados datos institucionales de la empresa: ${empresa.razonSocial} (NIT: ${empresa.nit}-${empresa.digitoVerificacion})`,
+    autor,
+    'principal'
+  );
+};
+
+export const obtenerEmpresaFB = async (): Promise<ConfiguracionEmpresa | null> => {
+  try {
+    const docRef = doc(db, 'configuracion_empresa', 'principal');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as ConfiguracionEmpresa;
+    }
+    return null;
+  } catch (err) {
+    console.warn('Error al obtener configuración de empresa desde Firestore:', err);
+    return null;
+  }
+};
+
 
 export const guardarInventarioEppFB = async (item: ItemInventarioEPP) => {
   const docRef = doc(db, 'inventario_epp', item.id);

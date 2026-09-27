@@ -8,7 +8,8 @@ import {
   RegistroParticipanteCapacitacion,
   Role,
   RolSistema,
-  UsuarioSistema
+  UsuarioSistema,
+  ConfiguracionEmpresa
 } from '../types';
 import { CAPACITACIONES_INICIALES } from '../data/capacitacionesData';
 import {
@@ -71,6 +72,7 @@ interface CapacitacionesViewProps {
   rolSistema?: RolSistema;
   currentEmpleadoId?: string;
   currentUser?: UsuarioSistema;
+  empresa?: ConfiguracionEmpresa;
 }
 
 export function CapacitacionesView({
@@ -79,7 +81,8 @@ export function CapacitacionesView({
   userRole,
   rolSistema,
   currentEmpleadoId,
-  currentUser
+  currentUser,
+  empresa
 }: CapacitacionesViewProps) {
   const isSuperAdmin = rolSistema === 'superadmin';
   const esAdmin = userRole !== 'empleado' && (rolSistema === 'superadmin' || rolSistema === 'admin_gh' || userRole === 'admin');
@@ -169,7 +172,7 @@ export function CapacitacionesView({
       setModalDepurarOpen(false);
       showToast('Historial de capacitaciones restablecido con éxito.');
     } catch (e: any) {
-      alert('Error al depurar capacitaciones: ' + e.message);
+      showToast('Error al depurar capacitaciones: ' + (e?.message || 'Error'));
     } finally {
       setDepurando(false);
     }
@@ -268,7 +271,7 @@ export function CapacitacionesView({
     if (!nuevoTipoInput.trim()) return;
     const nombreLimpio = nuevoTipoInput.trim();
     if (tiposCapacitacion.includes(nombreLimpio)) {
-      alert('Este tipo de capacitación ya existe.');
+      showToast('Este tipo de capacitación ya existe.');
       return;
     }
     const actualizados = [...tiposCapacitacion, nombreLimpio];
@@ -299,7 +302,7 @@ export function CapacitacionesView({
 
   const handleEliminarTipo = (tipoABorrar: string) => {
     if (tiposCapacitacion.length <= 1) {
-      alert('Debe permanecer al menos un tipo de capacitación configurado.');
+      showToast('Debe permanecer al menos un tipo de capacitación configurado.');
       return;
     }
     const actualizados = tiposCapacitacion.filter(t => t !== tipoABorrar);
@@ -690,7 +693,7 @@ export function CapacitacionesView({
 
   const handleEliminarPregunta = (pIdx: number) => {
     if (nuevaCap.preguntas.length <= 1) {
-      alert('La capacitación debe contar con al menos una (1) pregunta en su examen.');
+      showToast('La capacitación debe contar con al menos una (1) pregunta en su examen.');
       return;
     }
     setNuevaCap(prev => ({
@@ -721,7 +724,7 @@ export function CapacitacionesView({
   const handleGuardarNuevaCapacitacion = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevaCap.titulo.trim() || !nuevaCap.objetivo.trim() || nuevaCap.cargosAsignados.length === 0) {
-      alert('Por favor complete el título, objetivo y asigne al menos un cargo destinatario.');
+      showToast('Por favor complete el título, objetivo y asigne al menos un cargo destinatario.');
       return;
     }
 
@@ -795,7 +798,7 @@ export function CapacitacionesView({
       setCapacitacionAEliminar(null);
       showToast('Capacitación eliminada del catálogo.');
     } catch (e: any) {
-      alert('Error al eliminar la capacitación: ' + (e?.message || e));
+      showToast('Error al eliminar la capacitación: ' + (e?.message || e));
     } finally {
       setEliminandoCap(false);
     }
@@ -2923,13 +2926,21 @@ export function CapacitacionesView({
             </button>
 
             <div className="text-center space-y-4">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <div className="w-12 h-12 rounded-full bg-[#18235C] flex items-center justify-center text-white">
-                  <ShieldCheck className="w-7 h-7 text-[#00FF00]" />
-                </div>
+              <div className="flex flex-col items-center justify-center gap-2 mb-1">
+                {empresa?.identidadVisual?.logoUrl ? (
+                  <img
+                    src={empresa.identidadVisual.logoUrl}
+                    alt={empresa.nombreComercial || 'Logo'}
+                    className="max-h-16 w-auto max-w-[240px] object-contain"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-[#18235C] flex items-center justify-center text-white">
+                    <ShieldCheck className="w-7 h-7 text-[#00FF00]" />
+                  </div>
+                )}
               </div>
               <div className="text-xs uppercase tracking-widest text-[#18235C] font-bold">
-                B GROUP INGENIERIA S.A.S. • SISTEMA DE GESTIÓN SST
+                {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'} • SISTEMA DE GESTIÓN SST
               </div>
               <h2 className="text-xl sm:text-2xl font-bold font-serif text-[#18235C] tracking-tight uppercase">
                 Constancia Oficial de Capacitación y Competencias

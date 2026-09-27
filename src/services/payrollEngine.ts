@@ -105,6 +105,20 @@ export function determinarClaseRiesgoARL(cargoCodigo: string, cargoNombre: strin
   return 'I'; // Riesgo I por defecto administrativo / dirección
 }
 
+// Determina si una vinculación contractual NO genera nómina de salarios ni prestaciones sociales patronales (ej. Prestación de Servicios, Aprendizaje, Pasantía)
+export function esContratoSinNominaLaboral(tipoContrato?: string): boolean {
+  if (!tipoContrato) return false;
+  const t = tipoContrato.toLowerCase();
+  return (
+    t.includes('prestación de servicios') ||
+    t.includes('prestacion de servicios') ||
+    t.includes('honorarios') ||
+    t.includes('pasantía') ||
+    t.includes('pasantia') ||
+    t.includes('aprendizaje')
+  );
+}
+
 // Calcula la nómina periódica para un empleado
 export function calcularLiquidacionEmpleado(
   empleado: Empleado,
@@ -113,6 +127,10 @@ export function calcularLiquidacionEmpleado(
   novedades: NovedadNominaEmpleado,
   parametros: ParametrosLegalesNomina = PARAMETROS_COLOMBIA_2026
 ): LiquidacionEmpleadoNomina {
+  const tipoContrato = empleado.laboral?.tipoContrato || empleado.contrato?.tipo || '';
+  const esSinNomina = esContratoSinNominaLaboral(tipoContrato);
+  const esAprendizajeSENA = tipoContrato.toLowerCase().includes('aprendizaje');
+
   const salarioBasicoPactado = parseSalarioNumerico(empleado.contrato.salario);
   const claseRiesgoARL = determinarClaseRiesgoARL(cargoCodigo, cargoNombre);
 
@@ -120,8 +138,8 @@ export function calcularLiquidacionEmpleado(
   const salarioProporcional = Math.round((salarioBasicoPactado / 30) * diasTrabajados);
 
   // Auxilio de transporte: aplica si el salario básico pactado es menor o igual a 2 SMMLV
-  // y se paga proporcional a los días laborados
-  const tieneDerechoAuxilioTransporte = salarioBasicoPactado <= (parametros.smmlv * parametros.topeSmmlvAuxilioTransporte);
+  // y se paga proporcional a los días laborados (NO aplica para contratos de prestación de servicios ni aprendizaje)
+  const tieneDerechoAuxilioTransporte = !esSinNomina && salarioBasicoPactado <= (parametros.smmlv * parametros.topeSmmlvAuxilioTransporte);
   const auxilioTransporte = tieneDerechoAuxilioTransporte
     ? Math.round((parametros.auxilioTransporte / 30) * diasTrabajados)
     : 0;
@@ -137,11 +155,11 @@ export function calcularLiquidacionEmpleado(
   const factorHFN = parametros.factorDominicalFestivoNocturno ?? 2.10;
   const factorRN = parametros.factorRecargoNocturno ?? 0.35;
 
-  const valorHED = Math.round(valorHoraOrdinaria * factorHED * (novedades.horasExtrasDiurnas || 0));
-  const valorHEN = Math.round(valorHoraOrdinaria * factorHEN * (novedades.horasExtrasNocturnas || 0));
-  const valorHFD = Math.round(valorHoraOrdinaria * factorHFD * (novedades.horasFestivasDiurnas || 0));
-  const valorHFN = Math.round(valorHoraOrdinaria * factorHFN * (novedades.horasFestivasNocturnas || 0));
-  const valorRecargoNocturno = Math.round(valorHoraOrdinaria * factorRN * (novedades.recargoNocturnoOrdinario || 0));
+  const valorHED = esSinNomina ? 0 : Math.round(valorHoraOrdinaria * factorHED * (novedades.horasExtrasDiurnas || 0));
+  const valorHEN = esSinNomina ? 0 : Math.round(valorHoraOrdinaria * factorHEN * (novedades.horasExtrasNocturnas || 0));
+  const valorHFD = esSinNomina ? 0 : Math.round(valorHoraOrdinaria * factorHFD * (novedades.horasFestivasDiurnas || 0));
+  const valorHFN = esSinNomina ? 0 : Math.round(valorHoraOrdinaria * factorHFN * (novedades.horasFestivasNocturnas || 0));
+  const valorRecargoNocturno = esSinNomina ? 0 : Math.round(valorHoraOrdinaria * factorRN * (novedades.recargoNocturnoOrdinario || 0));
 
   const valorHorasExtrasYRecargos = valorHED + valorHEN + valorHFD + valorHFN + valorRecargoNocturno;
   const bonificacionesYComisiones = (novedades.bonificacionesSalariales || 0) + (novedades.comisiones || 0);
@@ -149,34 +167,37 @@ export function calcularLiquidacionEmpleado(
   const totalDevengado = salarioProporcional + auxilioTransporte + valorHorasExtrasYRecargos + bonificacionesYComisiones;
 
   // IBC (Ingreso Base de Cotización) para Seguridad Social:
-  // El auxilio de transporte NO constituye salario ni hace parte del IBC (Art. 7 Ley 1 de 1963)
-  const ibcSeguridadSocial = Math.max(
-    parametros.smmlv,
-    salarioProporcional + valorHorasExtrasYRecargos + bonificacionesYComisiones
-  );
+  const ibcSeguridadSocial = esSinNomina
+    ? 0
+    : Math.max(
+        parametros.smmlv,
+        salarioProporcional + valorHorasExtrasYRecargos + bonificacionesYComisiones
+      );
 
   // Deducciones obligatorias del trabajador:
-  const saludEmpleado = Math.round(ibcSeguridadSocial * parametros.pctSaludEmpleado); // 4%
-  const pensionEmpleado = Math.round(ibcSeguridadSocial * parametros.pctPensionEmpleado); // 4%
+  // Contratistas por prestación de servicios pagan su propia PILA independiente
+  const saludEmpleado = esSinNomina ? 0 : Math.round(ibcSeguridadSocial * parametros.pctSaludEmpleado); // 4%
+  const pensionEmpleado = esSinNomina ? 0 : Math.round(ibcSeguridadSocial * parametros.pctPensionEmpleado); // 4%
 
   // Fondo de Solidaridad Pensional (FSP): aplica para IBC >= 4 SMMLV (Ley 100/93 Art. 27)
   let pctFSP = 0;
   const smmlvIbc = ibcSeguridadSocial / parametros.smmlv;
-  if (smmlvIbc >= 20) pctFSP = 0.020;
-  else if (smmlvIbc >= 19) pctFSP = 0.018;
-  else if (smmlvIbc >= 18) pctFSP = 0.016;
-  else if (smmlvIbc >= 17) pctFSP = 0.014;
-  else if (smmlvIbc >= 16) pctFSP = 0.012;
-  else if (smmlvIbc >= 4) pctFSP = 0.010;
+  if (!esSinNomina) {
+    if (smmlvIbc >= 20) pctFSP = 0.020;
+    else if (smmlvIbc >= 19) pctFSP = 0.018;
+    else if (smmlvIbc >= 18) pctFSP = 0.016;
+    else if (smmlvIbc >= 17) pctFSP = 0.014;
+    else if (smmlvIbc >= 16) pctFSP = 0.012;
+    else if (smmlvIbc >= 4) pctFSP = 0.010;
+  }
 
   const fondoSolidaridadPensional = Math.round(ibcSeguridadSocial * pctFSP);
 
-  // Retención en la fuente (proyección Art. 383 Estatuto Tributario)
-  // Depuración de ingresos: IBC - Aportes obligatorios salud/pensión/FSP
+  // Retención en la fuente
   const baseGravablePesos = Math.max(0, totalDevengado - saludEmpleado - pensionEmpleado - fondoSolidaridadPensional);
   const baseGravableUVT = baseGravablePesos / parametros.uvt;
   let retencionFuente = 0;
-  if (baseGravableUVT > 95) {
+  if (!esSinNomina && baseGravableUVT > 95) {
     if (baseGravableUVT <= 150) {
       retencionFuente = Math.round(((baseGravableUVT - 95) * 0.19) * parametros.uvt);
     } else if (baseGravableUVT <= 360) {
@@ -192,33 +213,28 @@ export function calcularLiquidacionEmpleado(
   const netoAPagar = totalDevengado - totalDeducciones;
 
   // Aportes de la Empresa (Seguridad Social y Parafiscales):
-  // Exoneración Art. 114-1 E.T. (Ley 1607/2012 y Ley 1819/2016):
-  // Empleadores están exonerados de Salud (8.5%), SENA (2%) e ICBF (3%) por trabajadores que devenguen menos de 10 SMMLV
   const devengaMenos10SMMLV = salarioBasicoPactado < (parametros.smmlv * parametros.topeSmmlvExoneracionParafiscales);
   const exoneradoArt114_1 = devengaMenos10SMMLV;
 
-  const saludEmpleador = exoneradoArt114_1 ? 0 : Math.round(ibcSeguridadSocial * parametros.pctSaludEmpleador);
-  const pensionEmpleador = Math.round(ibcSeguridadSocial * parametros.pctPensionEmpleador); // 12%
+  const saludEmpleador = (esSinNomina || exoneradoArt114_1) ? 0 : Math.round(ibcSeguridadSocial * parametros.pctSaludEmpleador);
+  const pensionEmpleador = esSinNomina ? 0 : Math.round(ibcSeguridadSocial * parametros.pctPensionEmpleador); // 12%
 
+  // ARL: En aprendizaje productivo la empresa paga ARL, en prestación de servicios paga el contratista (salvo riesgo IV/V)
   const tarifaArlAplicada = parametros.tarifasARL[claseRiesgoARL] || parametros.tarifasARL.I;
-  const arl = Math.round(ibcSeguridadSocial * tarifaArlAplicada);
+  const arl = (esSinNomina && !esAprendizajeSENA) ? 0 : Math.round((ibcSeguridadSocial || salarioProporcional) * tarifaArlAplicada);
 
-  const cajaCompensacion = Math.round(ibcSeguridadSocial * parametros.pctCajaCompensacion); // 4% siempre
-  const sena = exoneradoArt114_1 ? 0 : Math.round(ibcSeguridadSocial * parametros.pctSena);
-  const icbf = exoneradoArt114_1 ? 0 : Math.round(ibcSeguridadSocial * parametros.pctIcbf);
+  const cajaCompensacion = esSinNomina ? 0 : Math.round(ibcSeguridadSocial * parametros.pctCajaCompensacion); // 4% siempre
+  const sena = (esSinNomina || exoneradoArt114_1) ? 0 : Math.round(ibcSeguridadSocial * parametros.pctSena);
+  const icbf = (esSinNomina || exoneradoArt114_1) ? 0 : Math.round(ibcSeguridadSocial * parametros.pctIcbf);
 
   const totalSeguridadSocialYParafiscales = saludEmpleador + pensionEmpleador + arl + cajaCompensacion + sena + icbf;
 
   // Provisiones para Prestaciones Sociales:
-  // Base cesantías y prima = Devengado salarial + Auxilio de transporte
-  const basePrestacionesConAuxilio = totalDevengado;
-  // Base vacaciones = Solo salario sin auxilio de transporte
-  const baseVacacionesSinAuxilio = totalDevengado - auxilioTransporte;
-
-  const cesantias = Math.round(basePrestacionesConAuxilio * parametros.pctCesantias); // 8.33%
-  const interesesCesantias = Math.round(cesantias * parametros.pctInteresesCesantias); // 1% mensual sobre cesantías
-  const primaServicios = Math.round(basePrestacionesConAuxilio * parametros.pctPrimaServicios); // 8.33%
-  const vacaciones = Math.round(baseVacacionesSinAuxilio * parametros.pctVacaciones); // 4.17%
+  // Para prestación de servicios / aprendizaje / pasantías = 0 COP (No genera prima, cesantías ni vacaciones prestacionales patronales)
+  const cesantias = esSinNomina ? 0 : Math.round(totalDevengado * parametros.pctCesantias); // 8.33%
+  const interesesCesantias = esSinNomina ? 0 : Math.round(cesantias * parametros.pctInteresesCesantias); // 1% mensual sobre cesantías
+  const primaServicios = esSinNomina ? 0 : Math.round(totalDevengado * parametros.pctPrimaServicios); // 8.33%
+  const vacaciones = esSinNomina ? 0 : Math.round((totalDevengado - auxilioTransporte) * parametros.pctVacaciones); // 4.17%
 
   const totalProvisiones = cesantias + interesesCesantias + primaServicios + vacaciones;
 

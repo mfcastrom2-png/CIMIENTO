@@ -26,6 +26,7 @@ import {
   Award,
   TrendingUp,
   AlertTriangle,
+  AlertCircle,
   FileSpreadsheet,
   CheckCircle2,
   ArrowRight,
@@ -169,8 +170,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [formLinkAccion, setFormLinkAccion] = useState('');
   const [formTextoBoton, setFormTextoBoton] = useState('');
   const [formDestacado, setFormDestacado] = useState(true);
+  const [errorModalAnuncio, setErrorModalAnuncio] = useState<string | null>(null);
 
   const abrirCrearAnuncio = () => {
+    setErrorModalAnuncio(null);
     setAnuncioEnEdicion(null);
     setFormTitulo('');
     setFormSubtitulo('');
@@ -185,6 +188,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   const abrirEditarAnuncio = (anuncio: AnuncioSlide) => {
+    setErrorModalAnuncio(null);
     setAnuncioEnEdicion(anuncio);
     setFormTitulo(anuncio.titulo);
     setFormSubtitulo(anuncio.subtitulo || '');
@@ -200,8 +204,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const handleGuardarAnuncio = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorModalAnuncio(null);
     if (!formTitulo.trim() || !formDescripcion.trim()) {
-      alert('Por favor ingrese el título y la descripción del comunicado.');
+      setErrorModalAnuncio('Por favor ingrese el título y la descripción del comunicado.');
       return;
     }
 
@@ -887,6 +892,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <form onSubmit={handleGuardarAnuncio} className="space-y-4 text-xs">
+              {errorModalAnuncio && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-300 text-rose-800 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{errorModalAnuncio}</span>
+                </div>
+              )}
+
               {/* Título y Subtítulo */}
               <div className="space-y-1">
                 <label className="font-bold text-[#18235C] block">

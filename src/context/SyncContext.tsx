@@ -8,7 +8,8 @@ import {
   ItemInventarioEPP,
   SolicitudEntregaEPP,
   UsuarioSistema,
-  ProcesoOrganizacion
+  ProcesoOrganizacion,
+  ConfiguracionEmpresa
 } from '../types';
 import {
   initialAreas,
@@ -16,9 +17,11 @@ import {
   initialCargos,
   initialEmpleados,
   initialSolicitudes,
-  initialEvaluaciones
+  initialEvaluaciones,
+  initialEmpresa
 } from '../data/initialData';
 import { INITIAL_INVENTARIO_EPP, INITIAL_SOLICITUDES_ENTREGA_EPP } from '../data/eppData';
+import { INITIAL_USUARIOS_SISTEMA } from '../data/usuariosYVotacionesData';
 import {
   db,
   suscribirColeccion,
@@ -36,6 +39,10 @@ import {
   guardarEvaluacionFB,
   guardarInventarioEppLoteFB,
   guardarSolicitudesEppLoteFB,
+  guardarUsuarioFB,
+  registrarUsuarioEnAuth,
+  guardarEmpresaFB,
+  obtenerEmpresaFB,
   registrarEventoAuditoria
 } from '../lib/firebase';
 import { useAuth } from './AuthContext';
@@ -64,7 +71,10 @@ interface SyncContextType {
   cargandoMasSolicitudes: boolean;
   cargarMasSolicitudesNube: () => Promise<void>;
   // Acciones CRUD con Trazabilidad de Auditoría Inmutable
-  handleAddEmpleado: (empleado: Empleado) => Promise<void>;
+  handleAddEmpleado: (
+    empleado: Empleado,
+    opciones?: { crearUsuario?: boolean; passwordTemporal?: string }
+  ) => Promise<{ usuarioCreado?: UsuarioSistema; passwordTemporal?: string; resultadoEnvio?: any } | void>;
   handleUpdateEmpleado: (empleado: Empleado) => Promise<void>;
   handleDeleteEmpleado: (id: string) => Promise<void>;
   handleEmpleadosImportados: (nuevos: Empleado[]) => void;
@@ -90,6 +100,8 @@ interface SyncContextType {
   handleLimpiarEstructura: () => void;
   handleCatalogoCargado: () => void;
   recargarDatosBajoDemanda: () => Promise<void>;
+  empresa: ConfiguracionEmpresa;
+  handleUpdateEmpresa: (empresa: ConfiguracionEmpresa) => Promise<void>;
 }
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
@@ -102,6 +114,17 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [esLimpio, setEsLimpio] = useState<boolean>(() => {
     return localStorage.getItem('bgroup_datos_limpios') === 'true';
+  });
+
+  const [empresa, setEmpresa] = useState<ConfiguracionEmpresa>(() => {
+    try {
+      const cached = localStorage.getItem('bgroup_empresa_config');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.razonSocial) return parsed;
+      }
+    } catch {}
+    return initialEmpresa;
   });
 
   const [areas, setAreas] = useState<AreaOrganizacion[]>(() => {
@@ -145,7 +168,23 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [solicitudesEpp, setSolicitudesEpp] = useState<SolicitudEntregaEPP[]>(() => {
     return shouldOmitMocks ? [] : INITIAL_SOLICITUDES_ENTREGA_EPP;
   });
-  const [usuariosList, setUsuariosList] = useState<UsuarioSistema[]>([]);
+  const [usuariosList, setUsuariosList] = useState<UsuarioSistema[]>(() => {
+    try {
+      const eliminadosRaw = localStorage.getItem('bgroup_usuarios_eliminados');
+      const eliminadosSet = new Set(eliminadosRaw ? (JSON.parse(eliminadosRaw) as string[]).map(x => String(x).toLowerCase()) : []);
+      const cached = localStorage.getItem('bgroup_usuarios_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(u => !eliminadosSet.has(u.id.toLowerCase()) && !eliminadosSet.has((u.email || '').toLowerCase()));
+        }
+      }
+      return (shouldOmitMocks ? [] : INITIAL_USUARIOS_SISTEMA).filter(
+        u => !eliminadosSet.has(u.id.toLowerCase()) && !eliminadosSet.has((u.email || '').toLowerCase())
+      );
+    } catch {}
+    return shouldOmitMocks ? [] : INITIAL_USUARIOS_SISTEMA;
+  });
   const [cloudSynced, setCloudSynced] = useState<boolean>(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
   const [cargandoNube, setCargandoNube] = useState<boolean>(false);
@@ -214,10 +253,22 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setEvaluaciones(evalData);
       setInventarioEpp(eppData);
       setSolicitudesEpp(solEppData);
-      setUsuariosList(usrData);
+      if (usrData && usrData.length > 0) {
+        setUsuariosList(usrData);
+        try {
+          localStorage.setItem('bgroup_usuarios_cache', JSON.stringify(usrData));
+        } catch {}
+      }
 
       // Verificación de configuración de la empresa bajo demanda (sin listener continuo)
       try {
+        const empresaData = await obtenerEmpresaFB();
+        if (empresaData && empresaData.razonSocial) {
+          setEmpresa(empresaData);
+          try {
+            localStorage.setItem('bgroup_empresa_config', JSON.stringify(empresaData));
+          } catch {}
+        }
         const configSnap = await getDoc(doc(db, 'configuracion_empresa', 'general'));
         if (configSnap.exists()) {
           const configData = configSnap.data();
@@ -235,8 +286,13 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       console.warn('Advertencia en sincronización bajo demanda:', err);
       setCloudSynced(false);
-      const codeStr = err?.code ? `[${err.code}] ` : '';
-      setCloudError(`${codeStr}${err?.message || 'Error de conexión con Cloud Firestore backend'}`);
+      const isOffline = err?.code === 'unavailable' || err?.message?.includes('Could not reach Cloud Firestore') || err?.message?.includes('offline');
+      if (isOffline) {
+        setCloudError('Modo local/offline activo: Trabajando con los datos en memoria del navegador. Se reconectará automáticamente cuando mejore el canal con Cloud Firestore.');
+      } else {
+        const codeStr = err?.code ? `[${err.code}] ` : '';
+        setCloudError(`${codeStr}${err?.message || 'Error de conexión con Cloud Firestore backend'}`);
+      }
     } finally {
       setCargandoNube(false);
     }
@@ -312,7 +368,10 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [authReady, fbUser, recargarDatosBajoDemanda]);
 
   // Handlers con Trazabilidad Inmutable
-  const handleAddEmpleado = async (empleado: Empleado) => {
+  const handleAddEmpleado = async (
+    empleado: Empleado,
+    opciones?: { crearUsuario?: boolean; passwordTemporal?: string }
+  ) => {
     setEmpleados(prev => {
       const updated = [...prev.filter(e => e.id !== empleado.id), empleado];
       try {
@@ -325,6 +384,50 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.warn('Error al guardar empleado en Firestore:', err);
     }
+
+    let usuarioCreado: UsuarioSistema | undefined;
+    let resultadoEnvio: any;
+
+    if (opciones?.crearUsuario && (empleado.email || empleado.persona?.numeroDocumento)) {
+      const emailFinal = (empleado.email || `${empleado.codigo || empleado.documento}@bgroup.com.co`).trim().toLowerCase();
+      const pass = opciones.passwordTemporal || 'BGroup2026*';
+      const nuevoUsuario: UsuarioSistema = {
+        id: `usr-${empleado.id}`,
+        nombre: empleado.nombre,
+        documento: empleado.documento,
+        email: emailFinal,
+        rol: 'empleado',
+        cargoNombre: empleado.laboral?.cargoNombre || 'Colaborador',
+        empresaId: empleado.empresaId || currentUser?.empresaId || 'empresa-a',
+        estado: 'activo',
+        ultimoAcceso: 'Nunca',
+        fechaCreacion: new Date().toISOString().slice(0, 10),
+        dobleFactorHabilitado: false,
+        permisos: ['empleados', 'solicitudes', 'capacitaciones'],
+        empleadoId: empleado.id
+      };
+
+      try {
+        const authRes = await registrarUsuarioEnAuth(emailFinal, pass, empleado.nombre);
+        if (authRes.success && authRes.uid) {
+          nuevoUsuario.id = authRes.uid;
+          resultadoEnvio = { exitoAuth: true, uid: authRes.uid };
+        } else {
+          resultadoEnvio = { exitoAuth: false, mensaje: authRes.message };
+        }
+        await guardarUsuarioFB(nuevoUsuario);
+        setUsuariosList(prev => [...prev.filter(u => u.email !== emailFinal), nuevoUsuario]);
+        usuarioCreado = nuevoUsuario;
+      } catch (err: any) {
+        console.warn('Error al aprovisionar usuario para empleado:', err);
+      }
+    }
+
+    return {
+      usuarioCreado,
+      passwordTemporal: opciones?.passwordTemporal || 'BGroup2026*',
+      resultadoEnvio
+    };
   };
 
   const handleUpdateEmpleado = async (empleado: Empleado) => {
@@ -360,6 +463,18 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleEmpleadosImportados = (nuevos: Empleado[]) => {
     setEmpleados(prev => [...prev, ...nuevos]);
+  };
+
+  const handleUpdateEmpresa = async (nuevaEmpresa: ConfiguracionEmpresa) => {
+    setEmpresa(nuevaEmpresa);
+    try {
+      localStorage.setItem('bgroup_empresa_config', JSON.stringify(nuevaEmpresa));
+    } catch {}
+    try {
+      await guardarEmpresaFB(nuevaEmpresa, currentUser);
+    } catch (err) {
+      console.warn('Error al guardar datos de la empresa en Firestore:', err);
+    }
   };
 
   const handleAddCargo = async (cargo: Cargo) => {
@@ -584,6 +699,9 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleActualizarUsuarios = (nuevos: UsuarioSistema[]) => {
     setUsuariosList(nuevos);
+    try {
+      localStorage.setItem('bgroup_usuarios_cache', JSON.stringify(nuevos));
+    } catch {}
   };
 
   const handleDatosLimpiados = () => {
@@ -670,6 +788,8 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleLimpiarEstructura,
         handleCatalogoCargado,
         recargarDatosBajoDemanda,
+        empresa,
+        handleUpdateEmpresa,
         cargandoNube,
         hayMasEmpleadosNube,
         cargandoMasEmpleados,

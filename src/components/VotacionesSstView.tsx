@@ -4,7 +4,8 @@ import {
   CertificadoVotoEmpleado,
   Empleado,
   ProcesoVotacionSST,
-  Role
+  Role,
+  ConfiguracionEmpresa
 } from '../types';
 import { INITIAL_PROCESOS_VOTACION } from '../data/usuariosYVotacionesData';
 import {
@@ -41,12 +42,14 @@ interface VotacionesSstViewProps {
   userRole?: Role;
   currentEmpleadoId?: string;
   empleados?: Empleado[];
+  empresa?: ConfiguracionEmpresa;
 }
 
 export function VotacionesSstView({
   userRole = 'admin',
   currentEmpleadoId = 'e6', // Por defecto Carlos Mendivelso (empleado técnico que vota)
-  empleados = []
+  empleados = [],
+  empresa
 }: VotacionesSstViewProps) {
   const [procesos, setProcesos] = useState<ProcesoVotacionSST[]>(() => {
     const limpio = typeof window !== 'undefined' && localStorage.getItem('bgroup_datos_limpios') === 'true';
@@ -115,6 +118,7 @@ export function VotacionesSstView({
 
   // Selección en el tarjetón de votación
   const [candidatoSeleccionadoId, setCandidatoSeleccionadoId] = useState<string | null>(null);
+  const [errorVotacion, setErrorVotacion] = useState<string | null>(null);
 
   // Certificado activo para mostrar en modal o vista
   const [certificadoActivo, setCertificadoActivo] = useState<CertificadoVotoEmpleado | null>(null);
@@ -187,13 +191,14 @@ export function VotacionesSstView({
   // Acción: Emitir Voto
   const handleEmitirVoto = (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorVotacion(null);
     if (!candidatoSeleccionadoId) {
-      alert('Por favor seleccione una opción en el tarjetón electoral.');
+      setErrorVotacion('Por favor seleccione una opción en el tarjetón electoral antes de continuar.');
       return;
     }
 
     if (votoRegistrado) {
-      alert('Usted ya ha ejercido su voto en este proceso electoral.');
+      setErrorVotacion('Usted ya ha ejercido su voto en este proceso electoral.');
       return;
     }
 
@@ -456,6 +461,14 @@ export function VotacionesSstView({
         ) : (
           /* FORMULARIO DE VOTACIÓN ACTIVA (TARJETÓN) */
           <form onSubmit={handleEmitirVoto} className="space-y-4">
+            {errorVotacion && (
+              <div className="p-3 bg-rose-50 border border-rose-300 rounded-lg text-rose-800 text-xs flex items-center justify-between font-semibold">
+                <span>{errorVotacion}</span>
+                <button type="button" onClick={() => setErrorVotacion(null)} className="text-rose-600 hover:text-rose-800 font-bold ml-2">
+                  ✕
+                </button>
+              </div>
+            )}
             <div className="text-xs text-[#282829] bg-[#FFFFFF] p-3 rounded-lg border border-[#8FA7D6]">
               <strong>Instrucciones:</strong> Seleccione únicamente <strong>un (1) candidato</strong> o la opción de <strong>Voto en Blanco</strong> marcando la casilla correspondiente. Su voto es completamente confidencial y anónimo conforme a la ley colombiana.
             </div>
@@ -830,8 +843,17 @@ export function VotacionesSstView({
 
             {/* Certificado con formato oficial imprimible */}
             <div className="p-5 border-2 border-[#18235C]/30 rounded-xl bg-[#FFFFFF] text-center space-y-3">
-              <div className="text-xs font-bold tracking-widest text-[#18235C] uppercase">
-                B GROUP INGENIERIA S.A.S. • SISTEMA DE GESTIÓN SST
+              <div className="flex flex-col items-center justify-center gap-2 mb-1">
+                {empresa?.identidadVisual?.logoUrl ? (
+                  <img
+                    src={empresa.identidadVisual.logoUrl}
+                    alt={empresa.nombreComercial || 'Logo'}
+                    className="max-h-14 w-auto max-w-[220px] object-contain"
+                  />
+                ) : null}
+                <div className="text-xs font-bold tracking-widest text-[#18235C] uppercase">
+                  {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'} • SISTEMA DE GESTIÓN SST
+                </div>
               </div>
 
               <h4 className="text-base font-bold font-serif text-[#18235C]">

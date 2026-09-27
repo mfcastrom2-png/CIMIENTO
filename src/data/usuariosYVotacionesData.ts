@@ -7,7 +7,7 @@ import {
 } from '../types';
 
 export const MODULOS_SISTEMA = [
-  { id: 'dashboard', nombre: 'Tablero de Control', descripcion: 'Métricas generales, KPIs y accesos rápidos' },
+  { id: 'dashboard', nombre: 'Dashboard', descripcion: 'Métricas generales, KPIs y accesos rápidos' },
   { id: 'estructura', nombre: 'Estructura Organizacional', descripcion: 'Organigrama, áreas y dependencias jerárquicas' },
   { id: 'cargos', nombre: 'Manual de Cargos', descripcion: 'Fichas técnicas, perfiles, requisitos y competencias' },
   { id: 'empleados', nombre: 'Personas & Personal', descripcion: 'Hojas de vida, contratos, datos sociodemográficos' },
@@ -37,10 +37,34 @@ export const INITIAL_USUARIOS_SISTEMA: UsuarioSistema[] = [
       'dashboard', 'estructura', 'cargos', 'empleados', 'evaluaciones',
       'solicitudes', 'capacitaciones', 'sst', 'epps', 'nomina', 'usuarios', 'documentos'
     ]
+  },
+  {
+    id: 'usr-manuel-castro',
+    nombre: 'Manuel Castro',
+    documento: '80.892.411',
+    email: 'manuelfcastrom@gmail.com',
+    rol: 'empleado',
+    cargoNombre: 'Técnico de Redes y Operaciones ISP',
+    estado: 'activo',
+    ultimoAcceso: 'Reciente',
+    fechaCreacion: '2026-01-15',
+    dobleFactorHabilitado: false,
+    empleadoId: 'e-manuel-castro',
+    permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
   }
 ];
 
 export const CUENTAS_PRUEBA_OFICIALES = [
+  {
+    email: 'manuelfcastrom@gmail.com',
+    pass: 'Cimiento2026*!',
+    nombre: 'Manuel Castro',
+    rol: 'empleado' as const,
+    empresaId: 'empresa-principal',
+    empleadoId: 'e-manuel-castro',
+    documento: '80.892.411',
+    permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
+  },
   {
     email: 'superadmin@test-cimiento.com',
     pass: 'Cimiento2026*!',
@@ -69,9 +93,9 @@ export const CUENTAS_PRUEBA_OFICIALES = [
   {
     email: 'admin-a@test-cimiento.com',
     pass: 'Cimiento2026*!',
-    nombre: 'Administrador Empresa A',
+    nombre: 'Administrador Gestión Humana',
     rol: 'admin_gh' as const,
-    empresaId: 'empresa-a',
+    empresaId: 'empresa-principal',
     documento: '10.000.002',
     permisos: [
       'dashboard',
@@ -93,9 +117,9 @@ export const CUENTAS_PRUEBA_OFICIALES = [
   {
     email: 'sst-a@test-cimiento.com',
     pass: 'Cimiento2026*!',
-    nombre: 'Responsable SST Empresa A',
+    nombre: 'Responsable SG-SST',
     rol: 'responsable_sst' as const,
-    empresaId: 'empresa-a',
+    empresaId: 'empresa-principal',
     documento: '10.000.003',
     permisos: [
       'dashboard',
@@ -109,20 +133,20 @@ export const CUENTAS_PRUEBA_OFICIALES = [
   {
     email: 'empleado-a@test-cimiento.com',
     pass: 'Cimiento2026*!',
-    nombre: 'Carlos Mendoza (Empresa A)',
+    nombre: 'Carlos Mendoza (Colaborador)',
     rol: 'empleado' as const,
-    empresaId: 'empresa-a',
-    empleadoId: 'empleado-a-001',
+    empresaId: 'empresa-principal',
+    empleadoId: 'empleado-001',
     documento: '10.000.004',
     permisos: ['dashboard', 'solicitudes', 'capacitaciones']
   },
   {
     email: 'empleado-b@test-cimiento.com',
     pass: 'Cimiento2026*!',
-    nombre: 'Laura Restrepo (Empresa B)',
+    nombre: 'Laura Restrepo (Colaboradora)',
     rol: 'empleado' as const,
-    empresaId: 'empresa-b',
-    empleadoId: 'empleado-b-001',
+    empresaId: 'empresa-principal',
+    empleadoId: 'empleado-002',
     documento: '20.000.001',
     permisos: ['dashboard', 'solicitudes', 'capacitaciones']
   }

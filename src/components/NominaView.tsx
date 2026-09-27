@@ -13,6 +13,7 @@ import {
   PARAMETROS_COLOMBIA_2026,
   calcularLiquidacionEmpleado,
   crearPeriodoNomina,
+  esContratoSinNominaLaboral,
   formatMonedaCOP,
   guardarParametrosConfigurados,
   obtenerNombreMes,
@@ -467,7 +468,14 @@ export function NominaView({
               </div>
               <div>
                 <span className="text-[#282829]/70 block text-[10px] uppercase font-bold">Tipo Contrato</span>
-                <span className="font-medium text-[#282829]">{miLiquidacion.tipoContrato}</span>
+                <span className="font-medium text-[#282829] flex items-center gap-1.5 flex-wrap">
+                  {miLiquidacion.tipoContrato}
+                  {esContratoSinNominaLaboral(miLiquidacion.tipoContrato) && (
+                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 border border-amber-300 rounded text-[9px] font-bold">
+                      Sin Prestaciones CST
+                    </span>
+                  )}
+                </span>
               </div>
               <div>
                 <span className="text-[#282829]/70 block text-[10px] uppercase font-bold">Salario Básico</span>

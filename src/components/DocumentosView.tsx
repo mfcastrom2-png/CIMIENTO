@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cargo, Empleado, EvaluacionDesempeno } from '../types';
+import { Cargo, Empleado, EvaluacionDesempeno, ConfiguracionEmpresa } from '../types';
 import {
   FileText,
   Printer,
@@ -16,6 +16,7 @@ interface DocumentosViewProps {
   empleados: Empleado[];
   evaluaciones: EvaluacionDesempeno[];
   onOpenEvaluacionDetalle: (evaluacionId: string) => void;
+  empresa?: ConfiguracionEmpresa;
 }
 
 export const DocumentosView: React.FC<DocumentosViewProps> = ({
@@ -23,6 +24,7 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
   empleados,
   evaluaciones,
   onOpenEvaluacionDetalle,
+  empresa
 }) => {
   const [selectedDocType, setSelectedDocType] = useState<'ficha' | 'acta_eval' | 'certificado' | 'contrato'>('ficha');
   const [selectedCargoId, setSelectedCargoId] = useState<string>(cargos[0]?.id || '');
@@ -46,7 +48,7 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               Gestión Documental Oficial
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#8FA7D6]/15 text-[#18235C] border border-[#8FA7D6]/30">
-              B GROUP INGENIERIA S.A.S.
+              {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#18235C]">
@@ -148,16 +150,29 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
         {selectedDocType === 'ficha' && cargo && (
           <div className="space-y-6 text-xs text-[#282829]">
             {/* Header Documento */}
-            <div className="border-b-2 border-[#18235C] pb-4 flex justify-between items-start">
-              <div>
-                <span className="text-xl font-bold text-[#18235C] block">
-                  B GROUP INGENIERIA S.A.S. — GESTIÓN HUMANA
-                </span>
-                <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold">
-                  Manual Específico de Funciones y Competencias Laborales
-                </span>
+            <div className="border-b-2 border-[#18235C] pb-4 flex justify-between items-center gap-4">
+              <div className="flex items-center gap-4">
+                {empresa?.identidadVisual?.logoUrl ? (
+                  <img
+                    src={empresa.identidadVisual.logoUrl}
+                    alt={empresa.nombreComercial || 'Logo'}
+                    className="max-h-16 w-auto max-w-[200px] object-contain shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-[#18235C] text-[#00FF00] font-black text-xl flex items-center justify-center rounded-lg shrink-0">
+                    {empresa?.nombreComercial ? empresa.nombreComercial.charAt(0) : 'B'}
+                  </div>
+                )}
+                <div>
+                  <span className="text-lg sm:text-xl font-bold text-[#18235C] block">
+                    {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'} — GESTIÓN HUMANA
+                  </span>
+                  <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold">
+                    Manual Específico de Funciones y Competencias Laborales
+                  </span>
+                </div>
               </div>
-              <div className="text-right text-[11px] font-mono text-[#282829]/70">
+              <div className="text-right text-[11px] font-mono text-[#282829]/70 shrink-0">
                 <div>Código: {cargo.ficha.identificacion.codigo || 'GH-MC-001'}</div>
                 <div>Versión: {cargo.ficha.identificacion.version || '1.0'}</div>
                 <div>Fecha: {cargo.ficha.historial[0]?.fecha || '2026-09'}</div>
@@ -267,17 +282,30 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
         {/* Plantilla 2: Acta de Evaluación Técnica */}
         {selectedDocType === 'acta_eval' && (
           <div className="space-y-6 text-xs text-[#282829]">
-            <div className="border-b-2 border-[#18235C] pb-4 flex justify-between items-start">
-              <div>
-                <span className="text-xl font-bold text-[#18235C] block">
-                  ACTA DE EVALUACIÓN TÉCNICA DE DESEMPEÑO
-                </span>
-                <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold">
-                  Modelo Cuantitativo de 100 Puntos Derivado del Cargo · B GROUP INGENIERIA S.A.S.
-                </span>
+            <div className="border-b-2 border-[#18235C] pb-4 flex justify-between items-center gap-4">
+              <div className="flex items-center gap-4">
+                {empresa?.identidadVisual?.logoUrl ? (
+                  <img
+                    src={empresa.identidadVisual.logoUrl}
+                    alt={empresa.nombreComercial || 'Logo'}
+                    className="max-h-16 w-auto max-w-[200px] object-contain shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-[#18235C] text-[#00FF00] font-black text-xl flex items-center justify-center rounded-lg shrink-0">
+                    {empresa?.nombreComercial ? empresa.nombreComercial.charAt(0) : 'B'}
+                  </div>
+                )}
+                <div>
+                  <span className="text-lg sm:text-xl font-bold text-[#18235C] block">
+                    ACTA DE EVALUACIÓN TÉCNICA DE DESEMPEÑO
+                  </span>
+                  <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold">
+                    Modelo Cuantitativo de 100 Puntos · {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
+                  </span>
+                </div>
               </div>
-              <div className="text-right text-[11px] font-mono text-[#282829]/70">
-                <div>Fecha de emisión: {new Date().toLocaleDateString('es-CO')}</div>
+              <div className="text-right text-[11px] font-mono text-[#282829]/70 shrink-0">
+                <div>Fecha: {new Date().toLocaleDateString('es-CO')}</div>
                 <div>Período: 2026 - S1</div>
               </div>
             </div>
@@ -362,12 +390,23 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
         {/* Plantilla 3: Certificado Laboral */}
         {selectedDocType === 'certificado' && (
           <div className="space-y-8 text-xs text-[#282829] py-6">
-            <div className="text-center space-y-1 border-b border-[#8FA7D6]/30 pb-4">
-              <span className="text-2xl font-bold tracking-wide block text-[#18235C]">
-                B GROUP INGENIERIA S.A.S.
+            <div className="flex flex-col items-center justify-center space-y-2 border-b border-[#8FA7D6]/30 pb-4 text-center">
+              {empresa?.identidadVisual?.logoUrl ? (
+                <img
+                  src={empresa.identidadVisual.logoUrl}
+                  alt={empresa.nombreComercial || 'Logo'}
+                  className="max-h-20 w-auto max-w-[280px] object-contain mb-1"
+                />
+              ) : (
+                <span className="text-2xl font-bold tracking-wide block text-[#18235C]">
+                  {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
+                </span>
+              )}
+              <span className="text-sm font-bold text-[#18235C] block">
+                {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
               </span>
               <span className="text-xs text-[#282829]/70 font-semibold">
-                NIT 900.995.99-2 · DEPARTAMENTO DE GESTIÓN HUMANA
+                NIT {empresa?.nit || '901.458.789'}-{empresa?.digitoVerificacion || '3'} · DEPARTAMENTO DE GESTIÓN HUMANA
               </span>
             </div>
 
@@ -391,8 +430,12 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
 
             <div className="pt-16 max-w-xs">
               <div className="border-t border-[#18235C] pt-2">
-                <span className="font-bold block text-sm text-[#18235C]">Gerencia de Talento Humano</span>
-                <span className="text-xs text-[#282829]/70">B GROUP INGENIERIA S.A.S.</span>
+                <span className="font-bold block text-sm text-[#18235C]">
+                  {empresa?.representanteLegal?.nombre || 'Gerencia de Talento Humano'}
+                </span>
+                <span className="text-xs text-[#282829]/70">
+                  {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
+                </span>
               </div>
             </div>
           </div>

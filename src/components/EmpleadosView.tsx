@@ -10,7 +10,9 @@ import {
   SolicitudEntregaEPP,
   Role,
   UsuarioSistema,
-  EstadoColaborador
+  EstadoColaborador,
+  ConfiguracionEmpresa,
+  CentroTrabajo
 } from '../types';
 import {
   Users,
@@ -53,6 +55,8 @@ import {
 interface EmpleadosViewProps {
   empleados: Empleado[];
   cargos: Cargo[];
+  empresa?: ConfiguracionEmpresa;
+  centrosTrabajo?: CentroTrabajo[];
   areas?: AreaOrganizacion[];
   procesos?: ProcesoOrganizacion[];
   solicitudes: Solicitud[];
@@ -82,6 +86,8 @@ interface EmpleadosViewProps {
 export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
   empleados,
   cargos,
+  empresa,
+  centrosTrabajo,
   areas = [],
   procesos = [],
   solicitudes,
@@ -406,6 +412,8 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
       <ExpedienteDigitalView
         empleado={currentEmpleadoSeleccionado}
         cargos={cargos}
+        empresa={empresa}
+        centrosTrabajo={centrosTrabajo || empresa?.centrosTrabajo}
         areas={areas}
         currentUser={currentUser}
         solicitudes={solicitudes.filter(s => s.empleadoId === currentEmpleadoSeleccionado.id)}
@@ -947,6 +955,8 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
         <ModalNuevoEmpleadoWizard
           cargos={cargos}
           empleados={empleados}
+          empresa={empresa}
+          centrosTrabajo={centrosTrabajo || empresa?.centrosTrabajo}
           areas={areas}
           procesos={procesos}
           currentUser={currentUser}

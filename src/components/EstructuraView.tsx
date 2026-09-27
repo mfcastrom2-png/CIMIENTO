@@ -98,8 +98,9 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
   const [modalDepurarOpen, setModalDepurarOpen] = useState(false);
   const [depurando, setDepurando] = useState(false);
 
-  // Mensaje de éxito
+  // Mensajes de notificación
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
+  const [mensajeError, setMensajeError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Formulario Nuevo Cargo
@@ -309,7 +310,8 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
       setModalAreaOpen(false);
       setTimeout(() => setMensajeExito(null), 4000);
     } catch (err: any) {
-      alert('Error al guardar el área: ' + (err?.message || 'Error en servidor'));
+      setMensajeError('Error al guardar el área: ' + (err?.message || 'Error en servidor'));
+      setTimeout(() => setMensajeError(null), 5000);
     } finally {
       setGuardandoArea(false);
     }
@@ -324,7 +326,8 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
       setAreaAEliminar(null);
       setTimeout(() => setMensajeExito(null), 4000);
     } catch (err: any) {
-      alert('Error al eliminar área: ' + (err?.message || 'Error'));
+      setMensajeError('Error al eliminar área: ' + (err?.message || 'Error'));
+      setTimeout(() => setMensajeError(null), 5000);
     } finally {
       setEliminandoArea(false);
     }
@@ -388,7 +391,8 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
       setModalProcesoOpen(false);
       setTimeout(() => setMensajeExito(null), 4000);
     } catch (err: any) {
-      alert('Error al guardar proceso: ' + (err?.message || 'Error en servidor'));
+      setMensajeError('Error al guardar proceso: ' + (err?.message || 'Error en servidor'));
+      setTimeout(() => setMensajeError(null), 5000);
     } finally {
       setGuardandoProceso(false);
     }
@@ -403,7 +407,8 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
       setProcesoAEliminar(null);
       setTimeout(() => setMensajeExito(null), 4000);
     } catch (err: any) {
-      alert('Error al eliminar proceso: ' + (err?.message || 'Error'));
+      setMensajeError('Error al eliminar proceso: ' + (err?.message || 'Error'));
+      setTimeout(() => setMensajeError(null), 5000);
     } finally {
       setEliminandoProceso(false);
     }
@@ -421,7 +426,8 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
       setModalDepurarOpen(false);
       setTimeout(() => setMensajeExito(null), 5000);
     } catch (e: any) {
-      alert('Error al restablecer estructura: ' + e.message);
+      setMensajeError('Error al restablecer estructura: ' + (e?.message || 'Error'));
+      setTimeout(() => setMensajeError(null), 5000);
     } finally {
       setDepurando(false);
     }
@@ -523,6 +529,19 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
             <span>{mensajeExito}</span>
           </div>
           <button onClick={() => setMensajeExito(null)} className="text-emerald-700 hover:text-emerald-900 font-bold">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Notificación de Error */}
+      {mensajeError && (
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs font-semibold flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{mensajeError}</span>
+          </div>
+          <button onClick={() => setMensajeError(null)} className="text-rose-700 hover:text-rose-900 font-bold">
             ✕
           </button>
         </div>
