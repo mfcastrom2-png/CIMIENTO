@@ -15,22 +15,22 @@ import {
 
 /**
  * PARÁMETROS LEGALES DE REFERENCIA COLOMBIA 2026
- * Actualizados con la normatividad laboral vigente:
- * - Salario Mínimo Legal Mensual Vigente (SMMLV): $1.560.000 COP
- * - Auxilio Legal de Transporte (<= 2 SMMLV): $220.000 COP
+ * Actualizados con la normatividad laboral vigente (Decretos 1469/1470 de 2025 y Decreto 0159 de 2026):
+ * - Salario Mínimo Legal Mensual Vigente (SMMLV): $1.750.905 COP
+ * - Auxilio Legal de Transporte (<= 2 SMMLV): $249.095 COP
  * - Unidad de Valor Tributario (UVT DIAN 2026): $52.374 COP
- * - Tope auxilio de transporte: 2 SMMLV ($3.120.000 COP)
- * - Tope exoneración aportes Art 114-1 E.T. (Salud, SENA, ICBF): 10 SMMLV ($15.600.000 COP)
+ * - Tope auxilio de transporte: 2 SMMLV ($3.501.810 COP)
+ * - Tope exoneración aportes Art 114-1 E.T. (Salud, SENA, ICBF): 10 SMMLV ($17.509.050 COP)
  * - Jornada semanal máxima legal (Ley 2101 de 2021 vigente en 2026): 42 horas semanales
  * - Divisor mensual de horas ordinarias: 210 horas (42h / 6d * 30d)
  */
 export const PARAMETROS_COLOMBIA_2026: ParametrosLegalesNomina = {
   anoVigencia: 2026,
-  smmlv: 1560000, // Salario mínimo legal mensual vigente 2026
-  auxilioTransporte: 220000, // Auxilio legal de transporte 2026
+  smmlv: 1750905, // Salario mínimo legal mensual vigente 2026 (Decreto 0159 de 2026)
+  auxilioTransporte: 249095, // Auxilio legal de transporte 2026
   uvt: 52374, // Unidad de Valor Tributario DIAN 2026
-  topeSmmlvAuxilioTransporte: 2, // Hasta 2 SMMLV ($3.120.000)
-  topeSmmlvExoneracionParafiscales: 10, // Menos de 10 SMMLV para exoneración de Salud, Sena, ICBF (Art 114-1 E.T.) ($15.600.000)
+  topeSmmlvAuxilioTransporte: 2, // Hasta 2 SMMLV ($3.501.810)
+  topeSmmlvExoneracionParafiscales: 10, // Menos de 10 SMMLV para exoneración de Salud, Sena, ICBF (Art 114-1 E.T.) ($17.509.050)
   pctSaludEmpleado: 0.04,
   pctPensionEmpleado: 0.04,
   pctSaludEmpleador: 0.085,

@@ -318,7 +318,7 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
       tipo: 'Término indefinido',
       inicio: '2025-01-01',
       fin: '—',
-      salario: '$ 1.560.000'
+      salario: '$ 1.750.905'
     }
   };
 
@@ -338,7 +338,7 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
   };
 
   describe('Cálculo de Nómina Ordinaria con Salario Mínimo (1 SMMLV 2026)', () => {
-    it('Debe liquidar correctamente un empleado con 1 SMMLV ($1.560.000) y Auxilio de Transporte ($220.000)', () => {
+    it('Debe liquidar correctamente un empleado con 1 SMMLV ($1.750.905) y Auxilio de Transporte ($249.095)', () => {
       const liq = calcularLiquidacionEmpleado(
         empleadoBase,
         'Auxiliar Administrativo',
@@ -348,39 +348,39 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
       );
 
       // Devengados
-      expect(liq.devengados.salarioBasico).toBe(1560000);
-      expect(liq.devengados.salarioProporcional).toBe(1560000);
-      expect(liq.devengados.auxilioTransporte).toBe(220000);
-      expect(liq.devengados.totalDevengado).toBe(1780000);
+      expect(liq.devengados.salarioBasico).toBe(1750905);
+      expect(liq.devengados.salarioProporcional).toBe(1750905);
+      expect(liq.devengados.auxilioTransporte).toBe(249095);
+      expect(liq.devengados.totalDevengado).toBe(2000000);
 
-      // Deducciones (4% salud y 4% pensión sobre IBC de $1.560.000)
-      // 1.560.000 * 0.04 = 62.400
-      expect(liq.deducciones.saludEmpleado).toBe(62400);
-      expect(liq.deducciones.pensionEmpleado).toBe(62400);
+      // Deducciones (4% salud y 4% pensión sobre IBC de $1.750.905)
+      // 1.750.905 * 0.04 = 70.036
+      expect(liq.deducciones.saludEmpleado).toBe(70036);
+      expect(liq.deducciones.pensionEmpleado).toBe(70036);
       expect(liq.deducciones.fondoSolidaridadPensional).toBe(0);
       expect(liq.deducciones.retencionFuente).toBe(0);
-      expect(liq.deducciones.totalDeducciones).toBe(124800);
+      expect(liq.deducciones.totalDeducciones).toBe(140072);
 
-      // Neto a pagar: 1.780.000 - 124.800 = 1.655.200
-      expect(liq.netoAPagar).toBe(1655200);
+      // Neto a pagar: 2.000.000 - 140.072 = 1.859.928
+      expect(liq.netoAPagar).toBe(1859928);
 
       // Aportes patronales: Exonerado de Salud (Art 114-1), Sena (0), ICBF (0) por devengar < 10 SMMLV
       expect(liq.aportesEmpresa.exoneradoArt114_1).toBe(true);
       expect(liq.aportesEmpresa.saludEmpleador).toBe(0);
-      expect(liq.aportesEmpresa.pensionEmpleador).toBe(187200); // 12% de 1.560.000
-      expect(liq.aportesEmpresa.cajaCompensacion).toBe(62400); // 4% de 1.560.000
+      expect(liq.aportesEmpresa.pensionEmpleador).toBe(210109); // 12% de 1.750.905
+      expect(liq.aportesEmpresa.cajaCompensacion).toBe(70036); // 4% de 1.750.905
       expect(liq.aportesEmpresa.sena).toBe(0);
       expect(liq.aportesEmpresa.icbf).toBe(0);
 
-      // Provisiones de ley sobre total devengado ($1.780.000)
-      // Cesantías: 1.780.000 * 0.0833 = 148.274
-      expect(liq.provisiones.cesantias).toBe(Math.round(1780000 * 0.0833));
-      // Intereses sobre cesantías: Cesantías * 0.01 = 1.483
-      expect(liq.provisiones.interesesCesantias).toBe(Math.round(Math.round(1780000 * 0.0833) * 0.01));
-      // Prima de servicios: 1.780.000 * 0.0833 = 148.274
-      expect(liq.provisiones.primaServicios).toBe(Math.round(1780000 * 0.0833));
-      // Vacaciones (sin auxilio de transporte): 1.560.000 * 0.0417 = 65.052
-      expect(liq.provisiones.vacaciones).toBe(Math.round(1560000 * 0.0417));
+      // Provisiones de ley sobre total devengado ($2.000.000)
+      // Cesantías: 2.000.000 * 0.0833 = 166.600
+      expect(liq.provisiones.cesantias).toBe(Math.round(2000000 * 0.0833));
+      // Intereses sobre cesantías: Cesantías * 0.01 = 1.666
+      expect(liq.provisiones.interesesCesantias).toBe(Math.round(Math.round(2000000 * 0.0833) * 0.01));
+      // Prima de servicios: 2.000.000 * 0.0833 = 166.600
+      expect(liq.provisiones.primaServicios).toBe(Math.round(2000000 * 0.0833));
+      // Vacaciones (sin auxilio de transporte): 1.750.905 * 0.0417 = 73.013
+      expect(liq.provisiones.vacaciones).toBe(Math.round(1750905 * 0.0417));
     });
 
     it('Debe calcular correctamente el ingreso a mitad de mes (15 días laborados)', () => {
@@ -397,20 +397,20 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
         PARAMETROS_COLOMBIA_2026
       );
 
-      // Salario proporcional: 1.560.000 / 30 * 15 = 780.000
-      expect(liq.devengados.salarioProporcional).toBe(780000);
-      // Auxilio proporcional: 220.000 / 30 * 15 = 110.000
-      expect(liq.devengados.auxilioTransporte).toBe(110000);
-      expect(liq.devengados.totalDevengado).toBe(890000);
+      // Salario proporcional: 1.750.905 / 30 * 15 = 875.453
+      expect(liq.devengados.salarioProporcional).toBe(Math.round((1750905 / 30) * 15));
+      // Auxilio proporcional: 249.095 / 30 * 15 = 124.548
+      expect(liq.devengados.auxilioTransporte).toBe(Math.round((249095 / 30) * 15));
+      expect(liq.devengados.totalDevengado).toBe(Math.round((1750905 / 30) * 15) + Math.round((249095 / 30) * 15));
 
-      // IBC mínimo legal para seguridad social es 1 SMMLV ($1.560.000)
-      expect(liq.deducciones.saludEmpleado).toBe(62400);
-      expect(liq.deducciones.pensionEmpleado).toBe(62400);
+      // IBC mínimo legal para seguridad social es 1 SMMLV ($1.750.905)
+      expect(liq.deducciones.saludEmpleado).toBe(70036);
+      expect(liq.deducciones.pensionEmpleado).toBe(70036);
     });
   });
 
   describe('Cálculo de Empleados con Salarios Superiores y Topes de Ley', () => {
-    it('No debe otorgar auxilio de transporte a salarios mayores a 2 SMMLV ($3.120.000)', () => {
+    it('No debe otorgar auxilio de transporte a salarios mayores a 2 SMMLV ($3.501.810)', () => {
       const empSalarioAlto: Empleado = {
         ...empleadoBase,
         contrato: {
@@ -432,12 +432,12 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
       expect(liq.devengados.totalDevengado).toBe(4500000);
     });
 
-    it('Debe aplicar Fondo de Solidaridad Pensional (FSP 1%) cuando el salario es >= 4 SMMLV ($6.240.000)', () => {
+    it('Debe aplicar Fondo de Solidaridad Pensional (FSP 1%) cuando el salario es >= 4 SMMLV ($7.003.620)', () => {
       const empSalarioFSP: Empleado = {
         ...empleadoBase,
         contrato: {
           ...empleadoBase.contrato,
-          salario: '$ 7.000.000'
+          salario: '$ 8.000.000'
         }
       };
 
@@ -449,8 +449,8 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
         PARAMETROS_COLOMBIA_2026
       );
 
-      // FSP = 7.000.000 * 0.01 = 70.000
-      expect(liq.deducciones.fondoSolidaridadPensional).toBe(70000);
+      // FSP = 8.000.000 * 0.01 = 80.000
+      expect(liq.deducciones.fondoSolidaridadPensional).toBe(80000);
     });
 
     it('Debe cobrar aportes patronales plenos (Salud 8.5%, Sena 2%, ICBF 3%) si el salario es >= 10 SMMLV', () => {
@@ -497,8 +497,8 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
         PARAMETROS_COLOMBIA_2026
       );
 
-      // Valor hora ordinaria con jornada 2026 (210 horas): 1.560.000 / 210 = 7428.5714
-      const valorHora = 1560000 / 210;
+      // Valor hora ordinaria con jornada 2026 (210 horas): 1.750.905 / 210 = 8337.6428
+      const valorHora = 1750905 / 210;
       const expectedHED = Math.round(valorHora * 1.25 * 10);
       const expectedHEN = Math.round(valorHora * 1.75 * 5);
       const expectedRN = Math.round(valorHora * 0.35 * 20);
@@ -552,7 +552,7 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
       expect(sim.cesantiasPendientes).toBeGreaterThan(0);
       expect(sim.interesesCesantiasPendientes).toBeGreaterThan(0);
       expect(sim.primaServiciosPendiente).toBeGreaterThan(0);
-      expect(sim.valorVacacionesPendientes).toBe(Math.round((1560000 * 15) / 30));
+      expect(sim.valorVacacionesPendientes).toBe(Math.round((1750905 * 15) / 30));
     });
 
     it('Debe calcular la indemnización por despido sin justa causa', () => {
@@ -564,7 +564,7 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
         PARAMETROS_COLOMBIA_2026
       );
 
-      expect(sim.indemnizacionDespidoInjusto).toBeGreaterThanOrEqual(1560000);
+      expect(sim.indemnizacionDespidoInjusto).toBeGreaterThanOrEqual(1750905);
       expect(sim.totalLiquidacionDefinitiva).toBe(
         sim.cesantiasPendientes +
         sim.interesesCesantiasPendientes +

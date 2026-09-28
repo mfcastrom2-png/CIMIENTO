@@ -22,6 +22,7 @@ import {
   restablecerParametrosLegales,
   simularLiquidacionDefinitiva
 } from '../services/payrollEngine';
+import { obtenerParametrosNominaFB } from '../lib/firebase';
 import {
   AlertCircle,
   AlertTriangle,
@@ -92,6 +93,17 @@ export function NominaView({
   const [formParametros, setFormParametros] = useState<ParametrosLegalesNomina>(() => {
     return obtenerParametrosConfigurados();
   });
+
+  // Sincronizar parámetros legales desde Firestore al iniciar
+  useEffect(() => {
+    obtenerParametrosNominaFB().then(fbParams => {
+      if (fbParams) {
+        setParametrosLegales(prev => ({ ...prev, ...fbParams }));
+        setFormParametros(prev => ({ ...prev, ...fbParams }));
+        guardarParametrosConfigurados(fbParams);
+      }
+    }).catch(() => {});
+  }, []);
 
   // GESTIÓN DINÁMICA DE TODOS LOS PERÍODOS DE TODOS LOS MESES Y AÑOS
   const [periodos, setPeriodos] = useState<PeriodoNomina[]>(() => {

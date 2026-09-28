@@ -6,7 +6,7 @@ import {
   obtenerParametrosConfigurados,
   guardarParametrosConfigurados
 } from '../services/payrollEngine';
-import { guardarParametrosNominaFB } from '../lib/firebase';
+import { guardarParametrosNominaFB, obtenerParametrosNominaFB } from '../lib/firebase';
 import {
   Settings,
   Scale,
@@ -47,6 +47,22 @@ export const ParametrosNominaView: React.FC<ParametrosNominaViewProps> = ({
 
   const [activeTab, setActiveTab] = useState<'generales' | 'seguridad_social' | 'prestaciones' | 'recargos' | 'simulador'>('generales');
   const [mensajeGuardado, setMensajeGuardado] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    obtenerParametrosNominaFB().then(fbParams => {
+      if (fbParams) {
+        setForm(prev => ({
+          ...prev,
+          ...fbParams,
+          tarifasARL: {
+            ...prev.tarifasARL,
+            ...(fbParams.tarifasARL || {})
+          }
+        }));
+        guardarParametrosConfigurados(fbParams);
+      }
+    }).catch(() => {});
+  }, []);
 
   // Estado del simulador interactivo
   const [simSalario, setSimSalario] = useState<number>(form.smmlv);
