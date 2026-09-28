@@ -8,8 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db, registrarUsuarioEnAuth } from './firebase';
 import { UsuarioSistema, Empleado, Solicitud } from '../types';
-import { CUENTAS_PRUEBA_OFICIALES } from '../data/usuariosYVotacionesData';
-export { CUENTAS_PRUEBA_OFICIALES };
+export const CUENTAS_PRUEBA_OFICIALES: any[] = [];
 
 export interface ResultadoMigracion {
   documentosActualizados: number;
@@ -85,7 +84,7 @@ export async function migrarDocumentosConEmpresaId(
         empresaId: 'empresa-a',
         nombre: 'Carlos Mendoza',
         documento: '10.000.004',
-        email: 'empleado-a@test-cimiento.com',
+        email: 'colaborador.a@empresa-ejemplo.co',
         telefono: '3001234567',
         cargoId: 'CARGO-001',
         formacion: 'Profesional en Ingeniería',
@@ -111,7 +110,7 @@ export async function migrarDocumentosConEmpresaId(
         empresaId: 'empresa-b',
         nombre: 'Laura Restrepo',
         documento: '20.000.001',
-        email: 'empleado-b@test-cimiento.com',
+        email: 'colaborador.b@empresa-ejemplo.co',
         telefono: '3109876543',
         cargoId: 'CARGO-002',
         formacion: 'Especialista en Logística',
@@ -152,36 +151,7 @@ export async function migrarDocumentosConEmpresaId(
     detalles.push(`Aviso al sembrar empleados/solicitudes de prueba: ${err?.message}`);
   }
 
-  // Aprovisionar los 5 usuarios de prueba oficiales en Firebase Auth y Firestore
   const usuariosCreados: string[] = [];
-  for (const c of CUENTAS_PRUEBA_OFICIALES) {
-    try {
-      const authRes = await registrarUsuarioEnAuth(c.email, c.pass, c.nombre);
-      const uid = authRes.uid || `uid-mock-${c.email.split('@')[0]}`;
-
-      const userProfile: Record<string, any> = {
-        id: uid,
-        nombre: c.nombre,
-        email: c.email,
-        documento: c.documento,
-        rol: c.rol,
-        empresaId: c.empresaId,
-        estado: 'activo',
-        ultimoAcceso: new Date().toISOString(),
-        fechaCreacion: new Date().toISOString(),
-        dobleFactorHabilitado: false,
-        permisos: c.permisos
-      };
-      if ((c as any).empleadoId) {
-        userProfile.empleadoId = (c as any).empleadoId;
-      }
-
-      await setDoc(doc(db, 'usuarios', uid), userProfile as UsuarioSistema, { merge: true });
-      usuariosCreados.push(c.email);
-    } catch (err: any) {
-      detalles.push(`Usuario ${c.email}: ${err?.message}`);
-    }
-  }
 
   return {
     documentosActualizados: totalActualizados,

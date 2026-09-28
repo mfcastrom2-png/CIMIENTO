@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Empleado, Solicitud, Role, UsuarioSistema, TipoSolicitud, EstadoSolicitud } from '../types';
+import { Empleado, Solicitud, Role, UsuarioSistema, TipoSolicitud, EstadoSolicitud, ConfiguracionEmpresa } from '../types';
 import {
   FileText,
   Plus,
@@ -26,7 +26,8 @@ import {
   HelpCircle,
   Eye,
   FileCheck,
-  Award
+  Award,
+  MapPin
 } from 'lucide-react';
 import { uid, initialEmpresa } from '../data/initialData';
 import { DriveLinkField } from './common/DriveLinkField';
@@ -45,6 +46,7 @@ import { VerCertificadoLaboralModal } from './VerCertificadoLaboralModal';
 interface SolicitudesViewProps {
   solicitudes: Solicitud[];
   empleados: Empleado[];
+  empresa?: ConfiguracionEmpresa;
   onAddSolicitud: (nueva: Solicitud) => void;
   onUpdateEstado: (id: string, nuevoEstado: EstadoSolicitud, comentario: string) => void;
   userRole?: Role;
@@ -56,6 +58,7 @@ interface SolicitudesViewProps {
 export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
   solicitudes,
   empleados,
+  empresa,
   onAddSolicitud,
   onUpdateEstado,
   userRole,
@@ -63,6 +66,19 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
   isSuperAdmin = false,
   cargos = []
 }) => {
+  // Configuración de la Empresa activa (prioriza props, luego caché localStorage, luego initialEmpresa)
+  const empresaActiva = useMemo<ConfiguracionEmpresa>(() => {
+    if (empresa && (empresa.razonSocial || empresa.nit)) return empresa;
+    try {
+      const cached = localStorage.getItem('bgroup_empresa_config');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && (parsed.razonSocial || parsed.nit)) return parsed;
+      }
+    } catch (e) {}
+    return initialEmpresa;
+  }, [empresa]);
+
   // Pestaña principal en vista del colaborador / administrador
   const [tabPortal, setTabPortal] = useState<'centro' | 'buzon'>('centro');
 
@@ -166,21 +182,6 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
     }
 
     let estadoFinal: EstadoSolicitud = 'Radicada';
-    let certificadoData: any = null;
-    let codigoVerif: string | undefined = undefined;
-
-    // REGLA DE NEGOCIO: Los certificados laborales evaden la aprobación humana y se autogeneran de inmediato
-    if (tipoSolicitud === 'Certificado') {
-      estadoFinal = 'Autogenerada';
-      const certObj = generarDatosCertificadoLaboral(
-        effectiveEmpleado,
-        cargos,
-        subtipoCertificado || 'Trámite Personal',
-        entidadDestino
-      );
-      certificadoData = certObj;
-      codigoVerif = certObj.codigoVerificacion;
-    }
 
     let fechaFinFinal = fechaInicio;
     if (tipoSolicitud === 'Permiso') {
@@ -200,8 +201,13 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       }
     }
 
+    const sedeEmpleado = effectiveEmpleado.laboral?.lugarTrabajo || empresaActiva.centrosTrabajo?.find(c => c.esSedePrincipal)?.nombre || empresaActiva.centrosTrabajo?.[0]?.nombre || 'Sede Principal';
+
     const nueva: Solicitud = {
       id: uid(),
+      empresaId: empresaActiva.id || 'empresa-a',
+      empresaNombre: empresaActiva.razonSocial || empresaActiva.nombreComercial || 'Empresa Registrada',
+      sedeTrabajo: sedeEmpleado,
       empleadoId: effectiveEmpleado.id,
       empleadoNombre: effectiveEmpleado.nombre,
       empleadoDocumento: effectiveEmpleado.documento,
@@ -212,9 +218,9 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       fin: fechaFinFinal,
       motivo: motivoGeneral.trim() || `Solicitud de ${tipoSolicitud} (${subtipoCesantias || subtipoLicencia || subtipoCertificado || 'General'})`,
       estado: estadoFinal,
-      decisorId: tipoSolicitud === 'Certificado' ? 'SISTEMA_AUTO' : null,
-      fechaDecision: tipoSolicitud === 'Certificado' ? new Date().toISOString().slice(0, 10) : null,
-      comentario: tipoSolicitud === 'Certificado' ? 'Certificado laboral autogenerado y firmado digitalmente de forma instantánea.' : '',
+      decisorId: null,
+      fechaDecision: null,
+      comentario: '',
       fechaCreacion: new Date().toISOString().slice(0, 10),
       subtipoCesantias: tipoSolicitud === 'Cesantías' ? subtipoCesantias : undefined,
       montoSolicitadoCOP: tipoSolicitud === 'Cesantías' ? montoCesantiasCOP : undefined,
@@ -223,8 +229,6 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       diasFestivosInvolucrados: tipoSolicitud === 'Permiso' ? calculoPermiso.diasFestivosInvolucrados.map(f => `${f.fecha}: ${f.nombre}`) : undefined,
       subtipoCertificado: tipoSolicitud === 'Certificado' ? subtipoCertificado : undefined,
       entidadDestino: tipoSolicitud === 'Certificado' ? entidadDestino : undefined,
-      codigoVerificacionCertificado: codigoVerif,
-      certificadoGeneradoData: certificadoData,
       soporteUrlDrive: soporteUrlDrive.trim() || undefined,
       historialRespuestas: [
         {
@@ -233,7 +237,7 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
           estadoAnterior: 'Nuevo',
           estadoNuevo: estadoFinal,
           comentario: tipoSolicitud === 'Certificado'
-            ? 'Certificado autogenerado sin requerir aprobación humana.'
+            ? 'Solicitud de certificado laboral radicada. En espera de autorización del Administrador para su generación.'
             : 'Solicitud radicada formalmente por el colaborador.'
         }
       ]
@@ -242,11 +246,10 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
     onAddSolicitud(nueva);
     setModalRadicarOpen(false);
 
-    // Si fue certificado, ofrecer previsualización inmediata
-    if (tipoSolicitud === 'Certificado' && certificadoData) {
-      setModalCertificadoVer(certificadoData);
+    if (tipoSolicitud === 'Certificado') {
+      alert(`¡Solicitud de Certificado radicada con éxito! Estado: Radicada. Una vez el administrador la autorice, el botón para generar y descargar el PDF oficial se habilitará en su Buzón Interno y Centro de Estados.`);
     } else {
-      alert(`¡Solicitud radicada con éxito! Estado actual: ${estadoFinal}. Podrá hacer seguimiento en su Centro de Estados.`);
+      alert(`¡Solicitud de ${tipoSolicitud} radicada con éxito! Podrá hacer seguimiento a su estado en el Centro de Estados.`);
     }
 
     // Limpiar formulario
@@ -371,10 +374,17 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       {/* Header Principal del Módulo */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#8FA7D6]/30">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#18235C]/10 text-[#18235C] border border-[#18235C]/20 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-[#00FF00]" />
               <span>Módulo Oficial de Solicitudes & Novedades CST</span>
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#8FA7D6]/20 text-[#18235C] border border-[#8FA7D6]/40 flex items-center gap-1">
+              <Building2 className="w-3 h-3 text-[#18235C]" />
+              <span>{empresaActiva.razonSocial || empresaActiva.nombreComercial}</span>
+              {empresaActiva.nit && (
+                <span className="text-slate-600 font-normal">· NIT {empresaActiva.nit}{empresaActiva.digitoVerificacion ? `-${empresaActiva.digitoVerificacion}` : ''}</span>
+              )}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#18235C]">
@@ -382,7 +392,7 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
           </h1>
           <p className="text-xs sm:text-sm text-[#282829] mt-1 max-w-2xl font-normal">
             {isEmployeeMode
-              ? 'Radique solicitudes de cesantías, licencias, permisos remunerados autocalculados y certificados laborales autogenerados al instante.'
+              ? 'Radique solicitudes de cesantías, licencias, permisos remunerados autocalculados y certificados laborales autorizados por Administración.'
               : 'Panel de revisión y moderación de solicitudes con trazabilidad legal en Google Drive y observaciones obligatorias.'}
           </p>
         </div>
@@ -405,6 +415,54 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
             <Plus className="w-4 h-4 text-[#00FF00]" />
             <span>+ Radicar Nueva Solicitud</span>
           </button>
+        </div>
+      </div>
+
+      {/* Banner Institucional con Datos de la Empresa */}
+      <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 border border-[#8FA7D6]/40 rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            {empresaActiva.identidadVisual?.logoUrl ? (
+              <img
+                src={empresaActiva.identidadVisual.logoUrl}
+                alt={empresaActiva.nombreComercial || 'Logo'}
+                className="w-12 h-12 object-contain rounded-xl border border-slate-200 p-1 bg-white shrink-0"
+              />
+            ) : (
+              <div className="w-12 h-12 bg-[#18235C] text-[#00FF00] font-black text-xl flex items-center justify-center rounded-xl shrink-0 shadow-xs">
+                {(empresaActiva.nombreComercial || empresaActiva.razonSocial || 'E').charAt(0)}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-extrabold text-[#18235C] uppercase tracking-wide">
+                  {empresaActiva.razonSocial || empresaActiva.nombreComercial}
+                </h2>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Sincronizado con Datos de la Empresa
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-slate-600 mt-0.5 flex-wrap">
+                {empresaActiva.nit && (
+                  <span className="font-mono font-bold text-slate-800">
+                    NIT: {empresaActiva.nit}{empresaActiva.digitoVerificacion ? `-${empresaActiva.digitoVerificacion}` : ''}
+                  </span>
+                )}
+                {empresaActiva.contacto?.ciudad && (
+                  <span>· Domicilio: {empresaActiva.contacto.direccion ? `${empresaActiva.contacto.direccion}, ` : ''}{empresaActiva.contacto.ciudad}</span>
+                )}
+                {empresaActiva.centrosTrabajo && empresaActiva.centrosTrabajo.length > 0 && (
+                  <span>· Centros de Trabajo: <strong className="text-[#18235C]">{empresaActiva.centrosTrabajo.length} Sedes</strong></span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-left sm:text-right text-[11px] text-slate-600 bg-slate-100/80 px-3 py-1.5 rounded-xl border border-slate-200 shrink-0">
+            <span className="block text-[10px] text-slate-500 font-bold uppercase">Representante Legal / Emisor</span>
+            <strong className="text-[#18235C] block">{empresaActiva.representanteLegal?.nombre || 'Representante Legal Institucional'}</strong>
+            <span className="text-[10px] text-slate-500">{empresaActiva.representanteLegal?.cargo || 'Gerente General y Representante Legal'}</span>
+          </div>
         </div>
       </div>
 
@@ -541,6 +599,10 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                           <span className="text-[10px] text-slate-500 font-mono block">
                             C.C. {s.empleadoDocumento || emp?.documento || '—'}
                           </span>
+                          <span className="text-[10px] text-slate-600 flex items-center gap-1 mt-0.5">
+                            <MapPin className="w-3 h-3 text-emerald-700 shrink-0" />
+                            <span>Sede: {s.sedeTrabajo || emp?.laboral?.lugarTrabajo || empresaActiva.centrosTrabajo?.[0]?.nombre || 'Sede Principal'}</span>
+                          </span>
                           <span className="text-[10px] text-slate-400 block mt-0.5">
                             Radicado: {s.fechaCreacion || s.inicio}
                           </span>
@@ -615,14 +677,15 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                         <td className="p-3.5 text-right space-y-1">
                           {/* Acciones según el rol */}
                           {canApprove && (s.estado === 'Radicada' || s.estado === 'En Revisión' || s.estado === 'Pendiente') && (
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex items-center justify-end gap-1 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => setDecisionModal({ id: s.id, accion: 'Aprobada', solicitudObj: s })}
                                 className="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-[10px] flex items-center gap-1 cursor-pointer"
+                                title={s.tipo === 'Certificado' ? 'Autorizar emisión del certificado laboral' : 'Aprobar solicitud'}
                               >
                                 <Check className="w-3 h-3" />
-                                <span>Aprobar</span>
+                                <span>{s.tipo === 'Certificado' ? 'Autorizar Certificado' : 'Aprobar'}</span>
                               </button>
                               <button
                                 type="button"
@@ -641,15 +704,33 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                             </div>
                           )}
 
-                          {s.tipo === 'Certificado' && s.certificadoGeneradoData && (
-                            <button
-                              type="button"
-                              onClick={() => setModalCertificadoVer(s.certificadoGeneradoData)}
-                              className="px-2.5 py-1 bg-[#18235C] text-white hover:bg-[#101740] rounded font-bold text-[10px] flex items-center gap-1 ml-auto cursor-pointer"
-                            >
-                              <Printer className="w-3 h-3 text-[#00FF00]" />
-                              <span>Ver Certificado PDF</span>
-                            </button>
+                          {/* Certificado Laboral: Habilitado solo si está autorizada por el Administrador */}
+                          {s.tipo === 'Certificado' && (
+                            s.estado === 'Aprobada' ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const sEmpleado = empleados.find(e => e.id === s.empleadoId) || effectiveEmpleado;
+                                  const data = generarDatosCertificadoLaboral(
+                                    sEmpleado,
+                                    cargos,
+                                    s.subtipoCertificado || 'Trámite Personal',
+                                    s.entidadDestino,
+                                    empresaActiva
+                                  );
+                                  setModalCertificadoVer(data);
+                                }}
+                                className="px-2.5 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white rounded font-bold text-[10px] flex items-center gap-1 ml-auto cursor-pointer shadow-xs"
+                                title="Generar e imprimir certificado oficial autorizado"
+                              >
+                                <Printer className="w-3.5 h-3.5 text-[#00FF00]" />
+                                <span>{isEmployeeMode ? 'Generar / Descargar PDF' : 'Ver Certificado Autorizado'}</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 block text-right font-medium">
+                                {s.estado === 'Rechazada' ? 'No autorizado por Administración' : '⏳ Requiere Autorización de Admin'}
+                              </span>
+                            )
                           )}
 
                           {s.comentario && (
@@ -684,11 +765,18 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2.5">
             <Inbox className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
             <div>
-              <strong className="block font-bold text-emerald-950 text-sm">
-                Casillero Digital & Respuestas Oficiales de Gestión Humana:
-              </strong>
+              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                <strong className="block font-bold text-emerald-950 text-sm">
+                  Casillero Digital & Notificaciones Oficiales — {empresaActiva.razonSocial || empresaActiva.nombreComercial}
+                </strong>
+                {empresaActiva.nit && (
+                  <span className="text-[10px] text-emerald-800 font-mono font-bold">
+                    · NIT {empresaActiva.nit}{empresaActiva.digitoVerificacion ? `-${empresaActiva.digitoVerificacion}` : ''}
+                  </span>
+                )}
+              </div>
               <span>
-                En este buzón privado recibirá los pronunciamientos oficiales de RRHH, observaciones para corrección de trámites y sus <strong>Certificados Laborales autogenerados listos para imprimir con firma digital y código QR</strong>.
+                En este casillero privado recibe los comunicados oficiales emitidos por Gestión Humana, observaciones de trámite y sus <strong>Certificados Laborales autorizados listos para generar y descargar con membrete institucional, firma digital y código QR legal</strong>.
               </span>
             </div>
           </div>
@@ -743,15 +831,33 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                     </a>
                   ) : <span />}
 
-                  {s.tipo === 'Certificado' && s.certificadoGeneradoData && (
-                    <button
-                      type="button"
-                      onClick={() => setModalCertificadoVer(s.certificadoGeneradoData)}
-                      className="px-3 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      <Printer className="w-3.5 h-3.5 text-[#00FF00]" />
-                      <span>Imprimir / Descargar Certificado</span>
-                    </button>
+                  {/* Botón de descarga de certificado si está autorizada por el Administrador */}
+                  {s.tipo === 'Certificado' && (
+                    s.estado === 'Aprobada' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sEmpleado = empleados.find(e => e.id === s.empleadoId) || effectiveEmpleado;
+                          const data = generarDatosCertificadoLaboral(
+                            sEmpleado,
+                            cargos,
+                            s.subtipoCertificado || 'Trámite Personal',
+                            s.entidadDestino,
+                            empresaActiva
+                          );
+                          setModalCertificadoVer(data);
+                        }}
+                        className="px-3 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-[#00FF00]" />
+                        <span>Generar / Descargar Certificado</span>
+                      </button>
+                    ) : (
+                      <div className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>{s.estado === 'Rechazada' ? 'Certificado no autorizado por Gestión Humana' : 'En espera de autorización del Administrador para generar el certificado'}</span>
+                      </div>
+                    )
                   )}
                 </div>
               </div>
@@ -787,18 +893,41 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
             </div>
 
             <form onSubmit={handleRadicarSolicitud} className="space-y-4 text-xs">
-              {/* Información del Colaborador */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-500 block uppercase font-bold">Colaborador Solicitante</span>
-                  <strong className="text-[#18235C] text-sm">{effectiveEmpleado?.nombre}</strong>
-                  <span className="text-[11px] text-slate-600 block">
-                    C.C. {effectiveEmpleado?.documento} — {effectiveEmpleado?.laboral?.cargoNombre || 'Colaborador'}
+              {/* Información de la Empresa y Colaborador */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-[#18235C]" />
+                    <div>
+                      <strong className="text-xs text-[#18235C] block font-bold">
+                        {empresaActiva.razonSocial || empresaActiva.nombreComercial}
+                      </strong>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        NIT {empresaActiva.nit}{empresaActiva.digitoVerificacion ? `-${empresaActiva.digitoVerificacion}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-bold text-[9px] uppercase">
+                    Empresa Activa
                   </span>
                 </div>
-                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
-                  Activo CST
-                </span>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block uppercase font-bold">Colaborador Solicitante</span>
+                    <strong className="text-[#18235C] text-sm">{effectiveEmpleado?.nombre}</strong>
+                    <span className="text-[11px] text-slate-600 block">
+                      C.C. {effectiveEmpleado?.documento} — {effectiveEmpleado?.laboral?.cargoNombre || 'Colaborador'}
+                    </span>
+                    <span className="text-[10px] text-slate-600 flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3 h-3 text-emerald-700" />
+                      <span>Sede: <strong>{effectiveEmpleado?.laboral?.lugarTrabajo || empresaActiva.centrosTrabajo?.[0]?.nombre || 'Sede Principal'}</strong></span>
+                    </span>
+                  </div>
+                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">
+                    Activo CST
+                  </span>
+                </div>
               </div>
 
               {/* Selector Tipo de Solicitud */}
@@ -812,7 +941,7 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                   <option value="Permiso">Permiso Remunerado (Autocalculado con Festivos)</option>
                   <option value="Cesantías">Retiro Parcial / Avance de Cesantías (Ley 50/90)</option>
                   <option value="Licencia">Licencia de Ley (Maternidad / Paternidad / Luto / Voto)</option>
-                  <option value="Certificado">Certificado Laboral (Autogeneración Instantánea)</option>
+                  <option value="Certificado">Certificado Laboral (Sujeto a Autorización de Administración)</option>
                 </select>
               </div>
 
@@ -994,11 +1123,11 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                 <div className="space-y-3 p-3.5 bg-emerald-50/80 border border-emerald-300 rounded-xl animate-fade-in">
                   <div className="flex items-center gap-2 text-emerald-950 font-bold text-xs">
                     <Award className="w-4 h-4 text-emerald-700" />
-                    <span>Autogeneración Inmediata de Certificado Laboral (Evasión de aprobación humana)</span>
+                    <span>Solicitud Formal de Certificado Laboral Oficial</span>
                   </div>
 
                   <p className="text-[11px] text-emerald-900 leading-relaxed">
-                    Esta solicitud genera e imprime automáticamente un <strong>Certificado Laboral Oficial firmado digitalmente</strong> con salario, tipo de contrato, cargo y código de verificación QR, enviando la copia a su Buzón Interno sin requerir revisión manual.
+                    Al radicar esta solicitud, el área de <strong>Gestión Humana / Administrador</strong> revisará y autorizará la emisión. Una vez aprobada, el sistema habilitará automáticamente en su <strong>Buzón Interno</strong> y <strong>Centro de Estados</strong> el botón para generar, imprimir y descargar el <strong>Certificado Laboral Oficial con membrete de {empresaActiva.razonSocial || 'la empresa'}, NIT, firma digital y código QR de verificación</strong>.
                   </p>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -1045,9 +1174,7 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
                   className="px-6 py-2.5 bg-[#18235C] hover:bg-[#101740] text-white font-bold rounded-xl flex items-center gap-2 shadow-md transition-all cursor-pointer"
                 >
                   <Send className="w-4 h-4 text-[#00FF00]" />
-                  <span>
-                    {tipoSolicitud === 'Certificado' ? 'Generar Certificado Inmediato' : 'Radicar Solicitud Oficial'}
-                  </span>
+                  <span>Radicar Solicitud Oficial</span>
                 </button>
               </div>
             </form>
@@ -1061,15 +1188,34 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#8FA7D6] space-y-4">
             <div className="flex items-center gap-3 text-[#18235C]">
               <MessageSquare className="w-6 h-6 text-emerald-700 shrink-0" />
-              <h3 className="font-bold text-base">
-                Moderación RRHH: {decisionModal.accion} Solicitud
-              </h3>
+              <div>
+                <h3 className="font-bold text-base leading-tight">
+                  {decisionModal.solicitudObj.tipo === 'Certificado' && decisionModal.accion === 'Aprobada'
+                    ? 'Autorizar Emisión de Certificado Laboral'
+                    : `Moderación RRHH: ${decisionModal.accion} Solicitud`}
+                </h3>
+                <span className="text-[11px] text-slate-500 block">
+                  {empresaActiva.razonSocial || empresaActiva.nombreComercial} · Dirección de Gestión Humana
+                </span>
+              </div>
             </div>
 
-            <p className="text-xs text-slate-700 leading-relaxed">
-              Solicitud de <strong>{decisionModal.solicitudObj.tipo}</strong> radicada por{' '}
-              <strong>{decisionModal.solicitudObj.empleadoNombre}</strong>.
-            </p>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+              <p className="text-slate-700">
+                Colaborador: <strong className="text-[#18235C]">{decisionModal.solicitudObj.empleadoNombre}</strong> (C.C. {decisionModal.solicitudObj.empleadoDocumento || '—'})
+              </p>
+              <p className="text-slate-700">
+                Trámite: <strong>{decisionModal.solicitudObj.tipo}</strong> — {decisionModal.solicitudObj.subtipoCesantias || decisionModal.solicitudObj.subtipoLicencia || decisionModal.solicitudObj.subtipoCertificado || decisionModal.solicitudObj.motivo}
+              </p>
+              {decisionModal.solicitudObj.tipo === 'Certificado' && decisionModal.accion === 'Aprobada' && (
+                <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 text-emerald-900 text-[11px] mt-2 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                  <span>
+                    Al confirmar la <strong>Autorización</strong>, el sistema habilitará inmediatamente al trabajador en su <strong>Buzón Interno</strong> y <strong>Centro de Estados</strong> la opción para generar, imprimir y descargar el certificado laboral con membrete institucional de {empresaActiva.razonSocial}, NIT {empresaActiva.nit} y firma electrónica.
+                  </span>
+                </div>
+              )}
+            </div>
 
             <form onSubmit={handleConfirmarDecisionRRHH} className="space-y-3 text-xs">
               <div>

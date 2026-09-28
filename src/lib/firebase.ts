@@ -33,7 +33,6 @@ import {
   DocumentData
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { CUENTAS_PRUEBA_OFICIALES } from '../data/usuariosYVotacionesData';
 import {
   Empleado,
   Cargo,
@@ -158,25 +157,25 @@ export const registrarConEmail = async (
   email: string,
   pass: string,
   nombre: string,
-  rol: RolSistema | string = 'admin_gh',
+  rol: RolSistema | string = 'empleado',
   documento: string = ''
 ) => {
   const credential = await createUserWithEmailAndPassword(auth, email.trim(), pass);
   await updateProfile(credential.user, { displayName: nombre });
 
-  // Crear perfil en la colección `usuarios`
+  // Crear perfil inicial seguro en la colección `usuarios` (Siempre rol: 'empleado' y sin empresa por defecto)
   const userProfile: UsuarioSistema = {
     id: credential.user.uid,
     nombre,
     email: email.trim().toLowerCase(),
     documento: documento || '—',
-    rol: (rol as any) || 'admin_gh',
-    empresaId: 'empresa-a',
+    rol: 'empleado',
+    empresaId: '',
     estado: 'activo',
     ultimoAcceso: new Date().toISOString(),
     fechaCreacion: new Date().toISOString(),
     dobleFactorHabilitado: false,
-    permisos: ['dashboard', 'empleados', 'cargos', 'estructura', 'evaluaciones', 'solicitudes', 'nomina', 'sst', 'capacitaciones', 'vacaciones', 'usuarios']
+    permisos: ['dashboard', 'solicitudes']
   };
 
   await setDoc(doc(db, 'usuarios', credential.user.uid), userProfile);
@@ -187,30 +186,22 @@ export const loginConGoogle = async () => {
   const result = await signInWithPopup(auth, googleProvider);
   const user = result.user;
 
-  // Verificar si existe el perfil en Firestore
-  const userDocRef = doc(db, 'usuarios', user.uid);
-  const userDoc = await getDoc(userDocRef);
+  // Obtener o inicializar perfil seguro con rol empleado
+  const profile = await obtenerPerfilUsuario(user.uid, user.email || '');
 
-  if (!userDoc.exists()) {
-    // Si es el primer usuario, se le asigna rol de Administrador
-    const userProfile: UsuarioSistema = {
-      id: user.uid,
-      nombre: user.displayName || 'Usuario Corporativo',
-      email: (user.email || '').toLowerCase(),
-      documento: '—',
-      rol: 'admin_gh',
-      empresaId: 'empresa-a',
-      estado: 'activo',
-      ultimoAcceso: new Date().toISOString(),
-      fechaCreacion: new Date().toISOString(),
-      dobleFactorHabilitado: false,
-      permisos: ['dashboard', 'empleados', 'cargos', 'estructura', 'evaluaciones', 'solicitudes', 'nomina', 'sst', 'capacitaciones', 'vacaciones', 'usuarios']
-    };
-    await setDoc(userDocRef, userProfile);
-    return { user, profile: userProfile };
-  }
-
-  return { user, profile: userDoc.data() as UsuarioSistema };
+  return { user, profile: profile || {
+    id: user.uid,
+    nombre: user.displayName || 'Usuario Corporativo',
+    email: (user.email || '').toLowerCase(),
+    documento: '—',
+    rol: 'empleado',
+    empresaId: '',
+    estado: 'activo',
+    ultimoAcceso: new Date().toISOString(),
+    fechaCreacion: new Date().toISOString(),
+    dobleFactorHabilitado: false,
+    permisos: ['dashboard', 'solicitudes']
+  }};
 };
 
 export const cerrarSesion = async () => {
@@ -225,95 +216,25 @@ export const obtenerPerfilUsuario = async (uid: string, emailOpcional?: string):
       return userDoc.data() as UsuarioSistema;
     }
 
-    // Si no existe un documento con ID = uid, buscar por correo o auto-aprovisionar para no bloquear al usuario registrado
     const currentFbUser = auth.currentUser;
     const userEmail = (emailOpcional || currentFbUser?.email || '').trim().toLowerCase();
 
     if (userEmail) {
-      // 1. Buscar si existe en la colección usuarios por correo
-      try {
-        const qUser = query(collection(db, 'usuarios'), where('email', '==', userEmail), limit(1));
-        const snapUser = await getDocs(qUser);
-        if (!snapUser.empty) {
-          const docExistente = snapUser.docs[0];
-          const datos = docExistente.data() as UsuarioSistema;
-          const perfilEnlazado: UsuarioSistema = {
-            ...datos,
-            id: uid,
-            ultimoAcceso: new Date().toISOString()
-          };
-          await setDoc(userDocRef, perfilEnlazado, { merge: true });
-          return perfilEnlazado;
-        }
-      } catch (errQ) {
-        console.debug('Búsqueda por email en usuarios no completada:', errQ);
-      }
-
-      // 2. Si coincide con una de las cuentas corporativas oficiales
-      const cuentaOficial = CUENTAS_PRUEBA_OFICIALES.find(c => c.email.toLowerCase() === userEmail);
-      if (cuentaOficial) {
-        const perfilOficial: UsuarioSistema = {
-          id: uid,
-          nombre: cuentaOficial.nombre,
-          email: userEmail,
-          documento: cuentaOficial.documento,
-          rol: cuentaOficial.rol,
-          cargoNombre: cuentaOficial.rol === 'admin_gh' ? 'Administrador de Gestión Humana' : cuentaOficial.rol === 'responsable_sst' ? 'Responsable SST' : 'Colaborador',
-          empresaId: cuentaOficial.empresaId,
-          estado: 'activo',
-          ultimoAcceso: new Date().toISOString(),
-          fechaCreacion: new Date().toISOString().split('T')[0],
-          dobleFactorHabilitado: false,
-          permisos: cuentaOficial.permisos,
-          ...(cuentaOficial.empleadoId ? { empleadoId: cuentaOficial.empleadoId } : {})
-        };
-        await setDoc(userDocRef, perfilOficial);
-        return perfilOficial;
-      }
-
-      // 4. Si coincide con un empleado del censo institucional
-      try {
-        const qEmp = query(collection(db, 'empleados'), where('email', '==', userEmail), limit(1));
-        const snapEmp = await getDocs(qEmp);
-        if (!snapEmp.empty) {
-          const empDoc = snapEmp.docs[0];
-          const empData = empDoc.data();
-          const perfilEmpleado: UsuarioSistema = {
-            id: uid,
-            nombre: empData.nombre || currentFbUser?.displayName || 'Colaborador B GROUP',
-            email: userEmail,
-            documento: empData.documento || '—',
-            rol: 'empleado',
-            cargoNombre: empData.cargo || 'Colaborador',
-            empresaId: empData.empresaId || 'empresa-principal',
-            empleadoId: empDoc.id,
-            estado: 'activo',
-            ultimoAcceso: new Date().toISOString(),
-            fechaCreacion: new Date().toISOString().split('T')[0],
-            dobleFactorHabilitado: false,
-            permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
-          };
-          await setDoc(userDocRef, perfilEmpleado);
-          return perfilEmpleado;
-        }
-      } catch (errEmp) {
-        console.debug('Búsqueda en empleados no completada:', errEmp);
-      }
-
-      // 5. Usuario registrado en Firebase Auth: asignación de perfil de colaborador institucional activo
+      // 1. Usuario nuevo (Google o Email): Siempre rol: 'empleado' y sin empresaId fija por defecto.
+      // La asignación de empresa/rol la realiza el Administrador desde el módulo de Gestión de Usuarios.
       const perfilColaboradorDefault: UsuarioSistema = {
         id: uid,
         nombre: currentFbUser?.displayName || userEmail.split('@')[0].replace('.', ' ').toUpperCase(),
         email: userEmail,
         documento: '—',
         rol: 'empleado',
-        cargoNombre: 'Colaborador Institucional',
-        empresaId: 'empresa-principal',
+        cargoNombre: 'Colaborador',
+        empresaId: '', // Sin empresa asignada inicialmente
         estado: 'activo',
         ultimoAcceso: new Date().toISOString(),
         fechaCreacion: new Date().toISOString().split('T')[0],
         dobleFactorHabilitado: false,
-        permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
+        permisos: ['dashboard', 'solicitudes']
       };
       await setDoc(userDocRef, perfilColaboradorDefault);
       return perfilColaboradorDefault;
@@ -321,7 +242,9 @@ export const obtenerPerfilUsuario = async (uid: string, emailOpcional?: string):
 
     return null;
   } catch (err) {
-    console.warn('Error al obtener o aprovisionar perfil de usuario:', err);
+    if (import.meta.env.DEV) {
+      console.warn('Error al obtener o aprovisionar perfil de usuario:', err);
+    }
     return null;
   }
 };
@@ -998,7 +921,7 @@ export const limpiarCapacitacionesFB = async () => {
 };
 
 // Limpieza modular y dedicada para la Estructura Orgánica y Cargos
-export const limpiarEstructuraOrganicaFB = async (cargosBaseIds: string[] = ['c1', 'c2', 'c3', 'c4', 'c5']) => {
+export const limpiarEstructuraOrganicaFB = async (cargosBaseIds: string[] = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7']) => {
   const batch = writeBatch(db);
 
   try {
@@ -1194,5 +1117,5 @@ export const eliminarCapacitacionFB = async (capId: string): Promise<void> => {
   }
 };
 
-export { migrarDocumentosConEmpresaId, CUENTAS_PRUEBA_OFICIALES } from './migracionEmpresa';
+export { migrarDocumentosConEmpresaId } from './migracionEmpresa';
 

@@ -9,7 +9,8 @@ import {
   SolicitudEntregaEPP,
   UsuarioSistema,
   ProcesoOrganizacion,
-  ConfiguracionEmpresa
+  ConfiguracionEmpresa,
+  EstadoSolicitud
 } from '../types';
 import {
   initialAreas,
@@ -88,7 +89,7 @@ interface SyncContextType {
   handleUpdateProceso: (proceso: ProcesoOrganizacion) => Promise<void>;
   handleDeleteProceso: (id: string) => Promise<void>;
   handleAddSolicitud: (nuevaSolicitud: Solicitud) => Promise<void>;
-  handleUpdateEstadoSolicitud: (id: string, nuevoEstado: 'Aprobada' | 'Rechazada', comentario: string) => Promise<void>;
+  handleUpdateEstadoSolicitud: (id: string, nuevoEstado: EstadoSolicitud, comentario: string) => Promise<void>;
   handleSaveEvaluacion: (evaluacion: EvaluacionDesempeno) => Promise<void>;
   handleDeleteEvaluacion: (evaluacionId: string) => void;
   handleActualizarInventarioEpp: (nuevos: ItemInventarioEPP[]) => Promise<void>;
@@ -235,16 +236,44 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCursorUltimoEmpleado(resEmp.ultimoDoc);
       setHayMasEmpleadosNube(resEmp.hayMas);
 
-      setCargos(carData);
-      setProcesos(procData);
-      try {
-        if (procData.length > 0) localStorage.setItem('bgroup_procesos', JSON.stringify(procData));
-      } catch {}
+      if (carData && carData.length > 0) {
+        const seen = new Set<string>();
+        const uniqueCargos = carData.filter(c => {
+          if (!c || !c.id || seen.has(c.id)) return false;
+          seen.add(c.id);
+          return true;
+        });
+        setCargos(uniqueCargos);
+      } else {
+        // Si no hay cargos en Firestore, conservar iniciales o cargados
+        setCargos(prev => prev.length > 0 ? prev : (shouldOmitMocks ? [] : initialCargos));
+      }
 
-      setAreas(areaData);
-      try {
-        if (areaData.length > 0) localStorage.setItem('bgroup_areas', JSON.stringify(areaData));
-      } catch {}
+      if (procData && procData.length > 0) {
+        const seenP = new Set<string>();
+        const uniqueProc = procData.filter(p => {
+          if (!p || !p.id || seenP.has(p.id)) return false;
+          seenP.add(p.id);
+          return true;
+        });
+        setProcesos(uniqueProc);
+        try {
+          localStorage.setItem('bgroup_procesos', JSON.stringify(uniqueProc));
+        } catch {}
+      }
+
+      if (areaData && areaData.length > 0) {
+        const seenA = new Set<string>();
+        const uniqueArea = areaData.filter(a => {
+          if (!a || !a.id || seenA.has(a.id)) return false;
+          seenA.add(a.id);
+          return true;
+        });
+        setAreas(uniqueArea);
+        try {
+          localStorage.setItem('bgroup_areas', JSON.stringify(uniqueArea));
+        } catch {}
+      }
 
       setSolicitudes(resSol.items);
       setCursorUltimaSolicitud(resSol.ultimoDoc);
@@ -478,7 +507,10 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleAddCargo = async (cargo: Cargo) => {
-    setCargos(prev => [...prev, cargo]);
+    setCargos(prev => {
+      const filtered = prev.filter(c => c.id !== cargo.id);
+      return [...filtered, cargo];
+    });
     try {
       await guardarCargoFB(cargo, currentUser);
     } catch (err) {
@@ -621,7 +653,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const handleUpdateEstadoSolicitud = async (id: string, nuevoEstado: 'Aprobada' | 'Rechazada', comentario: string) => {
+  const handleUpdateEstadoSolicitud = async (id: string, nuevoEstado: EstadoSolicitud, comentario: string) => {
     // Protección RBAC estricta: un colaborador o usuario no administrador no puede aprobar o rechazar solicitudes
     const isAuthorized = currentUser?.rol === 'superadmin' || currentUser?.rol === 'admin_gh' || currentUser?.permisos?.includes('solicitudes');
     if (!isAuthorized) {
@@ -632,12 +664,21 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const solicitudModificada = solicitudes.find(s => s.id === id);
     if (!solicitudModificada) return;
 
+    const nuevoEventoHistorial = {
+      fecha: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      usuarioNombre: currentUser?.nombre || 'Administrador GH',
+      estadoAnterior: solicitudModificada.estado,
+      estadoNuevo: nuevoEstado,
+      comentario
+    };
+
     const actualizada: Solicitud = {
       ...solicitudModificada,
       estado: nuevoEstado,
       decisorId: currentUser?.id || null,
       comentario,
-      fechaDecision: new Date().toISOString().slice(0, 10)
+      fechaDecision: new Date().toISOString().slice(0, 10),
+      historialRespuestas: [...(solicitudModificada.historialRespuestas || []), nuevoEventoHistorial]
     };
 
     setSolicitudes(prev => prev.map(s => s.id === id ? actualizada : s));

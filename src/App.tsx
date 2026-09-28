@@ -450,6 +450,7 @@ function AppLayout() {
                     solicitudes={solicitudes}
                     empleados={empleados}
                     cargos={cargos}
+                    empresa={empresa}
                     onAddSolicitud={handleAddSolicitud}
                     onUpdateEstado={handleUpdateEstadoSolicitud}
                     userRole={userRole}

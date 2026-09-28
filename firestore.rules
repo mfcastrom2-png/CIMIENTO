@@ -8,20 +8,24 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isEmailVerified() {
+      return signedIn() && (
+        request.auth.token.email_verified == true ||
+        request.auth.token.firebase.sign_in_provider == 'google.com'
+      );
+    }
+
     function currentUser() {
       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid));
     }
 
-    function isKnownSuperAdminEmail() {
-      return signedIn() && request.auth.token.email != null && (
-        request.auth.token.email in ['superadmin@test-cimiento.com', 'admin-a@test-cimiento.com', 'mf.castrom2@gmail.com']
-      );
-    }
-
+    // Verificación de roles basada estrictamente en Custom Claims o documento seguro en Firestore
     function hasRole(roles) {
       return signedIn() && (
         (request.auth.token.role != null && request.auth.token.role in roles) ||
-        (isKnownSuperAdminEmail() && 'superadmin' in roles) ||
+        (request.auth.token.superadmin == true && 'superadmin' in roles) ||
+        (request.auth.token.admin_gh == true && 'admin_gh' in roles) ||
+        (request.auth.token.responsable_sst == true && 'responsable_sst' in roles) ||
         (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
          currentUser().data.rol in roles)
       );
@@ -35,13 +39,17 @@ service cloud.firestore {
       return hasRole(['superadmin', 'admin_gh', 'responsable_sst']);
     }
 
-    // Aislamiento Multi-Tenant estricto
+    // Aislamiento Multi-Tenant estricto (Previene vulnerabilidad de coincidencia '' == '')
     function sameCompany(data) {
       return signedIn() && (
         hasRole(['superadmin']) ||
         (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
          ('empresaId' in data) &&
+         data.empresaId != null &&
+         data.empresaId != '' &&
          ('empresaId' in currentUser().data) &&
+         currentUser().data.empresaId != null &&
+         currentUser().data.empresaId != '' &&
          data.empresaId == currentUser().data.empresaId)
       );
     }
@@ -52,27 +60,28 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 1. Configuración de la Empresa y Parámetros
+    // 1. Configuración de la Empresa y Parámetros (Protegido por empresa / admin)
     match /configuracion_empresa/{docId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if isAdmin() || (signedIn() && docId == currentUser().data.empresaId && currentUser().data.empresaId != '') || sameCompany(resource.data);
+      allow write: if isAdmin() && (hasRole(['superadmin']) || sameCompany(request.resource.data));
     }
 
     match /configuracion_nomina/{docId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin() && (hasRole(['superadmin']) || sameCompany(resource.data));
     }
 
     // 2. Usuarios del Sistema (Protección de roles e inmutabilidad de privilegios)
+    // El auto-registro de usuario nuevo siempre se restringe a rol: 'empleado' y sin empresaId preasignado
     match /usuarios/{uid} {
       allow read: if isAdmin()
-        || (signedIn() && (request.auth.uid == uid || resource.data.email == request.auth.token.email));
+        || (signedIn() && (request.auth.uid == uid || (isEmailVerified() && resource.data.email == request.auth.token.email)));
 
       allow create: if isAdmin()
         || (
           signedIn()
           && request.auth.uid == uid
           && (!('rol' in request.resource.data) || request.resource.data.rol == 'empleado')
+          && (!('empresaId' in request.resource.data) || request.resource.data.empresaId == '')
         );
 
       allow update: if isAdmin()
@@ -98,20 +107,26 @@ service cloud.firestore {
         && sameCompany(resource.data);
     }
 
-    // 4. Cargos, Áreas y Procesos Organizacionales (Estructura Orgánica Institucional)
+    // 4. Cargos, Áreas y Procesos Organizacionales (Aislamiento por empresa)
     match /cargos/{cargoId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isAdmin() && sameCompany(request.resource.data);
+      allow update: if isAdmin() && sameCompany(resource.data) && sameCompany(request.resource.data);
+      allow delete: if isAdmin() && sameCompany(resource.data);
     }
 
     match /areas/{areaId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isAdmin() && sameCompany(request.resource.data);
+      allow update: if isAdmin() && sameCompany(resource.data) && sameCompany(request.resource.data);
+      allow delete: if isAdmin() && sameCompany(resource.data);
     }
 
     match /procesos/{procesoId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isAdmin() && sameCompany(request.resource.data);
+      allow update: if isAdmin() && sameCompany(resource.data) && sameCompany(request.resource.data);
+      allow delete: if isAdmin() && sameCompany(resource.data);
     }
 
     // 5. Inventario de EPP (Aislamiento Multi-Tenant)
@@ -129,20 +144,20 @@ service cloud.firestore {
       allow read: if isSSTorAdmin()
         || (signedIn() && sameCompany(resource.data) && (
           resource.data.empleadoId == currentUser().data.empleadoId ||
-          resource.data.empleadoEmail == request.auth.token.email
+          (isEmailVerified() && resource.data.empleadoEmail == request.auth.token.email)
         ));
       allow create: if signedIn() && sameCompany(request.resource.data);
       allow update: if isSSTorAdmin() && sameCompany(resource.data);
       allow delete: if isAdmin() && sameCompany(resource.data);
     }
 
-    // 7. Solicitudes Laborales (Vacaciones, Permisos, Incapacidades)
+    // 7. Solicitudes Laborales (Vacaciones, Permisos, Incapacidades, Certificados)
     match /solicitudes/{solicitudId} {
       allow read: if signedIn() && sameCompany(resource.data);
 
       allow create: if signedIn()
         && sameCompany(request.resource.data)
-        && (isAdmin() || request.resource.data.estado == 'Pendiente');
+        && (isAdmin() || request.resource.data.estado == 'Pendiente' || request.resource.data.estado == 'Radicada');
 
       allow update: if isAdmin()
         && sameCompany(resource.data)
@@ -152,16 +167,20 @@ service cloud.firestore {
         && sameCompany(resource.data);
     }
 
-    // 7.1 Control de Vacaciones
+    // 7.1 Control de Vacaciones (Aislamiento por empresa)
     match /vacaciones/{vacacionId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isAdmin() && sameCompany(request.resource.data);
+      allow update: if isAdmin() && sameCompany(resource.data) && sameCompany(request.resource.data);
+      allow delete: if isAdmin() && sameCompany(resource.data);
     }
 
-    // 7.2 Procesos de Votación SST
+    // 7.2 Procesos de Votación SST (Aislamiento por empresa)
     match /votaciones_sst/{votacionId} {
-      allow read: if signedIn();
-      allow write: if isSSTorAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create: if isSSTorAdmin() && sameCompany(request.resource.data);
+      allow update: if isSSTorAdmin() && sameCompany(resource.data) && sameCompany(request.resource.data);
+      allow delete: if isSSTorAdmin() && sameCompany(resource.data);
     }
 
     // 8. Evaluaciones de Desempeño
@@ -177,7 +196,7 @@ service cloud.firestore {
     // 9. Nómina y Pagos (Aislamiento confidencial estricto CST)
     match /nominas/{nominaId} {
       allow read: if (isAdmin() && sameCompany(resource.data))
-        || (signedIn() && sameCompany(resource.data) && (
+        || (signedIn() && sameCompany(resource.data) && isEmailVerified() && (
           resource.data.empleadoEmail == request.auth.token.email ||
           resource.data.email == request.auth.token.email
         ));
@@ -191,31 +210,38 @@ service cloud.firestore {
       allow write: if isAdmin() && sameCompany(request.resource.data);
     }
 
-    // 10. Capacitaciones y Exámenes (Plan Anual y Evaluaciones)
+    // 10. Capacitaciones y Exámenes (Plan Anual - Admin/SST edita cursos; Colaboradores registran asistencia/examen)
     match /capacitaciones/{capId} {
-      allow read: if signedIn();
-      allow create: if isSSTorAdmin();
-      allow update: if signedIn();
-      allow delete: if isSSTorAdmin();
+      allow read: if signedIn() && sameCompany(resource.data);
+      allow create, delete: if isSSTorAdmin() && sameCompany(request.resource.data);
+      allow update: if (isSSTorAdmin() && sameCompany(request.resource.data)) || (
+        sameCompany(resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantes', 'updatedAt'])
+      );
     }
 
-    // 11. Auditoría Inmutable del Sistema (Append-only)
+    // 11. Auditoría Inmutable del Sistema (Append-only no falsificable)
     match /auditoria_sistema/{logId} {
       allow read: if isAdmin();
-      allow create: if signedIn();
+      allow create: if signedIn() && (
+        ('usuario' in request.resource.data && 'uid' in request.resource.data.usuario && request.resource.data.usuario.uid == request.auth.uid) ||
+        ('usuarioId' in request.resource.data && request.resource.data.usuarioId == request.auth.uid)
+      );
       allow update, delete: if false;
     }
 
     match /logs_auditoria/{logId} {
       allow read: if isAdmin();
-      allow create: if signedIn();
+      allow create: if signedIn() && (
+        'usuarioId' in request.resource.data && request.resource.data.usuarioId == request.auth.uid
+      );
       allow update, delete: if false;
     }
 
-    // 12. Tablero de Anuncios y Slides (Muro de Noticias Institucionales)
+    // 12. Tablero de Anuncios y Slides (Muro de Noticias Institucionales con aislamiento)
     match /anuncios_slides/{anuncioId} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if sameCompany(resource.data);
+      allow write: if isSSTorAdmin() && sameCompany(request.resource.data);
     }
 
     // Default deny catch-all

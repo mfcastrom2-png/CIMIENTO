@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Cargo,
   Empleado,
@@ -29,7 +29,7 @@ import {
   ShieldCheck,
   Compass
 } from 'lucide-react';
-import { fichaVacia, uid } from '../data/initialData';
+import { fichaVacia, uid, initialEmpresa } from '../data/initialData';
 import { limpiarEstructuraOrganicaFB } from '../lib/firebase';
 import { generarSiguienteCodigo } from '../lib/codigoUtils';
 
@@ -156,7 +156,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
         proceso: procesoCargo.trim() || (procesos && procesos[0] ? procesos[0].nombre : 'Gestión Integral'),
         tipoVinculacion: 'Término indefinido',
         modalidad: 'Presencial',
-        ubicacion: 'Sede principal Bogotá',
+        ubicacion: initialEmpresa.centrosTrabajo[0]?.nombre || 'Sede Principal Bogotá',
         personalACargo: '0',
         estado: 'Vigente',
         version: '1.0'
@@ -433,20 +433,81 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
     }
   };
 
+  // Deduplicación estricta de cargos, áreas y procesos para evitar renderizados dobles
+  const cargosUnicos = useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+    return cargos.filter(c => {
+      if (!c || !c.id) return false;
+      const normalizedName = (c.nombre || '').trim().toLowerCase();
+      if (seenIds.has(c.id) || (normalizedName && seenNames.has(normalizedName))) {
+        return false;
+      }
+      seenIds.add(c.id);
+      if (normalizedName) seenNames.add(normalizedName);
+      return true;
+    });
+  }, [cargos]);
+
+  const areasUnicas = useMemo(() => {
+    const seenIds = new Set<string>();
+    return areas.filter(a => {
+      if (!a || !a.id) return false;
+      if (seenIds.has(a.id)) return false;
+      seenIds.add(a.id);
+      return true;
+    });
+  }, [areas]);
+
+  const procesosUnicos = useMemo(() => {
+    const seenIds = new Set<string>();
+    return procesos.filter(p => {
+      if (!p || !p.id) return false;
+      if (seenIds.has(p.id)) return false;
+      seenIds.add(p.id);
+      return true;
+    });
+  }, [procesos]);
+
+  // Validar dependencias jerárquicas seguras
+  const cargosValidos = useMemo(() => {
+    const validIds = new Set(cargosUnicos.map(c => c.id));
+    return cargosUnicos.map(c => {
+      if (c.reportaA && (!validIds.has(c.reportaA) || c.reportaA === c.id)) {
+        return { ...c, reportaA: null };
+      }
+      return c;
+    });
+  }, [cargosUnicos]);
+
   // Filtrado de cargos
-  const cargosFiltrados = searchTerm.trim()
-    ? cargos.filter(c =>
-        c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.ficha.identificacion.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.ficha.identificacion.area?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : cargos;
+  const cargosFiltrados = useMemo(() => {
+    if (!searchTerm.trim()) return cargosValidos;
+    const term = searchTerm.toLowerCase().trim();
+    return cargosValidos.filter(c =>
+      c.nombre.toLowerCase().includes(term) ||
+      c.ficha.identificacion.codigo?.toLowerCase().includes(term) ||
+      c.ficha.identificacion.area?.toLowerCase().includes(term)
+    );
+  }, [cargosValidos, searchTerm]);
 
-  const roots = cargosFiltrados.filter(c => !c.reportaA);
+  // Raíces del organigrama: sólo cargos sin superior o que no reportan a otro dentro del catálogo
+  const roots = useMemo(() => {
+    const rootList = cargosFiltrados.filter(c => !c.reportaA || c.reportaA.trim() === '');
+    const seen = new Set<string>();
+    return rootList.filter(r => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+  }, [cargosFiltrados]);
 
-  // Render del Nodo del Organigrama
-  const renderNode = (cargo: Cargo, level: number = 0) => {
-    const hijos = cargos.filter(c => c.reportaA === cargo.id);
+  // Render del Nodo del Organigrama con protección contra ciclos y recursión
+  const renderNode = (cargo: Cargo, level: number = 0, visitados: Set<string> = new Set()) => {
+    if (visitados.has(cargo.id) || level > 12) return null;
+    const nuevosVisitados = new Set(visitados).add(cargo.id);
+
+    const hijos = cargosValidos.filter(c => c.reportaA === cargo.id && c.id !== cargo.id);
     const personasEnCargo = empleados.filter(e => e.cargoId === cargo.id);
 
     return (
@@ -512,7 +573,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
 
         {hijos.length > 0 && (
           <div className="ml-5 sm:ml-8 pl-4 border-l-2 border-dashed border-[#8FA7D6] mt-2 space-y-2">
-            {hijos.map(h => renderNode(h, level + 1))}
+            {hijos.map(h => renderNode(h, level + 1, nuevosVisitados))}
           </div>
         )}
       </div>
@@ -598,7 +659,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
           }`}
         >
           <GitFork className="w-4 h-4 text-[#00FF00]" />
-          <span>Organigrama Jerárquico ({cargos.length})</span>
+          <span>Organigrama Jerárquico ({cargosUnicos.length})</span>
         </button>
 
         <button
@@ -610,7 +671,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
           }`}
         >
           <Network className="w-4 h-4 text-[#00FF00]" />
-          <span>Mapa Institucional de Procesos ({procesos.length})</span>
+          <span>Mapa Institucional de Procesos ({procesosUnicos.length})</span>
         </button>
 
         <button
@@ -622,7 +683,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
           }`}
         >
           <Building2 className="w-4 h-4 text-[#00FF00]" />
-          <span>Gestión de Procesos & Áreas ({areas.length})</span>
+          <span>Gestión de Procesos & Áreas ({areasUnicas.length})</span>
         </button>
       </div>
 
@@ -641,7 +702,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                   Organigrama Jerárquico Corporativo
                 </h2>
                 <span className="text-[11px] text-[#282829]/70">
-                  {cargos.length} cargos estructurados • {empleados.length} colaboradores activos
+                  {cargosUnicos.length} cargos estructurados • {empleados.length} colaboradores activos
                 </span>
               </div>
             </div>
@@ -704,7 +765,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
             {/* Clasificación por Macroproceso */}
             <div className="space-y-6">
               {(['Estratégico', 'Misional / Operativo', 'Apoyo', 'Control y Evaluación'] as TipoProceso[]).map(tipo => {
-                const procesosTipo = procesos.filter(p => p.tipo === tipo);
+                const procesosTipo = procesosUnicos.filter(p => p.tipo === tipo);
 
                 const getBadgeColor = (t: TipoProceso) => {
                   switch (t) {
@@ -728,7 +789,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {procesosTipo.map(proc => {
-                        const areasVinculadas = areas.filter(a => a.procesoId === proc.id || a.procesoNombre === proc.nombre);
+                        const areasVinculadas = areasUnicas.filter(a => a.procesoId === proc.id || a.procesoNombre === proc.nombre);
                         return (
                           <div key={proc.id} className="bg-[#F8FAFC] border border-[#8FA7D6] rounded-xl p-4 shadow-xs hover:border-[#18235C] transition-all space-y-3 flex flex-col justify-between">
                             <div>
@@ -808,7 +869,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-[#18235C]" />
                 <h3 className="font-bold text-sm text-[#18235C]">
-                  Áreas de la Estructura Orgánica ({areas.length})
+                  Áreas de la Estructura Orgánica ({areasUnicas.length})
                 </h3>
               </div>
               <button
@@ -821,7 +882,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
             </div>
 
             <div className="space-y-3">
-              {areas.map(area => (
+              {areasUnicas.map(area => (
                 <div key={area.id} className="p-3.5 bg-[#F8FAFC] border border-[#8FA7D6] rounded-xl flex items-center justify-between gap-3 hover:border-[#18235C] transition-all">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -874,7 +935,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
               <div className="flex items-center gap-2">
                 <Network className="w-4 h-4 text-[#18235C]" />
                 <h3 className="font-bold text-sm text-[#18235C]">
-                  Procesos Organizacionales ({procesos.length})
+                  Procesos Organizacionales ({procesosUnicos.length})
                 </h3>
               </div>
               <button
@@ -887,7 +948,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
             </div>
 
             <div className="space-y-3">
-              {procesos.map(proc => (
+              {procesosUnicos.map(proc => (
                 <div key={proc.id} className="p-3.5 bg-[#F8FAFC] border border-[#8FA7D6] rounded-xl flex items-center justify-between gap-3 hover:border-[#18235C] transition-all">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -989,7 +1050,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                   className="w-full text-xs p-2.5 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC] focus:outline-none focus:border-[#18235C]"
                 >
                   <option value="">— Cargo Raíz / Máxima Autoridad (Sin superior directo) —</option>
-                  {cargos
+                  {cargosUnicos
                     .filter(c => !cargoAEditar || c.id !== cargoAEditar.id)
                     .map(c => (
                       <option key={c.id} value={c.id}>
@@ -1108,7 +1169,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
             {/* Verificación de ocupantes */}
             {(() => {
               const ocupantes = empleados.filter(e => e.cargoId === cargoAEliminar.id);
-              const subordinados = cargos.filter(c => c.reportaA === cargoAEliminar.id);
+              const subordinados = cargosUnicos.filter(c => c.reportaA === cargoAEliminar.id);
 
               return (
                 <div className="space-y-3 text-xs">

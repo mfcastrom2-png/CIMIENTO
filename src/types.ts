@@ -435,6 +435,8 @@ export interface Empleado {
 export interface Solicitud {
   id: string;
   empresaId?: string; // Multi-Tenancy
+  empresaNombre?: string;
+  sedeTrabajo?: string;
   empleadoId: string;
   empleadoNombre?: string;
   empleadoDocumento?: string;

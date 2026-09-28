@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Building2,
   Save,
@@ -93,6 +93,12 @@ export const EmpresaConfigView: React.FC<EmpresaConfigViewProps> = ({
   const [formData, setFormData] = useState<ConfiguracionEmpresa>(() => {
     return empresaProp || initialEmpresa;
   });
+
+  useEffect(() => {
+    if (empresaProp && (empresaProp.razonSocial || empresaProp.nit)) {
+      setFormData(empresaProp);
+    }
+  }, [empresaProp]);
 
   const [tabActiva, setTabActiva] = useState<'legal' | 'representante' | 'contacto' | 'seguridad' | 'sst' | 'identidad' | 'centros'>('legal');
   const [guardando, setGuardando] = useState(false);
@@ -674,7 +680,7 @@ export const EmpresaConfigView: React.FC<EmpresaConfigViewProps> = ({
                         nombre: e.target.value
                       }
                     })}
-                    placeholder="Ej: Mauricio Castro Mendoza"
+                    placeholder="Ej: Representante Legal Institucional"
                     className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold text-sm text-[#18235C]"
                   />
                 </div>

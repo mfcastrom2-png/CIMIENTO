@@ -140,7 +140,16 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
     currentUser?.rol === 'superadmin'
   );
 
-  const getCargoNombre = (id: string) => cargos.find(c => c.id === id)?.nombre || 'Cargo no definido';
+  const cargosUnicos = useMemo(() => {
+    const seen = new Set<string>();
+    return (cargos || []).filter(c => {
+      if (!c || !c.id || seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  }, [cargos]);
+
+  const getCargoNombre = (id: string) => cargosUnicos.find(c => c.id === id)?.nombre || 'Cargo no definido';
   const getAreaNombre = (emp: Empleado) => {
     if (emp.laboral?.areaNombre) return emp.laboral.areaNombre;
     if (emp.areaId) {
@@ -411,7 +420,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
     return (
       <ExpedienteDigitalView
         empleado={currentEmpleadoSeleccionado}
-        cargos={cargos}
+        cargos={cargosUnicos}
         empresa={empresa}
         centrosTrabajo={centrosTrabajo || empresa?.centrosTrabajo}
         areas={areas}
@@ -604,7 +613,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
               className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800"
             >
               <option value="TODOS">Todos los cargos</option>
-              {cargos.map(c => (
+              {cargosUnicos.map(c => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
             </select>
@@ -953,7 +962,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
       {/* Modal Wizard: Nuevo Empleado / Editar Empleado (10 Pestañas) */}
       {wizardOpen && (
         <ModalNuevoEmpleadoWizard
-          cargos={cargos}
+          cargos={cargosUnicos}
           empleados={empleados}
           empresa={empresa}
           centrosTrabajo={centrosTrabajo || empresa?.centrosTrabajo}

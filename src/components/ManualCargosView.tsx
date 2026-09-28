@@ -42,9 +42,18 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
   onAddCargo,
 }) => {
   const centrosDisponibles = empresa?.centrosTrabajo || centrosTrabajo || initialEmpresa.centrosTrabajo || [];
-  const [internalId, setInternalId] = useState<string>(cargos[0]?.id || "");
+  const cargosUnicos = React.useMemo(() => {
+    const seen = new Set<string>();
+    return (cargos || []).filter(c => {
+      if (!c || !c.id || seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  }, [cargos]);
+
+  const [internalId, setInternalId] = useState<string>(cargosUnicos[0]?.id || "");
   const activeId = selectedCargoId || internalId;
-  const currentCargo = cargos.find(c => c.id === activeId) || cargos[0];
+  const currentCargo = cargosUnicos.find(c => c.id === activeId) || cargosUnicos[0];
   const handleSelect = (id: string) => {
     setInternalId(id);
     if (onSelectCargo) onSelectCargo(id);
@@ -92,7 +101,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
   const [nuevoReportaA, setNuevoReportaA] = useState('');
 
   const abrirModalNuevoCargo = () => {
-    const codigosExistentes = cargos.map(c => c.ficha?.identificacion?.codigo);
+    const codigosExistentes = cargosUnicos.map(c => c.ficha?.identificacion?.codigo);
     setNuevoCodigoCargo(generarSiguienteCodigo('CAR', codigosExistentes));
     setNuevoNombreCargo('');
     setNuevoAreaCargo('Operaciones');
@@ -104,7 +113,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
   const handleCrearCargo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevoNombreCargo.trim()) return;
-    const codigosExistentes = cargos.map(c => c.ficha?.identificacion?.codigo);
+    const codigosExistentes = cargosUnicos.map(c => c.ficha?.identificacion?.codigo);
     const codigoFinal = nuevoCodigoCargo.trim() || generarSiguienteCodigo('CAR', codigosExistentes);
 
     const nuevaFicha = fichaVacia({
@@ -115,7 +124,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         proceso: nuevoProcesoCargo.trim() || 'Gestión Integral',
         tipoVinculacion: 'Término indefinido',
         modalidad: 'Presencial',
-        ubicacion: 'Sede principal Bogotá',
+        ubicacion: centrosDisponibles.find(c => c.esSedePrincipal)?.nombre || centrosDisponibles[0]?.nombre || 'Sede Principal Bogotá',
         personalACargo: '0',
         estado: 'Vigente',
         version: '1.0'
@@ -372,7 +381,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
             onChange={e => handleSelect(e.target.value)}
             className="text-xs font-semibold p-2 rounded border border-[#8FA7D6] bg-white text-[#18235C] focus:outline-none focus:border-[#18235C]"
           >
-            {cargos.map(c => (
+            {cargosUnicos.map(c => (
               <option key={c.id} value={c.id}>
                 {c.nombre} ({c.ficha.identificacion.codigo || 'S/C'})
               </option>
@@ -568,7 +577,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
             </div>
 
             <div className="p-3 bg-[#F8FAFC] rounded border border-[#8FA7D6] text-xs text-[#282829]">
-              Jefe Inmediato: <strong className="text-[#18235C]">{currentCargo.reportaA ? cargos.find(c => c.id === currentCargo.reportaA)?.nombre : 'Cargo Raíz (Sin superior)'}</strong>. La jerarquía se gestiona desde el módulo de Estructura Organizacional.
+              Jefe Inmediato: <strong className="text-[#18235C]">{currentCargo.reportaA ? cargosUnicos.find(c => c.id === currentCargo.reportaA)?.nombre : 'Cargo Raíz (Sin superior)'}</strong>. La jerarquía se gestiona desde el módulo de Estructura Organizacional.
             </div>
           </div>
         )}
@@ -1457,7 +1466,7 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                     className="w-full p-2.5 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC]"
                   >
                     <option value="">— Ninguno (Nivel Directivo) —</option>
-                    {cargos.map(c => (
+                    {cargosUnicos.map(c => (
                       <option key={c.id} value={c.id}>
                         {c.nombre} ({c.ficha?.identificacion?.codigo || 'S/C'})
                       </option>

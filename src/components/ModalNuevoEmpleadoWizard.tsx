@@ -105,6 +105,15 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
   onVerExpediente
 }) => {
   const isEditing = Boolean(empleadoAEditar);
+  const cargosUnicos = useMemo(() => {
+    const seen = new Set<string>();
+    return (cargos || []).filter(c => {
+      if (!c || !c.id || seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  }, [cargos]);
+
   const centrosTrabajoDisponibles = useMemo(() => {
     return empresa?.centrosTrabajo || centrosTrabajo || initialEmpresa.centrosTrabajo || [];
   }, [empresa, centrosTrabajo]);
@@ -173,14 +182,14 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
   const auxilioTransporteVigente = parametrosNominaConfig.auxilioTransporte || 200000;
   const topeAuxilioTransporte = smmlvVigente * (parametrosNominaConfig.topeSmmlvAuxilioTransporte || 2);
 
-  const initialCargoId = empleadoAEditar?.cargoId || cargos[0]?.id || 'c1';
+  const initialCargoId = empleadoAEditar?.cargoId || cargosUnicos[0]?.id || 'c1';
   const [cargoId, setCargoId] = useState(initialCargoId);
 
   // Conectar cargo con áreas creadas
   const resolverAreaInicial = (): string => {
     if (empleadoAEditar?.laboral?.areaId) return empleadoAEditar.laboral.areaId;
     if (empleadoAEditar?.areaId) return empleadoAEditar.areaId;
-    const cObj = cargos.find(c => c.id === initialCargoId);
+    const cObj = cargosUnicos.find(c => c.id === initialCargoId);
     if (cObj?.ficha?.identificacion?.area) {
       const match = areas.find(a =>
         a.id === cObj.ficha.identificacion.area ||
@@ -195,7 +204,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
 
   const handleCargoSelectChange = (nuevoCargoId: string) => {
     setCargoId(nuevoCargoId);
-    const cObj = cargos.find(c => c.id === nuevoCargoId);
+    const cObj = cargosUnicos.find(c => c.id === nuevoCargoId);
     if (cObj?.ficha?.identificacion?.area) {
       const match = areas.find(a =>
         a.id === cObj.ficha.identificacion.area ||
@@ -211,7 +220,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
     setAreaId(nuevaAreaId);
     const areaObj = areas.find(a => a.id === nuevaAreaId);
     if (areaObj) {
-      const cargoMatch = cargos.find(c =>
+      const cargoMatch = cargosUnicos.find(c =>
         c.ficha?.identificacion?.area === areaObj.id ||
         (c.ficha?.identificacion?.area || '').toLowerCase().trim() === areaObj.nombre.toLowerCase().trim()
       );
@@ -240,7 +249,13 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
   const [modalidadTrabajo, setModalidadTrabajo] = useState<'Presencial' | 'Híbrida' | 'Trabajo remoto' | 'Teletrabajo'>(
     empleadoAEditar?.laboral?.modalidadTrabajo || 'Presencial'
   );
-  const [lugarTrabajo, setLugarTrabajo] = useState(empleadoAEditar?.laboral?.lugarTrabajo || 'Sede Central - Bogotá');
+  const defaultSede =
+    empresa?.centrosTrabajo?.find(c => c.esSedePrincipal)?.nombre ||
+    empresa?.centrosTrabajo?.[0]?.nombre ||
+    centrosTrabajo?.[0]?.nombre ||
+    initialEmpresa.centrosTrabajo[0]?.nombre ||
+    'Sede Principal Bogotá';
+  const [lugarTrabajo, setLugarTrabajo] = useState(empleadoAEditar?.laboral?.lugarTrabajo || defaultSede);
   const [estadoEmpleado, setEstadoEmpleado] = useState(
     (empleadoAEditar?.laboral?.estado || (empleadoAEditar?.activo === false ? 'Inactivo' : 'Activo')) as any
   );
@@ -554,12 +569,196 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
     { num: 10, label: 'Expediente Documental', icon: FileText }
   ];
 
+  // Validación exhaustiva por paso del expediente para bloquear avances incompletos
+  const validarPaso = (paso: number): { valido: boolean; error?: string } => {
+    if (paso === 1) {
+      if (!primerNombre.trim()) {
+        return { valido: false, error: 'Paso 1 (Identificación): Debe ingresar el Primer Nombre del colaborador.' };
+      }
+      if (!primerApellido.trim()) {
+        return { valido: false, error: 'Paso 1 (Identificación): Debe ingresar el Primer Apellido del colaborador.' };
+      }
+      const doc = (numeroDocumento || '').trim().replace(/\D/g, '');
+      if (!doc) {
+        return { valido: false, error: 'Paso 1 (Identificación): Debe ingresar el Número de Documento de Identidad.' };
+      }
+      if (validacionUnicidad.docDuplicado) {
+        return { valido: false, error: `Paso 1 (Identificación): El documento ${numeroDocumento} ya está asignado a ${validacionUnicidad.empleadoDocDuplicado?.nombre}.` };
+      }
+      if (!fechaNacimiento) {
+        return { valido: false, error: 'Paso 1 (Identificación): Debe seleccionar la Fecha de Nacimiento.' };
+      }
+      return { valido: true };
+    }
+
+    if (paso === 2) {
+      if (!direccion.trim()) {
+        return { valido: false, error: 'Paso 2 (Contacto & Residencia): Debe ingresar la Dirección de Residencia.' };
+      }
+      if (!departamento.trim()) {
+        return { valido: false, error: 'Paso 2 (Contacto & Residencia): Debe indicar el Departamento de residencia.' };
+      }
+      if (!ciudad.trim()) {
+        return { valido: false, error: 'Paso 2 (Contacto & Residencia): Debe indicar la Ciudad o Municipio.' };
+      }
+      if (!celular.trim() && !telefonoFijo.trim()) {
+        return { valido: false, error: 'Paso 2 (Contacto & Residencia): Debe ingresar al menos un número de teléfono o celular.' };
+      }
+      if (!contactoEmergenciaNombre.trim()) {
+        return { valido: false, error: 'Paso 2 (Contacto & Residencia): El Nombre del Contacto de Emergencia es obligatorio para el SG-SST.' };
+      }
+      if (!contactoEmergenciaParentesco.trim()) {
+        return { valido: false, error: 'Paso 2 (Contacto & Residencia): El Parentesco del Contacto de Emergencia es obligatorio.' };
+      }
+      if (!contactoEmergenciaTelefono.trim()) {
+        return { valido: false, error: 'Paso 2 (Contacto & Residencia): El Teléfono del Contacto de Emergencia es obligatorio.' };
+      }
+      return { valido: true };
+    }
+
+    if (paso === 3) {
+      if (!codigoInterno.trim()) {
+        return { valido: false, error: 'Paso 3 (Información Laboral): Debe asignar un Código Interno al colaborador.' };
+      }
+      if (validacionUnicidad.codDuplicado && !isEditing) {
+        return { valido: false, error: `Paso 3 (Información Laboral): El código interno ${codigoInterno} ya existe en el sistema.` };
+      }
+      if (!fechaIngreso) {
+        return { valido: false, error: 'Paso 3 (Información Laboral): Debe registrar la Fecha de Ingreso oficial.' };
+      }
+      if (!cargoId) {
+        return { valido: false, error: 'Paso 3 (Información Laboral): Debe seleccionar un Cargo institucional válido.' };
+      }
+      if (!areaId) {
+        return { valido: false, error: 'Paso 3 (Información Laboral): Debe asignar un Área / Dependencia orgánica.' };
+      }
+      if (!tipoContrato) {
+        return { valido: false, error: 'Paso 3 (Información Laboral): Debe definir la Modalidad Contractual.' };
+      }
+      if (!lugarTrabajo.trim()) {
+        return { valido: false, error: 'Paso 3 (Información Laboral): Debe seleccionar la Sede / Centro de Trabajo asignado.' };
+      }
+      if (!fechaInicioContrato) {
+        return { valido: false, error: 'Paso 3 (Información Laboral): Debe definir la Fecha de Inicio de Contrato.' };
+      }
+      return { valido: true };
+    }
+
+    if (paso === 4) {
+      if (!cargoId) {
+        return { valido: false, error: 'Paso 4 (Estructura & Cargo): El expediente requiere un Cargo Orgánico asignado.' };
+      }
+      if (!areaId) {
+        return { valido: false, error: 'Paso 4 (Estructura & Cargo): El expediente requiere un Área Orgánica asignada.' };
+      }
+      if (!nivelJerarquico) {
+        return { valido: false, error: 'Paso 4 (Estructura & Cargo): Debe definir el Nivel Jerárquico del puesto.' };
+      }
+      return { valido: true };
+    }
+
+    if (paso === 5) {
+      if (!salarioBasico || salarioBasico <= 0) {
+        return { valido: false, error: 'Paso 5 (Compensación): El Salario Básico Mensual debe ser mayor a cero.' };
+      }
+      if (!tipoSalario) {
+        return { valido: false, error: 'Paso 5 (Compensación): Debe definir el Tipo de Salario.' };
+      }
+      if (!periodicidadPago) {
+        return { valido: false, error: 'Paso 5 (Compensación): Debe definir la Periodicidad de Pago.' };
+      }
+      if (formaPago === 'Transferencia bancaria' && !numeroCuenta.trim()) {
+        return { valido: false, error: 'Paso 5 (Compensación): Ingrese el Número de Cuenta bancaria para la dispersión de nómina.' };
+      }
+      return { valido: true };
+    }
+
+    if (paso === 6) {
+      if (!eps.trim()) {
+        return { valido: false, error: 'Paso 6 (Seguridad Social): Debe indicar la EPS de afiliación en salud.' };
+      }
+      if (!fondoPensiones.trim()) {
+        return { valido: false, error: 'Paso 6 (Seguridad Social): Debe indicar el Fondo de Pensiones (AFP).' };
+      }
+      if (!arl.trim()) {
+        return { valido: false, error: 'Paso 6 (Seguridad Social): Debe indicar la Administradora de Riesgos Laborales (ARL).' };
+      }
+      if (!cajaCompensacion.trim()) {
+        return { valido: false, error: 'Paso 6 (Seguridad Social): Debe indicar la Caja de Compensación Familiar.' };
+      }
+      if (!fondoCesantias.trim()) {
+        return { valido: false, error: 'Paso 6 (Seguridad Social): Debe indicar el Fondo Administrador de Cesantías.' };
+      }
+      return { valido: true };
+    }
+
+    if (paso === 7) {
+      if (!estudios || estudios.length === 0 || !estudios[0]?.programa?.trim() || !estudios[0]?.institucion?.trim()) {
+        return { valido: false, error: 'Paso 7 (Información Académica): Debe registrar al menos un título o estudio con programa e institución.' };
+      }
+      return { valido: true };
+    }
+
+    if (paso === 8) {
+      if (!experiencias || experiencias.length === 0 || !experiencias[0]?.empresa?.trim() || !experiencias[0]?.cargo?.trim()) {
+        return { valido: false, error: 'Paso 8 (Experiencia Laboral): Debe registrar la experiencia previa con nombre de empresa y cargo desempeñado.' };
+      }
+      return { valido: true };
+    }
+
+    if (paso === 9) {
+      if (!conceptoAptitudVigente) {
+        return { valido: false, error: 'Paso 9 (Seguridad & Salud SST): Debe definir el Concepto Médico de Aptitud Laboral.' };
+      }
+      return { valido: true };
+    }
+
+    return { valido: true };
+  };
+
+  const handleIntentarCambiarTab = (nuevoTab: number) => {
+    setErrorValidacion(null);
+    if (nuevoTab <= tabActual) {
+      setTabActual(nuevoTab);
+      return;
+    }
+    for (let p = 1; p < nuevoTab; p++) {
+      const res = validarPaso(p);
+      if (!res.valido) {
+        setErrorValidacion(res.error || `Complete todos los datos obligatorios del Paso ${p} antes de avanzar.`);
+        setTabActual(p);
+        return;
+      }
+    }
+    setTabActual(nuevoTab);
+  };
+
+  const handleSiguiente = () => {
+    const res = validarPaso(tabActual);
+    if (!res.valido) {
+      setErrorValidacion(res.error || 'Por favor diligencie todos los campos requeridos antes de continuar.');
+      return;
+    }
+    setErrorValidacion(null);
+    setTabActual(prev => Math.min(10, prev + 1));
+  };
+
   // Handler de guardado final
   const handleSubmitFinal = async (e?: React.FormEvent) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
     }
     setErrorValidacion(null);
+
+    // Validar rigurosamente todos los pasos antes de guardar
+    for (let p = 1; p <= 9; p++) {
+      const res = validarPaso(p);
+      if (!res.valido) {
+        setErrorValidacion(res.error || `Complete todos los campos obligatorios del Paso ${p}.`);
+        setTabActual(p);
+        return;
+      }
+    }
 
     // 1. Normalización de Nombres y Apellidos
     let pNombre = primerNombre.trim();
@@ -617,7 +816,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
     let fInicioContratoFinal = fechaInicioContrato || fIngresoFinal;
     if (!fechaInicioContrato) setFechaInicioContrato(fInicioContratoFinal);
 
-    let cargoFinal = cargoId || cargos[0]?.id || 'c1';
+    let cargoFinal = cargoId || cargosUnicos[0]?.id || 'c1';
     if (!cargoId) setCargoId(cargoFinal);
 
     let areaFinal = areaId || areas[0]?.id || 'a1';
@@ -635,7 +834,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
     setGuardando(true);
     try {
       const targetId = empleadoAEditar?.id || uid();
-      const cargoSeleccionado = cargos.find(c => c.id === cargoFinal);
+      const cargoSeleccionado = cargosUnicos.find(c => c.id === cargoFinal);
       const areaSeleccionada = areas.find(a => a.id === areaFinal);
       const jefeSeleccionado = empleados.find(e => e.id === jefeInmediatoId);
 
@@ -829,7 +1028,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
 
   // Pantalla de Resumen Exitoso
   if (resumenExito) {
-    const cargoNombre = cargos.find(c => c.id === resumenExito.cargoId)?.nombre || 'Cargo Asignado';
+    const cargoNombre = cargosUnicos.find(c => c.id === resumenExito.cargoId)?.nombre || 'Cargo Asignado';
     const areaNombre = areas.find(a => a.id === resumenExito.areaId)?.nombre || 'Área Organizacional';
 
     return (
@@ -973,7 +1172,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
               <button
                 key={p.num}
                 type="button"
-                onClick={() => setTabActual(p.num)}
+                onClick={() => handleIntentarCambiarTab(p.num)}
                 className={`px-3 py-2.5 whitespace-nowrap flex items-center gap-1.5 border-b-2 transition-all cursor-pointer ${
                   esActiva
                     ? 'border-[#18235C] text-[#18235C] bg-white font-bold shadow-2xs'
@@ -1474,7 +1673,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     onChange={e => handleCargoSelectChange(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold text-[#18235C]"
                   >
-                    {cargos.map(c => (
+                    {cargosUnicos.map(c => (
                       <option key={c.id} value={c.id}>
                         {c.nombre} ({c.ficha?.identificacion?.codigo || 'S/C'})
                       </option>
@@ -1491,7 +1690,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                         Alineación con Manual de Funciones & Organigrama
                       </span>
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#18235C] text-white">
-                        {cargos.find(c => c.id === cargoId)?.ficha?.identificacion?.codigo || 'CAR-001'}
+                        {cargosUnicos.find(c => c.id === cargoId)?.ficha?.identificacion?.codigo || (cargosUnicos[0]?.ficha?.identificacion?.codigo || 'DIR-001')}
                       </span>
                     </div>
                     <span className="text-[11px] text-blue-900 font-semibold">
@@ -1508,7 +1707,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     <div className="p-2 bg-white rounded-lg border border-blue-100">
                       <span className="font-bold text-[#18235C] block text-[11px]">Misión del Cargo (Manual de Funciones):</span>
                       <p className="text-[11px] text-slate-700 italic line-clamp-2 mt-0.5">
-                        {cargos.find(c => c.id === cargoId)?.ficha?.proposito ||
+                        {cargosUnicos.find(c => c.id === cargoId)?.ficha?.proposito ||
                           'Garantizar la correcta ejecución de los procesos operacionales conforme a la normatividad y estándares de calidad.'}
                       </p>
                     </div>
@@ -1518,11 +1717,11 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                       <div className="text-[11px] text-slate-700 space-y-0.5 mt-0.5">
                         <div>
                           <strong>Educación:</strong>{' '}
-                          {cargos.find(c => c.id === cargoId)?.ficha?.requisitos?.formacion || 'Técnico o Tecnólogo en el área'}
+                          {cargosUnicos.find(c => c.id === cargoId)?.ficha?.requisitos?.formacion || 'Técnico o Tecnólogo en el área'}
                         </div>
                         <div>
                           <strong>Experiencia:</strong>{' '}
-                          {cargos.find(c => c.id === cargoId)?.ficha?.requisitos?.experiencia || 'Mínimo 1 año en cargos similares'}
+                          {cargosUnicos.find(c => c.id === cargoId)?.ficha?.requisitos?.experiencia || 'Mínimo 1 año en cargos similares'}
                         </div>
                       </div>
                     </div>
@@ -1539,7 +1738,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     <option value="">— Sin jefe asignado / Gerencia —</option>
                     {empleados.map(emp => (
                       <option key={emp.id} value={emp.id}>
-                        {emp.nombre} — {cargos.find(c => c.id === emp.cargoId)?.nombre || 'Cargo'}
+                        {emp.nombre} — {cargosUnicos.find(c => c.id === emp.cargoId)?.nombre || 'Cargo'}
                       </option>
                     ))}
                   </select>
@@ -1717,7 +1916,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                   <input
                     type="text"
                     disabled
-                    value={cargos.find(c => c.id === cargoId)?.nombre || 'Cargo'}
+                    value={cargosUnicos.find(c => c.id === cargoId)?.nombre || 'Cargo'}
                     className="w-full px-3 py-2 bg-slate-100 border border-[#8FA7D6] rounded-lg font-bold text-[#18235C]"
                   />
                 </div>
@@ -1727,7 +1926,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                   <input
                     type="text"
                     disabled
-                    value={cargos.find(c => c.id === cargoId)?.ficha?.identificacion?.codigo || 'CAR-001'}
+                    value={cargosUnicos.find(c => c.id === cargoId)?.ficha?.identificacion?.codigo || (cargosUnicos[0]?.ficha?.identificacion?.codigo || 'DIR-001')}
                     className="w-full px-3 py-2 bg-slate-100 border border-[#8FA7D6] rounded-lg font-mono"
                   />
                 </div>
@@ -2916,7 +3115,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
               {tabActual < 10 && (
                 <button
                   type="button"
-                  onClick={() => setTabActual(prev => Math.min(10, prev + 1))}
+                  onClick={handleSiguiente}
                   className="px-5 py-2 bg-[#18235C] hover:bg-[#101740] text-white font-bold text-xs rounded-lg flex items-center gap-1 cursor-pointer shadow-xs"
                 >
                   <span>Siguiente Paso</span>

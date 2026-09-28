@@ -26,7 +26,7 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
   onOpenEvaluacionDetalle,
   empresa
 }) => {
-  const [selectedDocType, setSelectedDocType] = useState<'ficha' | 'acta_eval' | 'certificado' | 'contrato'>('ficha');
+  const [selectedDocType, setSelectedDocType] = useState<'ficha' | 'acta_eval'>('ficha');
   const [selectedCargoId, setSelectedCargoId] = useState<string>(cargos[0]?.id || '');
   const [selectedEmpleadoId, setSelectedEmpleadoId] = useState<string>(empleados[0]?.id || '');
 
@@ -55,7 +55,7 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
             Repositorio y Generador de Documentos
           </h1>
           <p className="text-xs sm:text-sm text-[#282829]/70 mt-1 max-w-2xl">
-            Generación formal y exportación de manuales de funciones, actas de evaluación técnica de 100 puntos y certificaciones laborales oficiales.
+            Generación formal y exportación de manuales específicos de funciones y actas oficiales de evaluación técnica de desempeño de 100 puntos.
           </p>
         </div>
 
@@ -68,6 +68,7 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
           <span>Imprimir / Exportar Documento</span>
         </button>
       </div>
+
 
       {/* Control Selector (Hidden during print) */}
       <div className="bg-white p-4 rounded-xl border border-[#8FA7D6]/30 shadow-xs space-y-4 print:hidden">
@@ -93,17 +94,6 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
             }`}
           >
             Acta de Evaluación Técnica de Desempeño
-          </button>
-          <button
-            id="tab-doc-certificado"
-            onClick={() => setSelectedDocType('certificado')}
-            className={`px-3.5 py-2 rounded-lg font-semibold transition-colors ${
-              selectedDocType === 'certificado'
-                ? 'bg-[#18235C] text-white shadow-xs'
-                : 'bg-slate-100 text-[#282829]/70 hover:bg-[#8FA7D6]/20 hover:text-[#18235C]'
-            }`}
-          >
-            Certificado Laboral
           </button>
         </div>
 
@@ -382,60 +372,6 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               <div className="border-t border-[#18235C] pt-2 text-center">
                 <span className="font-bold text-[#18235C] block">Firma Colaborador Evaluado</span>
                 <span className="text-[10px] text-[#282829]/70">Constancia de retroalimentación recibida</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Plantilla 3: Certificado Laboral */}
-        {selectedDocType === 'certificado' && (
-          <div className="space-y-8 text-xs text-[#282829] py-6">
-            <div className="flex flex-col items-center justify-center space-y-2 border-b border-[#8FA7D6]/30 pb-4 text-center">
-              {empresa?.identidadVisual?.logoUrl ? (
-                <img
-                  src={empresa.identidadVisual.logoUrl}
-                  alt={empresa.nombreComercial || 'Logo'}
-                  className="max-h-20 w-auto max-w-[280px] object-contain mb-1"
-                />
-              ) : (
-                <span className="text-2xl font-bold tracking-wide block text-[#18235C]">
-                  {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
-                </span>
-              )}
-              <span className="text-sm font-bold text-[#18235C] block">
-                {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
-              </span>
-              <span className="text-xs text-[#282829]/70 font-semibold">
-                NIT {empresa?.nit || '901.458.789'}-{empresa?.digitoVerificacion || '3'} · DEPARTAMENTO DE GESTIÓN HUMANA
-              </span>
-            </div>
-
-            <div className="text-center py-4">
-              <h2 className="text-xl font-bold text-[#18235C] underline tracking-wider">
-                CERTIFICA:
-              </h2>
-            </div>
-
-            <p className="leading-loose text-justify text-sm text-[#282829]">
-              Que el(la) señor(a) <strong className="text-[#18235C]">{empleado.nombre}</strong>, identificado(a) con cédula de ciudadanía No. <strong className="text-[#18235C]">{empleado.documento}</strong>, labora en nuestra organización mediante contrato laboral a <strong className="text-[#18235C]">{empleado.contrato.tipo}</strong>, desempeñando a la fecha el cargo de <strong className="text-[#18235C]">{empCargo?.nombre}</strong> desde el día <strong className="text-[#18235C]">{empleado.contrato.inicio}</strong>.
-            </p>
-
-            <p className="leading-loose text-justify text-sm text-[#282829]">
-              Actualmente devenga una asignación salarial mensual de <strong className="text-[#18235C]">{empleado.contrato.salario} M/CTE</strong>. Durante el desempeño de sus labores ha demostrado alto compromiso, responsabilidad y apego a los estándares organizacionales.
-            </p>
-
-            <p className="text-sm pt-4 text-[#282829]/80">
-              La presente certificación se expide a solicitud de la parte interesada el día {new Date().toLocaleDateString('es-CO')}.
-            </p>
-
-            <div className="pt-16 max-w-xs">
-              <div className="border-t border-[#18235C] pt-2">
-                <span className="font-bold block text-sm text-[#18235C]">
-                  {empresa?.representanteLegal?.nombre || 'Gerencia de Talento Humano'}
-                </span>
-                <span className="text-xs text-[#282829]/70">
-                  {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
-                </span>
               </div>
             </div>
           </div>

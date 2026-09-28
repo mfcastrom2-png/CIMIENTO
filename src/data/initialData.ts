@@ -815,11 +815,11 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     }
   },
   {
-    id: 'e-manuel-castro',
-    nombre: 'Manuel Castro',
-    documento: '80.892.411',
-    email: 'manuelfcastrom@gmail.com',
-    telefono: '310 445 8821',
+    id: 'e-carlos-restrepo',
+    nombre: 'Carlos Restrepo',
+    documento: '1.020.892.411',
+    email: 'carlos.restrepo@empresa-ejemplo.co',
+    telefono: '+57 300 000 0000',
     cargoId: 'c7',
     areaId: 'a3',
     formacion: 'Técnico Profesional en Telecomunicaciones y Redes Ópticas',
@@ -1476,10 +1476,10 @@ export const initialEmpresa: ConfiguracionEmpresa = {
   camaraComercio: 'Cámara de Comercio de Bogotá',
   fechaConstitucion: '2019-03-15',
   representanteLegal: {
-    nombre: 'Mauricio Castro Mendoza',
+    nombre: 'Representante Legal Institucional',
     tipoDocumento: 'C.C.',
-    numeroDocumento: '79.845.120',
-    email: 'gerencia@bgroup.com.co',
+    numeroDocumento: '79.000.120',
+    email: 'gerencia@empresa-ejemplo.co',
     telefono: '+57 (601) 745-8900',
     cargo: 'Gerente General y Representante Legal'
   },

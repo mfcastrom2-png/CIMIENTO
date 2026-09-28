@@ -420,7 +420,8 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                   const centrosDisponibles = empresa?.centrosTrabajo || centrosTrabajo || initialEmpresa.centrosTrabajo || [];
                   const ctAsignado = centrosDisponibles.find(
                     ct => ct.nombre === empleado.laboral?.lugarTrabajo || (ct.codigo && ct.codigo === empleado.laboral?.lugarTrabajo)
-                  );
+                  ) || centrosDisponibles.find(c => c.esSedePrincipal) || centrosDisponibles[0];
+                  const nombreSede = empleado.laboral?.lugarTrabajo || ctAsignado?.nombre || 'Sede Principal Bogotá';
                   return (
                     <div>
                       <div className="flex items-center justify-between mb-1">
@@ -435,11 +436,11 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                         )}
                       </div>
                       <span className="text-[#18235C] font-bold text-sm block">
-                        {empleado.laboral?.lugarTrabajo || ctAsignado?.nombre || 'Sede Central - Bogotá'}
+                        {nombreSede}
                       </span>
                       {ctAsignado ? (
                         <div className="mt-1 text-[11px] text-slate-600 space-y-0.5 border-t border-slate-200 pt-1">
-                          <div>Código: <span className="font-mono font-bold text-slate-800">{ctAsignado.codigo || 'Sede'}</span></div>
+                          <div>Código: <span className="font-mono font-bold text-slate-800">{ctAsignado.codigo || 'CT-01'}</span></div>
                           <div>Ubicación: <span className="font-semibold text-slate-800">{ctAsignado.direccion} — {ctAsignado.ciudad}, {ctAsignado.departamento}</span></div>
                         </div>
                       ) : (

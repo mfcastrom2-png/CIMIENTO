@@ -21,7 +21,8 @@ import {
   guardarUsuarioFB,
   eliminarUsuarioFB,
   registrarUsuarioEnAuth,
-  enviarNotificacionCorreoNuevoUsuario
+  enviarNotificacionCorreoNuevoUsuario,
+  registrarEventoAuditoria
 } from '../lib/firebase';
 import {
   ComprobanteNotificacionModal,
@@ -860,7 +861,7 @@ export function UsuariosView({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start md:self-auto">
+          <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
             <button
               onClick={handleDepurarDuplicadosYAccesos}
               disabled={depurandoAccesos}
