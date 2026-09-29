@@ -12,6 +12,7 @@ import {
   INITIAL_CONTROL_VACACIONES,
   INITIAL_SOLICITUDES_VACACIONES
 } from '../data/usuariosYVotacionesData';
+import { PARAMETROS_COLOMBIA_2026 } from '../services/payrollEngine';
 import {
   AlertCircle,
   AlertTriangle,
@@ -63,10 +64,10 @@ interface ControlVacacionesViewProps {
  */
 const parseSalarioNumerico = (salario: number | string | undefined): number => {
   if (typeof salario === 'number') return salario;
-  if (!salario) return 1300000;
+  if (!salario) return PARAMETROS_COLOMBIA_2026.smmlv;
   const limpio = String(salario).replace(/[^0-9.-]+/g, '');
   const num = Number(limpio);
-  return isNaN(num) || num <= 0 ? 1300000 : num;
+  return isNaN(num) || num <= 0 ? PARAMETROS_COLOMBIA_2026.smmlv : num;
 };
 
 /**
@@ -569,7 +570,6 @@ export function ControlVacacionesView({
     if (onAddSolicitudGeneral) {
       onAddSolicitudGeneral({
         id: nuevaSol.id,
-        empresaId: currentUser?.empresaId || 'empresa-a',
         empleadoId: emp.id,
         empleadoNombre: emp.nombre,
         empleadoEmail: emp.email || '',

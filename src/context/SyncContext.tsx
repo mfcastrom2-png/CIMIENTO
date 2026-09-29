@@ -427,7 +427,6 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: emailFinal,
         rol: 'empleado',
         cargoNombre: empleado.laboral?.cargoNombre || 'Colaborador',
-        empresaId: empleado.empresaId || currentUser?.empresaId || 'empresa-a',
         estado: 'activo',
         ultimoAcceso: 'Nunca',
         fechaCreacion: new Date().toISOString().slice(0, 10),

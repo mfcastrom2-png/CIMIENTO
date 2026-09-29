@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CertificadoLaboralData, formatMonedaCOPCertificado } from '../utils/generadorCertificados';
 import { Printer, X, FileText, ShieldCheck } from 'lucide-react';
 
@@ -11,6 +11,8 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
   certificado,
   onClose
 }) => {
+  const [incluirSalario, setIncluirSalario] = useState<boolean>(true);
+
   const handleImprimir = () => {
     window.print();
   };
@@ -48,6 +50,15 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-white cursor-pointer select-none bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg border border-white/20 transition-colors">
+              <input
+                type="checkbox"
+                checked={incluirSalario}
+                onChange={e => setIncluirSalario(e.target.checked)}
+                className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+              />
+              <span className="font-semibold text-[11px]">Incluir Salario</span>
+            </label>
             <button
               type="button"
               id="btn-imprimir-pdf-certificado"
@@ -55,7 +66,7 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
               className="px-3 py-1.5 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimir / Guardar PDF</span>
+              <span>Imprimir / PDF</span>
             </button>
             <button
               type="button"
@@ -129,21 +140,31 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
               Que el(la) señor(a) <strong className="text-[#18235C] font-sans font-bold uppercase">{certificado.empleado.nombre}</strong>, identificado(a) con Cédula de Ciudadanía número <strong className="font-mono font-bold">{certificado.empleado.documento}</strong> expedida en Colombia, labora para nuestra organización bajo la modalidad de contrato de trabajo <strong className="font-bold text-[#18235C]">{certificado.tipoContrato}</strong> desde el <strong className="font-bold">{certificado.fechaIngreso}</strong>, prestando sus servicios en el Centro de Trabajo / Sede <strong className="font-bold text-[#18235C]">{certificado.centroTrabajoNombre}</strong> ({certificado.centroTrabajoCiudad}), desempeñando actualmente las funciones correspondientes al cargo de:
             </p>
 
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 font-sans my-3 text-xs space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-slate-500 uppercase font-bold block text-[10px]">Denominación del Cargo</span>
-                  <strong className="text-[#18235C] text-sm">{certificado.cargoNombre}</strong>
+            {incluirSalario ? (
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 font-sans my-3 text-xs space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-slate-500 uppercase font-bold block text-[10px]">Denominación del Cargo</span>
+                    <strong className="text-[#18235C] text-sm">{certificado.cargoNombre}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 uppercase font-bold block text-[10px]">Asignación Salarial Mensual Básica</span>
+                    <strong className="text-emerald-800 text-sm">{formatMonedaCOPCertificado(certificado.salarioBasicoCOP)}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-500 uppercase font-bold block text-[10px]">Asignación Salarial Mensual Básica</span>
-                  <strong className="text-emerald-800 text-sm">{formatMonedaCOPCertificado(certificado.salarioBasicoCOP)}</strong>
+                <div className="pt-2 border-t border-slate-200 text-slate-700 text-[11px]">
+                  Son: <strong>{certificado.salarioBasicoTexto}</strong>.
                 </div>
               </div>
-              <div className="pt-2 border-t border-slate-200 text-slate-700 text-[11px]">
-                Son: <strong>{certificado.salarioBasicoTexto}</strong>.
+            ) : (
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 font-sans my-3 text-xs">
+                <span className="text-slate-500 uppercase font-bold block text-[10px]">Denominación del Cargo</span>
+                <strong className="text-[#18235C] text-sm">{certificado.cargoNombre}</strong>
+                <p className="text-[10px] text-slate-500 mt-1 italic">
+                  (Constancia expedida sin divulgación de asignación salarial a solicitud expresa del trabajador, conforme al Art. 57 #7 del CST).
+                </p>
               </div>
-            </div>
+            )}
 
             <p>
               Para constancia de lo anterior, y a solicitud expresa del interesado(a), se expide la presente certificación con destino a: <strong className="font-sans font-bold text-[#18235C]">{certificado.entidadDestino || certificado.motivoDestino}</strong>, en la ciudad de {certificado.centroTrabajoCiudad || certificado.empresa.contacto?.ciudad || 'Bogotá D.C.'}, a los {certificado.fechaEmision}.

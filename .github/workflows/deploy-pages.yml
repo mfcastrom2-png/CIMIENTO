@@ -35,6 +35,9 @@ jobs:
 
       - name: Build Vite app
         run: npm run build
+        env:
+          VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

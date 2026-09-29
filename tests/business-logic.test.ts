@@ -375,8 +375,8 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
       // Provisiones de ley sobre total devengado ($2.000.000)
       // Cesantías: 2.000.000 * 0.0833 = 166.600
       expect(liq.provisiones.cesantias).toBe(Math.round(2000000 * 0.0833));
-      // Intereses sobre cesantías: Cesantías * 0.01 = 1.666
-      expect(liq.provisiones.interesesCesantias).toBe(Math.round(Math.round(2000000 * 0.0833) * 0.01));
+      // Intereses sobre cesantías: Cesantías * 0.12 (Ley 52 de 1975: 12% anual sobre cesantías)
+      expect(liq.provisiones.interesesCesantias).toBe(Math.round(Math.round(2000000 * 0.0833) * 0.12));
       // Prima de servicios: 2.000.000 * 0.0833 = 166.600
       expect(liq.provisiones.primaServicios).toBe(Math.round(2000000 * 0.0833));
       // Vacaciones (sin auxilio de transporte): 1.750.905 * 0.0417 = 73.013

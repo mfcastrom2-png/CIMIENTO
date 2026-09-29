@@ -64,13 +64,13 @@ describe('Suite de Seguridad y Regresión: Análisis Estático de Reglas y Anti-
     expect(rulesContent).toContain('allow update, delete: if false;');
   });
 
-  it('La función sameCompany debe rechazar evaluaciones con empresaId vacía ("" == "") para evitar filtraciones de colecciones sin asignar', () => {
-    expect(rulesContent).toContain("data.empresaId != ''");
-    expect(rulesContent).toContain("currentUser().data.empresaId != ''");
+  it('El auto-registro de usuario solo debe permitir rol empleado', () => {
+    expect(rulesContent).toContain("request.resource.data.rol == 'empleado'");
   });
 
-  it('El auto-registro de usuario solo debe permitir rol empleado y empresaId vacía', () => {
-    expect(rulesContent).toContain("request.resource.data.rol == 'empleado'");
-    expect(rulesContent).toContain("request.resource.data.empresaId == ''");
+  it('Las reglas deben proteger los expedientes de colaboradores (SEC-A01) y solicitudes (SEC-A02)', () => {
+    expect(rulesContent).toContain('match /empleados/{empleadoId}');
+    expect(rulesContent).toContain('resource.data.email == request.auth.token.email');
+    expect(rulesContent).toContain('match /solicitudes/{solicitudId}');
   });
 });

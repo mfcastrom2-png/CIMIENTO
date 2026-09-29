@@ -6,6 +6,7 @@
 
 import { Empleado, Cargo, ConfiguracionEmpresa } from '../types';
 import { initialEmpresa } from '../data/initialData';
+import { formatMonedaCOP, parseSalarioNumerico } from './formatters';
 
 export interface CertificadoLaboralData {
   codigoVerificacion: string;
@@ -25,13 +26,7 @@ export interface CertificadoLaboralData {
   firmanteCargo: string;
 }
 
-export function formatMonedaCOPCertificado(valor: number): string {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0
-  }).format(valor || 0);
-}
+export const formatMonedaCOPCertificado = formatMonedaCOP;
 
 // Convertidor dinámico de números a letras en Pesos Colombianos M/CTE
 export function numeroALetrasPesos(monto: number): string {
@@ -129,9 +124,7 @@ export function generarDatosCertificadoLaboral(
 
   const cargo = cargos.find(c => c.id === empleado.cargoId);
   const cargoNombre = cargo ? cargo.nombre : (empleado.laboral?.cargoNombre || 'Colaborador');
-  const salario = empleado.contrato?.salario
-    ? parseFloat(String(empleado.contrato.salario).replace(/[^0-9]/g, ''))
-    : (empleado.salarioBase || 2500000);
+  const salario = parseSalarioNumerico(empleado.contrato?.salario, empleado.salarioBase || 2500000);
 
   // Centro de trabajo alineado con la empresa
   const lugarTrabajoEmp = empleado.laboral?.lugarTrabajo || '';

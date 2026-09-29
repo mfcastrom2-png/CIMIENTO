@@ -59,19 +59,23 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // 1.1 Configuración de Firebase App Check (reCAPTCHA Enterprise)
 const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
-if (typeof window !== 'undefined' && recaptchaSiteKey) {
-  try {
-    if (import.meta.env.DEV) {
-      // @ts-expect-error Firebase App Check debug token setup
-      self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
+if (typeof window !== 'undefined') {
+  if (recaptchaSiteKey) {
+    try {
+      if (import.meta.env.DEV) {
+        // @ts-expect-error Firebase App Check debug token setup
+        self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
+      }
+      initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+        isTokenAutoRefreshEnabled: true
+      });
+      console.info('[Security] Firebase App Check activado con reCAPTCHA Enterprise.');
+    } catch (appCheckError) {
+      console.warn('[Security] Advertencia al inicializar App Check:', appCheckError);
     }
-    initializeAppCheck(app, {
-      provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
-      isTokenAutoRefreshEnabled: true
-    });
-    console.info('[Security] Firebase App Check activado con reCAPTCHA Enterprise.');
-  } catch (appCheckError) {
-    console.warn('[Security] Advertencia al inicializar App Check:', appCheckError);
+  } else if (import.meta.env.PROD) {
+    console.warn('[Security] ADVERTENCIA: VITE_RECAPTCHA_SITE_KEY no está configurado en producción. Firebase App Check permanece inactivo.');
   }
 }
 
@@ -163,14 +167,13 @@ export const registrarConEmail = async (
   const credential = await createUserWithEmailAndPassword(auth, email.trim(), pass);
   await updateProfile(credential.user, { displayName: nombre });
 
-  // Crear perfil inicial seguro en la colección `usuarios` (Siempre rol: 'empleado' y sin empresa por defecto)
+  // Crear perfil inicial seguro en la colección `usuarios` (Siempre rol: 'empleado' por defecto)
   const userProfile: UsuarioSistema = {
     id: credential.user.uid,
     nombre,
     email: email.trim().toLowerCase(),
     documento: documento || '—',
     rol: 'empleado',
-    empresaId: '',
     estado: 'activo',
     ultimoAcceso: new Date().toISOString(),
     fechaCreacion: new Date().toISOString(),
@@ -195,7 +198,6 @@ export const loginConGoogle = async () => {
     email: (user.email || '').toLowerCase(),
     documento: '—',
     rol: 'empleado',
-    empresaId: '',
     estado: 'activo',
     ultimoAcceso: new Date().toISOString(),
     fechaCreacion: new Date().toISOString(),
@@ -213,23 +215,68 @@ export const obtenerPerfilUsuario = async (uid: string, emailOpcional?: string):
     const userDocRef = doc(db, 'usuarios', uid);
     const userDoc = await getDoc(userDocRef);
     if (userDoc.exists()) {
-      return userDoc.data() as UsuarioSistema;
+      const data = userDoc.data() as UsuarioSistema;
+      // Auto-enlace con expediente de empleado si aún no tiene empleadoId asignado
+      if (!data.empleadoId && data.email) {
+        try {
+          const empQuery = query(collection(db, 'empleados'), where('email', '==', data.email.toLowerCase()));
+          const empSnap = await getDocs(empQuery);
+          if (!empSnap.empty) {
+            const empDoc = empSnap.docs[0];
+            const empData = empDoc.data();
+            const cargoNombre = empData?.laboral?.cargoNombre || empData?.cargoId || data.cargoNombre;
+            const docNum = empData?.documento || data.documento;
+            await updateDoc(userDocRef, {
+              empleadoId: empDoc.id,
+              cargoNombre,
+              documento: docNum
+            });
+            return {
+              ...data,
+              empleadoId: empDoc.id,
+              cargoNombre,
+              documento: docNum
+            };
+          }
+        } catch {}
+      }
+      return data;
     }
 
     const currentFbUser = auth.currentUser;
     const userEmail = (emailOpcional || currentFbUser?.email || '').trim().toLowerCase();
 
     if (userEmail) {
-      // 1. Usuario nuevo (Google o Email): Siempre rol: 'empleado' y sin empresaId fija por defecto.
-      // La asignación de empresa/rol la realiza el Administrador desde el módulo de Gestión de Usuarios.
+      // 1. Buscar si ya existe un expediente de empleado para asociarlo automáticamente (SEC-B02)
+      let vinculadoEmpleadoId: string | undefined;
+      let cargoVinculado = 'Colaborador';
+      let docVinculado = '—';
+      let nombreVinculado = currentFbUser?.displayName || userEmail.split('@')[0].replace('.', ' ').toUpperCase();
+
+      try {
+        const empQuery = query(collection(db, 'empleados'), where('email', '==', userEmail));
+        const empSnap = await getDocs(empQuery);
+        if (!empSnap.empty) {
+          const empDoc = empSnap.docs[0];
+          const empData = empDoc.data();
+          vinculadoEmpleadoId = empDoc.id;
+          cargoVinculado = empData?.laboral?.cargoNombre || empData?.cargoId || 'Colaborador';
+          docVinculado = empData?.documento || '—';
+          if (empData?.nombre) {
+            nombreVinculado = empData.nombre;
+          }
+        }
+      } catch {}
+
+      // Usuario nuevo (Google o Email): Siempre rol: 'empleado' por defecto
       const perfilColaboradorDefault: UsuarioSistema = {
         id: uid,
-        nombre: currentFbUser?.displayName || userEmail.split('@')[0].replace('.', ' ').toUpperCase(),
+        nombre: nombreVinculado,
         email: userEmail,
-        documento: '—',
+        documento: docVinculado,
         rol: 'empleado',
-        cargoNombre: 'Colaborador',
-        empresaId: '', // Sin empresa asignada inicialmente
+        cargoNombre: cargoVinculado,
+        ...(vinculadoEmpleadoId ? { empleadoId: vinculadoEmpleadoId } : {}),
         estado: 'activo',
         ultimoAcceso: new Date().toISOString(),
         fechaCreacion: new Date().toISOString().split('T')[0],
@@ -280,7 +327,6 @@ export const registrarEventoAuditoria = async (
         nombre: (userLog as any).nombre || userLog.email || 'Usuario',
         rol: (userLog as any).rol || 'usuario'
       },
-      empresaId: (userLog as any).empresaId || 'empresa-a',
       metadatos: metadatos || {}
     };
 
@@ -389,7 +435,7 @@ export const limpiarParaFirestore = <T>(obj: T): T => {
 // 4. Operaciones de Escritura y Actualización
 export const guardarEmpleadoFB = async (empleado: Empleado, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'empleados', empleado.id);
-  const data = limpiarParaFirestore({ ...empleado, empresaId: empleado.empresaId || 'empresa-a' });
+  const data = limpiarParaFirestore(empleado);
   await setDoc(docRef, data, { merge: true });
   await registrarEventoAuditoria(
     'ACTUALIZACION',
@@ -413,7 +459,7 @@ export const eliminarEmpleadoFB = async (id: string, nombreColaborador?: string,
 
 export const guardarCargoFB = async (cargo: Cargo, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'cargos', cargo.id);
-  const data = limpiarParaFirestore({ ...cargo, empresaId: cargo.empresaId || 'empresa-a' });
+  const data = limpiarParaFirestore(cargo);
   await setDoc(docRef, data, { merge: true });
   await registrarEventoAuditoria(
     'ACTUALIZACION',
@@ -437,7 +483,7 @@ export const eliminarCargoFB = async (id: string, nombre?: string, autor?: Usuar
 
 export const guardarAreaFB = async (area: AreaOrganizacion, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'areas', area.id);
-  const data = limpiarParaFirestore({ ...area, empresaId: area.empresaId || autor?.empresaId || 'empresa-a' });
+  const data = limpiarParaFirestore(area);
   await setDoc(docRef, data, { merge: true });
   await registrarEventoAuditoria(
     'ACTUALIZACION',
@@ -461,7 +507,7 @@ export const eliminarAreaFB = async (id: string, nombre?: string, autor?: Usuari
 
 export const guardarProcesoFB = async (proceso: ProcesoOrganizacion, autor?: UsuarioSistema | null) => {
   const docRef = doc(db, 'procesos', proceso.id);
-  const data = limpiarParaFirestore({ ...proceso, empresaId: proceso.empresaId || autor?.empresaId || 'empresa-a' });
+  const data = limpiarParaFirestore(proceso);
   await setDoc(docRef, data, { merge: true });
   await registrarEventoAuditoria(
     'ACTUALIZACION',
@@ -539,30 +585,28 @@ export const obtenerEmpresaFB = async (): Promise<ConfiguracionEmpresa | null> =
 
 export const guardarInventarioEppFB = async (item: ItemInventarioEPP) => {
   const docRef = doc(db, 'inventario_epp', item.id);
-  const data = { ...item, empresaId: item.empresaId || 'empresa-a' };
+  const data = limpiarParaFirestore(item);
   await setDoc(docRef, data, { merge: true });
 };
 
 /**
  * Persistencia atómica de inventario de EPPs en lote (writeBatch)
- * Elimina bucles secuenciales propensos a estados inconsistentes
  */
 export const guardarInventarioEppLoteFB = async (
-  items: ItemInventarioEPP[],
-  empresaId: string = 'empresa-a'
+  items: ItemInventarioEPP[]
 ): Promise<void> => {
   if (!items || items.length === 0) return;
   const batch = writeBatch(db);
   items.forEach(item => {
     const docRef = doc(db, 'inventario_epp', item.id);
-    batch.set(docRef, { ...item, empresaId: item.empresaId || empresaId }, { merge: true });
+    batch.set(docRef, limpiarParaFirestore(item), { merge: true });
   });
   await batch.commit();
 };
 
 export const guardarSolicitudEppFB = async (solicitud: SolicitudEntregaEPP) => {
   const docRef = doc(db, 'solicitudes_epp', solicitud.id);
-  const data = { ...solicitud, empresaId: solicitud.empresaId || 'empresa-a' };
+  const data = limpiarParaFirestore(solicitud);
   await setDoc(docRef, data, { merge: true });
 };
 
@@ -570,14 +614,13 @@ export const guardarSolicitudEppFB = async (solicitud: SolicitudEntregaEPP) => {
  * Persistencia atómica de solicitudes de entrega de EPPs en lote (writeBatch)
  */
 export const guardarSolicitudesEppLoteFB = async (
-  solicitudes: SolicitudEntregaEPP[],
-  empresaId: string = 'empresa-a'
+  solicitudes: SolicitudEntregaEPP[]
 ): Promise<void> => {
   if (!solicitudes || solicitudes.length === 0) return;
   const batch = writeBatch(db);
   solicitudes.forEach(sol => {
     const docRef = doc(db, 'solicitudes_epp', sol.id);
-    batch.set(docRef, { ...sol, empresaId: sol.empresaId || empresaId }, { merge: true });
+    batch.set(docRef, limpiarParaFirestore(sol), { merge: true });
   });
   await batch.commit();
 };
@@ -586,14 +629,13 @@ export const guardarSolicitudesEppLoteFB = async (
  * Persistencia atómica de colaboradores en lote (writeBatch)
  */
 export const guardarEmpleadosLoteFB = async (
-  empleados: Empleado[],
-  empresaId: string = 'empresa-a'
+  empleados: Empleado[]
 ): Promise<void> => {
   if (!empleados || empleados.length === 0) return;
   const batch = writeBatch(db);
   empleados.forEach(emp => {
     const docRef = doc(db, 'empleados', emp.id);
-    batch.set(docRef, { ...emp, empresaId: emp.empresaId || empresaId }, { merge: true });
+    batch.set(docRef, limpiarParaFirestore(emp), { merge: true });
   });
   await batch.commit();
 };
@@ -601,12 +643,10 @@ export const guardarEmpleadosLoteFB = async (
 /**
  * Persistencia 100% ATÓMICA de Nómina mediante writeBatch.
  * Guarda el consolidado del período y todos los desprendibles individuales simultáneamente.
- * Si falla alguna escritura, se revierte todo, evitando nóminas parciales o estados corruptos.
  */
 export const guardarPeriodoNominaLoteFB = async (
   periodo: PeriodoNomina,
-  liquidaciones: LiquidacionEmpleadoNomina[],
-  empresaId: string = 'empresa-a'
+  liquidaciones: LiquidacionEmpleadoNomina[]
 ): Promise<{ success: boolean; guardadosCount: number; error?: string }> => {
   try {
     const batch = writeBatch(db);
@@ -618,7 +658,6 @@ export const guardarPeriodoNominaLoteFB = async (
       periodoRef,
       {
         ...periodo,
-        empresaId,
         fechaActualizacion: new Date().toISOString(),
         totalesCalculados: {
           totalDevengado: liquidaciones.reduce((acc, l) => acc + l.devengados.totalDevengado, 0),
@@ -641,7 +680,6 @@ export const guardarPeriodoNominaLoteFB = async (
           ...liq,
           id: docId,
           codigoPeriodo,
-          empresaId,
           fechaLiquidacion: new Date().toISOString()
         },
         { merge: true }
@@ -669,13 +707,13 @@ export const guardarPeriodoNominaLoteFB = async (
 
 export const guardarSolicitudGeneralFB = async (solicitud: Solicitud) => {
   const docRef = doc(db, 'solicitudes', solicitud.id);
-  const data = { ...solicitud, empresaId: solicitud.empresaId || 'empresa-a' };
+  const data = limpiarParaFirestore(solicitud);
   await setDoc(docRef, data, { merge: true });
 };
 
 export const guardarEvaluacionFB = async (evaluacion: EvaluacionDesempeno) => {
   const docRef = doc(db, 'evaluaciones', evaluacion.id);
-  const data = { ...evaluacion, empresaId: evaluacion.empresaId || 'empresa-a' };
+  const data = limpiarParaFirestore(evaluacion);
   await setDoc(docRef, data, { merge: true });
 };
 
@@ -687,7 +725,7 @@ export const guardarUsuarioFB = async (usuario: UsuarioSistema) => {
   const docRef = doc(db, 'usuarios', usuario.id);
   // CRÍTICO PARA SEGURIDAD: NUNCA persistir contraseñas en texto plano en la base de datos Firestore
   const { password, ...usuarioSinPassword } = usuario;
-  const data = { ...usuarioSinPassword, empresaId: usuario.empresaId || 'empresa-a' };
+  const data = limpiarParaFirestore(usuarioSinPassword);
   await setDoc(docRef, data, { merge: true });
 };
 

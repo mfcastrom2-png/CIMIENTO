@@ -184,7 +184,7 @@ export function ComprobanteNotificacionModal({
             </div>
             <div>
               <span className="text-[10px] font-bold text-blue-950 uppercase tracking-wider block">
-                Contraseña Temporal Provisoria:
+                Mecanismo de Activación / Código Ref:
               </span>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs font-bold font-mono text-[#18235C] bg-white px-2 py-1 rounded border border-blue-300 select-all">
@@ -194,12 +194,15 @@ export function ComprobanteNotificacionModal({
                   type="button"
                   onClick={handleCopiarClave}
                   className="px-2 py-1 rounded bg-white hover:bg-blue-100 text-blue-900 border border-blue-200 font-medium text-[10px] flex items-center gap-1 transition-colors"
-                  title="Copiar contraseña al portapapeles"
+                  title="Copiar código al portapapeles"
                 >
                   {copiadoClaveFeedback ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                  <span>{copiadoClaveFeedback ? 'Copiada' : 'Copiar'}</span>
+                  <span>{copiadoClaveFeedback ? 'Copiado' : 'Copiar'}</span>
                 </button>
               </div>
+              <p className="text-[10px] text-blue-800 mt-1 font-medium">
+                Se envió un enlace a la bandeja de entrada para que el usuario configure su contraseña segura.
+              </p>
             </div>
           </div>
 

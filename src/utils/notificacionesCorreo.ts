@@ -1,12 +1,12 @@
 import { UsuarioSistema } from '../types';
 
 export const generarAsuntoBienvenida = (usuario: UsuarioSistema): string => {
-  return `Bienvenido a B GROUP INGENIERIA S.A.S. — Activación de Cuenta y Credenciales de Acceso`;
+  return `Activación de Cuenta y Acceso Institucional — B GROUP INGENIERIA S.A.S. (${usuario.nombre})`;
 };
 
 export const generarCartaBienvenida = (
   usuario: UsuarioSistema,
-  passwordTemporal: string,
+  passwordTemporal?: string,
   originUrl?: string
 ): string => {
   const url = originUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://bgroup-gh.web.app');
@@ -23,23 +23,26 @@ export const generarCartaBienvenida = (
 
   return `Apreciado(a) ${usuario.nombre},
 
-Le damos una cordial bienvenida a B GROUP INGENIERIA S.A.S. Se ha configurado y activado exitosamente su cuenta de acceso institucional al Sistema Integral de Gestión Humana y SG-SST.
+Le damos una cordial bienvenida a B GROUP INGENIERIA S.A.S. Se ha configurado y habilitado exitosamente su cuenta de acceso institucional al Sistema Integral de Gestión Humana y SG-SST.
 
-DATOS Y CREDENCIALES DE ACCESO:
-• Enlace de Ingreso: ${url}
+DATOS DE ACCESO Y CUENTA:
+• Portal de Ingreso: ${url}
 • Correo Electrónico: ${usuario.email}
 • Documento de Identidad: ${usuario.documento}
-• Contraseña Provisoria: ${passwordTemporal}
 • Rol Asignado: ${rolTexto}
 • Cargo / Función: ${usuario.cargoNombre || 'Colaborador'}
 
-INSTRUCCIONES DE ACCESO Y SEGURIDAD:
-1. Ingrese a la plataforma haciendo clic en el enlace de ingreso: ${url}
-2. Inicie sesión utilizando su correo electrónico y la contraseña provisoria indicada anteriormente.
-3. Desde su portal institucional podrá gestionar sus solicitudes de permisos, consultar el manual de su cargo, revisar dotaciones y EPPs, participar en comités y elecciones del SG-SST, y acceder a sus constancias.
-4. De conformidad con el Artículo 58 del Código Sustantivo del Trabajo (CST) y las directrices de seguridad de la información de B GROUP INGENIERIA S.A.S., las credenciales de acceso son estrictamente personales e intransferibles.
+PASOS OBLIGATORIOS PARA ACTIVAR SU CUENTA:
+1. Revise la bandeja de entrada (y la carpeta de spam o correo no deseado) de su correo ${usuario.email}.
+2. Localice el correo de activación/restablecimiento de contraseña despachado automáticamente por el servicio de identidad de Firebase Auth.
+3. Haga clic en el enlace seguro contenido en dicho correo para definir su contraseña personal confidencial.
+4. Una vez establecida su contraseña, ingrese al portal en ${url} con su correo y la nueva contraseña.
+${passwordTemporal ? `(Nota: Código de referencia de activación interna: ${passwordTemporal})` : ''}
 
-Si presenta dudas o dificultades técnicas durante el ingreso, comuníquese con la Dirección de Gestión Humana.
+SEGURIDAD Y HABEAS DATA:
+De conformidad con el Artículo 58 del Código Sustantivo del Trabajo (CST), la Ley 1581 de 2012 y las políticas corporativas de B GROUP INGENIERIA S.A.S., sus credenciales son estrictamente personales e intransferibles.
+
+Si presenta alguna dificultad técnica, comuníquese de inmediato con la Dirección de Gestión Humana.
 
 Atentamente,
 DIRECCIÓN DE GESTIÓN HUMANA

@@ -403,7 +403,6 @@ export function UsuariosView({
         fechaCreacion: new Date().toISOString().split('T')[0],
         dobleFactorHabilitado: Boolean(nuevoUsuario.dobleFactorHabilitado),
         password: claveAsignada,
-        empresaId: 'empresa-principal',
         empleadoId: nuevoUsuario.empleadoId,
         permisos: nuevoUsuario.permisos && nuevoUsuario.permisos.length > 0
           ? nuevoUsuario.permisos

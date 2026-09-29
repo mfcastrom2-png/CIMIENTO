@@ -205,7 +205,6 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
 
     const nueva: Solicitud = {
       id: uid(),
-      empresaId: empresaActiva.id || 'empresa-a',
       empresaNombre: empresaActiva.razonSocial || empresaActiva.nombreComercial || 'Empresa Registrada',
       sedeTrabajo: sedeEmpleado,
       empleadoId: effectiveEmpleado.id,

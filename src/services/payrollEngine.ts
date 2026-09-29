@@ -46,7 +46,7 @@ export const PARAMETROS_COLOMBIA_2026: ParametrosLegalesNomina = {
   pctSena: 0.02,
   pctIcbf: 0.03,
   pctCesantias: 0.0833, // 8.33% (1 mes por año laborado)
-  pctInteresesCesantias: 0.01, // 1% mensual sobre cesantías (12% anual)
+  pctInteresesCesantias: 0.12, // 12% anual sobre cesantías (Ley 52 de 1975)
   pctPrimaServicios: 0.0833, // 8.33% (1 mes por año: 1er semestre en junio y 2do semestre en diciembre)
   pctVacaciones: 0.0417, // 4.17% (15 días hábiles remunerados por año = 15/360)
   horasSemanalesJornada: 42, // Ley 2101/2021: 42 horas semanales vigentes
@@ -193,17 +193,24 @@ export function calcularLiquidacionEmpleado(
 
   const fondoSolidaridadPensional = Math.round(ibcSeguridadSocial * pctFSP);
 
-  // Retención en la fuente
-  const baseGravablePesos = Math.max(0, totalDevengado - saludEmpleado - pensionEmpleado - fondoSolidaridadPensional);
-  const baseGravableUVT = baseGravablePesos / parametros.uvt;
+  // Retención en la fuente (Procedimiento 1 - Arts. 383, 388 y 206 #10 E.T.):
   let retencionFuente = 0;
-  if (!esSinNomina && baseGravableUVT > 95) {
-    if (baseGravableUVT <= 150) {
-      retencionFuente = Math.round(((baseGravableUVT - 95) * 0.19) * parametros.uvt);
-    } else if (baseGravableUVT <= 360) {
-      retencionFuente = Math.round((((baseGravableUVT - 150) * 0.28) + 10) * parametros.uvt);
-    } else {
-      retencionFuente = Math.round((((baseGravableUVT - 360) * 0.33) + 69) * parametros.uvt);
+  if (!esSinNomina) {
+    const ingresoNetoPrevio = Math.max(0, totalDevengado - saludEmpleado - pensionEmpleado - fondoSolidaridadPensional);
+    // Renta exenta laboral del 25% (Art. 206 numeral 10 E.T., límite mensual de 65 UVT según Ley 2277/2022)
+    const topeRentaExenta25Pesos = 65 * parametros.uvt;
+    const rentaExenta25 = Math.min(Math.round(ingresoNetoPrevio * 0.25), topeRentaExenta25Pesos);
+    const baseGravablePesos = Math.max(0, ingresoNetoPrevio - rentaExenta25);
+    const baseGravableUVT = baseGravablePesos / parametros.uvt;
+
+    if (baseGravableUVT > 95) {
+      if (baseGravableUVT <= 150) {
+        retencionFuente = Math.round(((baseGravableUVT - 95) * 0.19) * parametros.uvt);
+      } else if (baseGravableUVT <= 360) {
+        retencionFuente = Math.round((((baseGravableUVT - 150) * 0.28) + 10) * parametros.uvt);
+      } else {
+        retencionFuente = Math.round((((baseGravableUVT - 360) * 0.33) + 69) * parametros.uvt);
+      }
     }
   }
 
@@ -232,7 +239,10 @@ export function calcularLiquidacionEmpleado(
   // Provisiones para Prestaciones Sociales:
   // Para prestación de servicios / aprendizaje / pasantías = 0 COP (No genera prima, cesantías ni vacaciones prestacionales patronales)
   const cesantias = esSinNomina ? 0 : Math.round(totalDevengado * parametros.pctCesantias); // 8.33%
-  const interesesCesantias = esSinNomina ? 0 : Math.round(cesantias * parametros.pctInteresesCesantias); // 1% mensual sobre cesantías
+  const factorIntereses = (parametros.pctInteresesCesantias && parametros.pctInteresesCesantias > 0.05)
+    ? parametros.pctInteresesCesantias
+    : 0.12;
+  const interesesCesantias = esSinNomina ? 0 : Math.round(cesantias * factorIntereses); // 12% anual sobre cesantías (Ley 52/1975)
   const primaServicios = esSinNomina ? 0 : Math.round(totalDevengado * parametros.pctPrimaServicios); // 8.33%
   const vacaciones = esSinNomina ? 0 : Math.round((totalDevengado - auxilioTransporte) * parametros.pctVacaciones); // 4.17%
 

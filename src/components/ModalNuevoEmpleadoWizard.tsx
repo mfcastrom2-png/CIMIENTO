@@ -886,7 +886,6 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
 
       const empleadoCompleto: Empleado = {
         id: targetId,
-        empresaId: currentUser?.empresaId || 'empresa-a',
         codigo: codFinal,
         codigoInterno: codFinal,
         nombre: nombreFinal,

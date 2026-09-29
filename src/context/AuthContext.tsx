@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UsuarioSistema, Role } from '../types';
-import { auth, cerrarSesion, obtenerPerfilUsuario } from '../lib/firebase';
+import { auth, db, cerrarSesion, obtenerPerfilUsuario } from '../lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   currentUser: UsuarioSistema | null;
@@ -50,7 +51,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let unsubscribeDoc: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+        unsubscribeDoc = null;
+      }
+
       setFbUser(user);
       setAuthReady(true);
       if (!user) {
@@ -69,8 +77,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         setCurrentUser(profile);
-        // Asignar rol inicial basado estrictamente en el perfil oficial de la base de datos
         setUserRoleState(profile.rol === 'empleado' ? 'empleado' : 'admin');
+
+        // Suscripción en tiempo real: Inactivación o eliminación expulsa de inmediato (SEC-B05)
+        unsubscribeDoc = onSnapshot(doc(db, 'usuarios', user.uid), async (docSnap) => {
+          if (!docSnap.exists()) {
+            await cerrarSesion();
+            setCurrentUser(null);
+            setUserRoleState('empleado');
+            return;
+          }
+          const data = docSnap.data() as UsuarioSistema;
+          if (data.estado !== 'activo') {
+            await cerrarSesion();
+            setCurrentUser(null);
+            setUserRoleState('empleado');
+            return;
+          }
+          setCurrentUser(data);
+          setUserRoleState(data.rol === 'empleado' ? 'empleado' : 'admin');
+        }, (err) => {
+          if (import.meta.env.DEV) {
+            console.debug('Listener de usuario cerrado:', err);
+          }
+        });
       } catch (err) {
         console.warn('Error al verificar perfil institucional:', err);
         setCurrentUser(null);
@@ -78,7 +108,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      if (unsubscribeDoc) {
+        unsubscribeDoc();
+      }
+      unsubscribeAuth();
+    };
   }, []);
 
   const logout = async () => {
