@@ -14,3 +14,138 @@
     background-color: #FFFFFF;
   }
 }
+
+/* ========================================================= */
+/* REGLAS OFICIALES DE IMPRESIÓN DE DOCUMENTOS LEGALES (CST) */
+/* Elimina capturas de pantalla y genera documentos puros    */
+/* ========================================================= */
+@page {
+  size: letter portrait;
+  margin: 12mm 15mm;
+}
+
+@media print {
+  /* 1. Ajustes globales de página e impresión */
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    color: #0F172A !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 2. Ocultar todos los elementos de la interfaz de usuario */
+  nav,
+  aside,
+  header,
+  footer,
+  .sidebar,
+  .no-print,
+  .print\\:hidden,
+  button,
+  .btn-print-hidden,
+  input[type="button"],
+  input[type="submit"],
+  .fixed.inset-0:not(:has(.documento-imprimible)):not(:has(#area-impresion-documento)) {
+    display: none !important;
+  }
+
+  /* 3. Neutralizar overlays y modales cuando contienen un documento imprimible */
+  .fixed.inset-0:has(.documento-imprimible),
+  .fixed.inset-0:has(#area-impresion-documento),
+  .fixed.inset-0.modal-imprimible-activo {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    z-index: auto !important;
+  }
+
+  /* 4. Estilo de la hoja o contenedor del documento imprimible */
+  .documento-imprimible,
+  #area-impresion-documento,
+  .hoja-impresion-cst {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* 5. Asegurar fidelidad de colores de marca, líneas y fondos de badges */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* 6. Control de saltos de página y paginación limpia */
+  .salto-pagina,
+  .page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .evitar-salto,
+  .avoid-break,
+  .card-imprimible,
+  .documento-imprimible .evitar-salto,
+  .documento-imprimible .card-imprimible {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  table,
+  .documento-imprimible table {
+    width: 100% !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    border-collapse: collapse !important;
+  }
+
+  tr, td, th,
+  .documento-imprimible tr,
+  .documento-imprimible td,
+  .documento-imprimible th {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  /* Enlaces impresos limpios (no mostrar URLs) */
+  a[href]:after {
+    content: none !important;
+  }
+}

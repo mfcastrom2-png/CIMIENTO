@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CertificadoLaboralData, formatMonedaCOPCertificado } from '../utils/generadorCertificados';
-import { Printer, X, FileText, ShieldCheck } from 'lucide-react';
+import { imprimirDocumento, descargarElementoComoPdf } from '../utils/printUtils';
+import { Printer, X, FileText, ShieldCheck, Download, FileDown, CheckCircle2 } from 'lucide-react';
 
 interface VerCertificadoLaboralModalProps {
   certificado: CertificadoLaboralData;
@@ -12,9 +13,21 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
   onClose
 }) => {
   const [incluirSalario, setIncluirSalario] = useState<boolean>(true);
+  const [descargandoPdf, setDescargandoPdf] = useState<boolean>(false);
+
+  const nombreArchivo = `Certificado_Laboral_${certificado.empleado.nombre.replace(/\s+/g, '_')}_${certificado.codigoVerificacion}`;
+
+  const handleDescargarPdf = async () => {
+    setDescargandoPdf(true);
+    try {
+      await descargarElementoComoPdf('area-impresion-certificado', nombreArchivo);
+    } finally {
+      setDescargandoPdf(false);
+    }
+  };
 
   const handleImprimir = () => {
-    window.print();
+    imprimirDocumento(nombreArchivo, 'area-impresion-certificado');
   };
 
   const nombreEmpresa = certificado.empresa.razonSocial || certificado.empresa.nombreComercial || 'Empresa Registrada';
@@ -61,12 +74,23 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
             </label>
             <button
               type="button"
+              id="btn-descargar-pdf-certificado"
+              onClick={handleDescargarPdf}
+              disabled={descargandoPdf}
+              className="px-3.5 py-1.5 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              title="Exportar archivo PDF directamente a su equipo"
+            >
+              <FileDown className={`w-4 h-4 ${descargandoPdf ? 'animate-bounce' : ''}`} />
+              <span>{descargandoPdf ? 'Generando PDF...' : 'Exportar a PDF'}</span>
+            </button>
+            <button
+              type="button"
               id="btn-imprimir-pdf-certificado"
               onClick={handleImprimir}
-              className="px-3 py-1.5 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-lg text-xs flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>Imprimir / PDF</span>
+              <span>Imprimir</span>
             </button>
             <button
               type="button"
@@ -79,7 +103,7 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
         </div>
 
         {/* Printable Document Body */}
-        <div className="p-8 sm:p-12 overflow-y-auto space-y-6 text-[#282829] bg-white text-xs sm:text-sm font-serif leading-relaxed" id="area-impresion-certificado">
+        <div className="documento-imprimible p-8 sm:p-12 overflow-y-auto space-y-6 text-[#282829] bg-white text-xs sm:text-sm font-serif leading-relaxed" id="area-impresion-certificado">
           {/* Header Institucional de la Empresa */}
           <div className="flex items-start justify-between border-b-2 border-[#18235C] pb-4 font-sans gap-4">
             <div className="flex items-center gap-3">

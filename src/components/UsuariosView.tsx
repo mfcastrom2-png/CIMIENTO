@@ -413,12 +413,10 @@ export function UsuariosView({
       await guardarUsuarioFB(nuevo);
 
       // 6. Actualizar estado local deduplicado y sincronizar con App.tsx
-      setUsuarios(prev => {
-        const sinDuplicados = prev.filter(u => u.id !== finalId && (u.email || '').trim().toLowerCase() !== emailLimpio);
-        const actualizados = [nuevo, ...sinDuplicados];
-        onActualizarUsuarios?.(actualizados);
-        return actualizados;
-      });
+      const sinDuplicados = usuarios.filter(u => u.id !== finalId && (u.email || '').trim().toLowerCase() !== emailLimpio);
+      const actualizados = [nuevo, ...sinDuplicados];
+      setUsuarios(actualizados);
+      onActualizarUsuarios?.(actualizados);
 
       // 7. Notificación por correo
       let resultadoEnvio: { success: boolean; message: string; method?: string; errorDetalle?: string } = {
@@ -495,11 +493,9 @@ export function UsuariosView({
       console.warn('Error al actualizar usuario en Firestore:', err);
     }
 
-    setUsuarios(prev => {
-      const actualizados = prev.map(u => (u.id === usuarioEditando.id ? usuarioEditando : u));
-      onActualizarUsuarios?.(actualizados);
-      return actualizados;
-    });
+    const actualizadosEdit = usuarios.map(u => (u.id === usuarioEditando.id ? usuarioEditando : u));
+    setUsuarios(actualizadosEdit);
+    onActualizarUsuarios?.(actualizadosEdit);
 
     const nuevoLog: LogAuditoriaUsuario = {
       id: `log-${Date.now()}`,
@@ -521,18 +517,16 @@ export function UsuariosView({
   // Alternar estado activo/inactivo/bloqueado
   const handleToggleEstado = async (usuarioId: string) => {
     let usuarioActualizado: UsuarioSistema | null = null;
-    setUsuarios(prev => {
-      const actualizados = prev.map(u => {
-        if (u.id === usuarioId) {
-          const nuevoEstado = u.estado === 'activo' ? 'inactivo' : 'activo';
-          usuarioActualizado = { ...u, estado: nuevoEstado };
-          return usuarioActualizado;
-        }
-        return u;
-      });
-      onActualizarUsuarios?.(actualizados);
-      return actualizados;
+    const actualizadosEstado = usuarios.map(u => {
+      if (u.id === usuarioId) {
+        const nuevoEstado = u.estado === 'activo' ? 'inactivo' : 'activo';
+        usuarioActualizado = { ...u, estado: nuevoEstado };
+        return usuarioActualizado;
+      }
+      return u;
     });
+    setUsuarios(actualizadosEstado);
+    onActualizarUsuarios?.(actualizadosEstado);
 
     if (usuarioActualizado) {
       try {
@@ -550,11 +544,9 @@ export function UsuariosView({
     const tempPass = 'BGroup' + Math.floor(1000 + Math.random() * 9000) + '*';
     if (usr) {
       const actualizado = { ...usr, password: tempPass };
-      setUsuarios(prev => {
-        const actualizados = prev.map(u => (u.id === usr.id ? actualizado : u));
-        onActualizarUsuarios?.(actualizados);
-        return actualizados;
-      });
+      const actualizadosPass = usuarios.map(u => (u.id === usr.id ? actualizado : u));
+      setUsuarios(actualizadosPass);
+      onActualizarUsuarios?.(actualizadosPass);
       guardarUsuarioFB(actualizado).catch(() => {});
     }
 
@@ -655,14 +647,12 @@ export function UsuariosView({
       }
 
       // 3. Actualizar estado local y sincronizar con SyncContext
-      setUsuarios(prev => {
-        const filtrados = prev.filter(u => u.id !== usuarioId && (u.email || '').trim().toLowerCase() !== emailLower);
-        onActualizarUsuarios?.(filtrados);
-        try {
-          localStorage.setItem('bgroup_usuarios_cache', JSON.stringify(filtrados));
-        } catch {}
-        return filtrados;
-      });
+      const filtrados = usuarios.filter(u => u.id !== usuarioId && (u.email || '').trim().toLowerCase() !== emailLower);
+      setUsuarios(filtrados);
+      onActualizarUsuarios?.(filtrados);
+      try {
+        localStorage.setItem('bgroup_usuarios_cache', JSON.stringify(filtrados));
+      } catch {}
 
       // 4. Registro de Auditoría
       const nuevoLog: LogAuditoriaUsuario = {

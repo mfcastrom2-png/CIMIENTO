@@ -1163,6 +1163,8 @@ export interface ItemInventarioEPP {
   descripcion: string;
   ubicacionAlmacen: string;
   proveedor?: string;
+  lote?: string;
+  fechaIngreso?: string;
   precioUnitarioEstimadoCOP?: number;
 }
 
@@ -1324,5 +1326,36 @@ export interface ConfiguracionEmpresa {
   centrosTrabajo?: CentroTrabajo[];
   fechaActualizacion?: string;
   actualizadoPor?: string;
+}
+
+export interface ConfiguracionBuzonCorreo {
+  id: string;
+  activo: boolean;
+  proveedor: 'smtp_personalizado' | 'gmail_workspace' | 'microsoft_365' | 'amazon_ses' | 'sendgrid';
+  nombreRemitente: string;
+  emailRemitente: string;
+  emailRespuesta?: string;
+  servidorSmtp: string;
+  puertoSmtp: number;
+  seguridadSmtp: 'TLS' | 'SSL' | 'STARTTLS' | 'NINGUNA';
+  usuarioSmtp: string;
+  passwordSmtp: string;
+  firmalegalHabeasData?: string;
+  incluirLogoCabecera: boolean;
+  fechaUltimaPrueba?: string;
+  estadoPrueba?: 'Exitosa' | 'Fallida' | 'Pendiente';
+  detalleUltimaPrueba?: string;
+}
+
+export interface RegistroEnvioCorreo {
+  id: string;
+  fecha: string;
+  destinatario: string;
+  destinatarioNombre?: string;
+  asunto: string;
+  tipoNotificacion: 'bienvenida_cuenta' | 'entrega_epp' | 'vacaciones' | 'nomina' | 'evaluacion' | 'prueba_sistema';
+  estado: 'Enviado' | 'Entregado' | 'Fallido';
+  remitenteUtilizado: string;
+  mensajeRespuesta?: string;
 }
 

@@ -5,7 +5,8 @@ import {
   ItemInventarioEPP,
   Role,
   RolSistema,
-  SolicitudEntregaEPP
+  SolicitudEntregaEPP,
+  ConfiguracionEmpresa
 } from '../types';
 import {
   HardHat,
@@ -14,6 +15,7 @@ import {
   Filter,
   Plus,
   Package,
+  PackagePlus,
   AlertTriangle,
   CheckCircle2,
   Clock,
@@ -31,6 +33,7 @@ import { limpiarBaseEppFB } from '../lib/firebase';
 import { SolicitarEppModal } from './SolicitarEppModal';
 import { EntregarEppModal } from './EntregarEppModal';
 import { ActaEntregaEppModal } from './ActaEntregaEppModal';
+import { IngresarEppModal } from './IngresarEppModal';
 
 interface EppInventarioViewProps {
   userRole: Role;
@@ -39,6 +42,7 @@ interface EppInventarioViewProps {
   empleados: Empleado[];
   inventarioEpp?: ItemInventarioEPP[];
   solicitudesEpp?: SolicitudEntregaEPP[];
+  empresa?: ConfiguracionEmpresa;
   onActualizarInventario?: (nuevoInventario: ItemInventarioEPP[]) => void;
   onActualizarSolicitudes?: (nuevasSolicitudes: SolicitudEntregaEPP[]) => void;
 }
@@ -50,6 +54,7 @@ export const EppInventarioView: React.FC<EppInventarioViewProps> = ({
   empleados,
   inventarioEpp = [],
   solicitudesEpp = [],
+  empresa,
   onActualizarInventario = () => {},
   onActualizarSolicitudes = () => {}
 }) => {
@@ -58,10 +63,17 @@ export const EppInventarioView: React.FC<EppInventarioViewProps> = ({
   const [busqueda, setBusqueda] = useState<string>('');
   
   // Modals state
+  const [modalIngresoOpen, setModalIngresoOpen] = useState(false);
   const [modalSolicitarOpen, setModalSolicitarOpen] = useState(false);
   const [modalDepurarEppOpen, setModalDepurarEppOpen] = useState(false);
   const [depurandoEpp, setDepurandoEpp] = useState(false);
   const [mensajeDepurarEpp, setMensajeDepurarEpp] = useState<string | null>(null);
+
+  const handleGuardarIngresoEpp = (nuevoInventario: ItemInventarioEPP[], mensaje: string) => {
+    onActualizarInventario(nuevoInventario);
+    setMensajeDepurarEpp(mensaje);
+    setTimeout(() => setMensajeDepurarEpp(null), 5000);
+  };
 
   const handleEjecutarDepuracionEpp = async () => {
     setDepurandoEpp(true);
@@ -259,6 +271,17 @@ export const EppInventarioView: React.FC<EppInventarioViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {esAdminOSst && (
+            <button
+              id="btn-ingreso-epp"
+              onClick={() => setModalIngresoOpen(true)}
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs"
+              title="Registrar entrada de nuevos elementos o reabastecimiento con proveedor y lote"
+            >
+              <PackagePlus className="w-3.5 h-3.5 text-[#00FF00]" />
+              <span>Ingreso de EPP</span>
+            </button>
+          )}
           {esSuperAdmin && (
             <button
               id="btn-depurar-epp"
@@ -366,8 +389,18 @@ export const EppInventarioView: React.FC<EppInventarioViewProps> = ({
           </button>
         </div>
 
-        {/* Search Input */}
+        {/* Search Input & Quick Action */}
         <div className="pb-2 flex items-center gap-2">
+          {esAdminOSst && activeSubTab === 'inventario' && (
+            <button
+              onClick={() => setModalIngresoOpen(true)}
+              className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-colors shadow-2xs"
+              title="Registrar nuevo elemento o entrada al inventario"
+            >
+              <PackagePlus className="w-3.5 h-3.5 text-[#00FF00]" />
+              <span className="hidden sm:inline">Nuevo Ingreso</span>
+            </button>
+          )}
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#282829]" />
             <input
@@ -375,7 +408,7 @@ export const EppInventarioView: React.FC<EppInventarioViewProps> = ({
               placeholder="Buscar EPP o colaborador..."
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
-              className="pl-8 pr-3 py-1.5 bg-white border border-[#8FA7D6] rounded-lg text-xs text-[#18235C] focus:outline-none focus:ring-1 focus:ring-[#18235C] w-48 sm:w-64"
+              className="pl-8 pr-3 py-1.5 bg-white border border-[#8FA7D6] rounded-lg text-xs text-[#18235C] focus:outline-none focus:ring-1 focus:ring-[#18235C] w-44 sm:w-56"
             />
           </div>
         </div>
@@ -637,6 +670,15 @@ export const EppInventarioView: React.FC<EppInventarioViewProps> = ({
         </div>
       )}
 
+      {/* Modal: Ingreso de EPP (Entrada a inventario / Nuevo elemento) */}
+      {modalIngresoOpen && (
+        <IngresarEppModal
+          inventarioEpp={inventarioEpp}
+          onClose={() => setModalIngresoOpen(false)}
+          onGuardarIngreso={handleGuardarIngresoEpp}
+        />
+      )}
+
       {/* Modal: Solicitar EPP */}
       {modalSolicitarOpen && (
         <SolicitarEppModal
@@ -661,6 +703,7 @@ export const EppInventarioView: React.FC<EppInventarioViewProps> = ({
       {solicitudParaActa && (
         <ActaEntregaEppModal
           solicitud={solicitudParaActa}
+          empresa={empresa}
           onClose={() => setSolicitudParaActa(null)}
         />
       )}

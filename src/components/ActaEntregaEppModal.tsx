@@ -1,5 +1,7 @@
-import React from 'react';
-import { SolicitudEntregaEPP } from '../types';
+import React, { useState } from 'react';
+import { SolicitudEntregaEPP, ConfiguracionEmpresa } from '../types';
+import { initialEmpresa } from '../data/initialData';
+import { imprimirDocumento, descargarElementoComoPdf } from '../utils/printUtils';
 import {
   FileText,
   Printer,
@@ -9,15 +11,34 @@ import {
   HardHat,
   Building2,
   Calendar,
-  Award
+  Award,
+  Download,
+  FileDown
 } from 'lucide-react';
 
 interface ActaEntregaEppModalProps {
   solicitud: SolicitudEntregaEPP;
+  empresa?: ConfiguracionEmpresa;
   onClose: () => void;
 }
 
-export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solicitud, onClose }) => {
+export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solicitud, empresa = initialEmpresa, onClose }) => {
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
+  const nombreArchivo = `Acta_Entrega_EPP_${solicitud.actaEntregaNumero || solicitud.id}_${solicitud.empleadoNombre.replace(/\s+/g, '_')}`;
+
+  const handleDescargarPdf = async () => {
+    setDescargandoPdf(true);
+    try {
+      await descargarElementoComoPdf('area-impresion-acta-epp', nombreArchivo);
+    } finally {
+      setDescargandoPdf(false);
+    }
+  };
+
+  const handleImprimir = () => {
+    imprimirDocumento(nombreArchivo, 'area-impresion-acta-epp');
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl border border-[#8FA7D6] max-w-3xl w-full overflow-hidden my-8">
@@ -35,15 +56,24 @@ export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solici
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => window.print()}
-              className="px-3 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+              onClick={handleDescargarPdf}
+              disabled={descargandoPdf}
+              className="px-3 py-1.5 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              title="Exportar archivo PDF directamente"
+            >
+              <FileDown className={`w-3.5 h-3.5 ${descargandoPdf ? 'animate-bounce' : ''}`} />
+              <span>{descargandoPdf ? 'Generando PDF...' : 'Exportar a PDF'}</span>
+            </button>
+            <button
+              onClick={handleImprimir}
+              className="px-3 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Imprimir / Descargar PDF</span>
+              <span>Imprimir</span>
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-[#282829] hover:text-[#18235C] rounded-lg hover:bg-white transition-colors"
+              className="p-1.5 text-[#282829] hover:text-[#18235C] rounded-lg hover:bg-white transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -51,17 +81,29 @@ export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solici
         </div>
 
         {/* Printable Document Body */}
-        <div className="p-8 sm:p-10 space-y-6 text-[#18235C] print:p-0 print:m-0 text-xs leading-relaxed">
+        <div className="documento-imprimible p-8 sm:p-10 space-y-6 text-[#18235C] print:p-0 print:m-0 text-xs leading-relaxed" id="area-impresion-acta-epp">
           
           {/* Institutional Document Header */}
           <div className="border-2 border-[#18235C] rounded-lg p-4 bg-[#FFFFFF]/50">
             <div className="grid grid-cols-12 gap-3 items-center">
               <div className="col-span-3 border-r border-[#8FA7D6] pr-3 flex flex-col items-center text-center">
-                <div className="w-10 h-10 rounded-lg bg-[#18235C] text-[#E2B765] flex items-center justify-center font-serif text-xl font-bold mb-1">
-                  B
-                </div>
-                <span className="font-bold text-xs tracking-tight">B GROUP INGENIERIA S.A.S.</span>
-                <span className="text-[10px] text-[#282829]">NIT: 900.995.99-2</span>
+                {empresa?.identidadVisual?.logoUrl ? (
+                  <img
+                    src={empresa.identidadVisual.logoUrl}
+                    alt={empresa.nombreComercial || 'Logo'}
+                    className="max-h-12 w-auto object-contain mb-1"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-[#18235C] text-[#E2B765] flex items-center justify-center font-serif text-xl font-bold mb-1">
+                    {empresa?.nombreComercial ? empresa.nombreComercial.charAt(0) : 'B'}
+                  </div>
+                )}
+                <span className="font-bold text-xs tracking-tight">{empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}</span>
+                {empresa?.nit && (
+                  <span className="text-[10px] text-[#282829]">
+                    NIT: {empresa.nit}{empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}
+                  </span>
+                )}
               </div>
               <div className="col-span-6 text-center px-2">
                 <div className="text-[11px] font-semibold text-[#282829] uppercase tracking-wider">
@@ -186,7 +228,7 @@ export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solici
             <div className="border-t-2 border-[#18235C] pt-2 text-center">
               <div className="font-bold text-xs text-[#18235C]">{solicitud.responsableEntrega || 'Julián Castro (Vigía SST)'}</div>
               <div className="text-[10px] text-[#282829]">Responsable SG-SST / Entrega de Almacén</div>
-              <div className="text-[10px] text-[#282829]">B GROUP INGENIERIA S.A.S.</div>
+              <div className="text-[10px] text-[#282829]">{empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}</div>
               <div className="text-[10px] text-[#18235C] font-semibold mt-1 flex items-center justify-center gap-1">
                 <ShieldCheck className="w-3 h-3" />
                 <span>Autorizado bajo Res. 0312 de 2019</span>

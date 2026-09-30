@@ -32,6 +32,7 @@ import { EvaluacionDetalleModal } from './components/EvaluacionDetalleModal';
 import { LoginView } from './components/LoginView';
 import { GestionDatosModal } from './components/GestionDatosModal';
 import { EmpresaConfigView } from './components/EmpresaConfigView';
+import { ConfiguracionBuzonCorreoView } from './components/ConfiguracionBuzonCorreoView';
 
 import {
   Bell,
@@ -521,6 +522,7 @@ function AppLayout() {
                     empleados={empleados}
                     inventarioEpp={inventarioEpp}
                     solicitudesEpp={solicitudesEpp}
+                    empresa={empresa}
                     onActualizarInventario={handleActualizarInventarioEpp}
                     onActualizarSolicitudes={handleActualizarSolicitudesEpp}
                   />
@@ -534,6 +536,7 @@ function AppLayout() {
                     cargos={cargos}
                     userRole={userRole}
                     currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
+                    empresa={empresa}
                   />
                 }
               />
@@ -567,6 +570,7 @@ function AppLayout() {
                     currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     currentUser={currentUser}
                     isSuperAdmin={isSuperAdmin}
+                    empresa={empresa}
                     onAddSolicitudGeneral={handleAddSolicitud}
                   />
                 }
@@ -624,6 +628,27 @@ function AppLayout() {
                     </div>
                   ) : (
                     <AuditoriaView currentUser={currentUser} />
+                  )
+                }
+              />
+              <Route
+                path="/buzon-correo"
+                element={
+                  !isSuperAdmin && currentUser?.rol !== 'admin_gh' ? (
+                    <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-xl shadow-xs border border-rose-200 text-center">
+                      <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <ShieldAlert className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-lg font-bold text-slate-800">Acceso Restringido a Configuración</h2>
+                      <p className="text-sm text-slate-600 mt-2">
+                        La configuración del servidor SMTP y buzón de salida está reservada exclusivamente para la Dirección de Gestión Humana y Superadministradores.
+                      </p>
+                    </div>
+                  ) : (
+                    <ConfiguracionBuzonCorreoView
+                      currentUser={currentUser}
+                      empresa={empresa}
+                    />
                   )
                 }
               />

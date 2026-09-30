@@ -7,8 +7,10 @@ import {
   ParametrosLegalesNomina,
   PeriodoNomina,
   Role,
-  SimulacionLiquidacionDefinitiva
+  SimulacionLiquidacionDefinitiva,
+  ConfiguracionEmpresa
 } from '../types';
+import { initialEmpresa } from '../data/initialData';
 import {
   PARAMETROS_COLOMBIA_2026,
   calcularLiquidacionEmpleado,
@@ -23,6 +25,7 @@ import {
   simularLiquidacionDefinitiva
 } from '../services/payrollEngine';
 import { obtenerParametrosNominaFB } from '../lib/firebase';
+import { descargarElementoComoPdf, imprimirDocumento } from '../utils/printUtils';
 import {
   AlertCircle,
   AlertTriangle,
@@ -35,6 +38,7 @@ import {
   Clock,
   Coins,
   Download,
+  FileDown,
   Edit3,
   FileCheck,
   FileSpreadsheet,
@@ -73,13 +77,15 @@ interface NominaViewProps {
   cargos: Cargo[];
   userRole: Role;
   currentEmpleadoId?: string;
+  empresa?: ConfiguracionEmpresa;
 }
 
 export function NominaView({
   empleados,
   cargos,
   userRole,
-  currentEmpleadoId
+  currentEmpleadoId,
+  empresa = initialEmpresa
 }: NominaViewProps) {
   const [activeTab, setActiveTab] = useState<'periodo' | 'provisiones' | 'novedades' | 'vacaciones' | 'desprendible' | 'liquidacion' | 'parametros'>('periodo');
 
@@ -424,30 +430,44 @@ export function NominaView({
             </div>
 
             <button
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-colors shadow-sm"
+              onClick={() => descargarElementoComoPdf('area-impresion-colilla-pago', `Colilla_Pago_${selectedPeriodoCodigo}_${currentEmpleadoId}`)}
+              className="px-4 py-2 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] rounded-xl text-xs font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+              title="Exportar archivo PDF directamente a su equipo"
             >
-              <Printer className="w-4 h-4 text-[#00FF00]" />
-              <span>Imprimir / Descargar PDF</span>
+              <FileDown className="w-4 h-4 text-[#18235C]" />
+              <span>Exportar a PDF</span>
             </button>
           </div>
         </div>
 
         {/* Formato Oficial de Colilla de Pago Colombiana */}
         {miLiquidacion && (
-          <div className="bg-[#FFFFFF] rounded-2xl border-2 border-[#8FA7D6] p-6 sm:p-8 max-w-4xl mx-auto shadow-sm print:border-none print:shadow-none print:p-0">
+          <div id="area-impresion-colilla-pago" className="documento-imprimible bg-[#FFFFFF] rounded-2xl border-2 border-[#8FA7D6] p-6 sm:p-8 max-w-4xl mx-auto shadow-sm print:border-none print:shadow-none print:p-0">
             {/* Encabezado Corporativo Legal */}
             <div className="border-b-2 border-[#18235C] pb-4 mb-5">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div>
-                  <h2 className="text-xl font-black text-[#18235C] tracking-tight">
-                    B GROUP INGENIERIA S.A.S.
-                  </h2>
-                  <div className="text-xs text-[#282829] font-medium">
-                    NIT: 900.995.99-2 | Actividad Económica: Ingeniería, Telecomunicaciones & Consultoría
-                  </div>
-                  <div className="text-xs text-[#282829]/70">
-                    Dirección: Carrera 7 # 71-21 Torre A, Piso 9 • Bogotá D.C., Colombia
+                <div className="flex items-center gap-3">
+                  {empresa?.identidadVisual?.logoUrl ? (
+                    <img
+                      src={empresa.identidadVisual.logoUrl}
+                      alt={empresa.nombreComercial || 'Logo'}
+                      className="max-h-14 w-auto object-contain"
+                    />
+                  ) : null}
+                  <div>
+                    <h2 className="text-xl font-black text-[#18235C] tracking-tight">
+                      {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}
+                    </h2>
+                    {empresa?.nit && (
+                      <div className="text-xs text-[#282829] font-medium">
+                        NIT: {empresa.nit}{empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}
+                      </div>
+                    )}
+                    {[empresa?.contacto?.direccion, empresa?.contacto?.ciudad, empresa?.contacto?.departamento].filter(Boolean).length > 0 && (
+                      <div className="text-xs text-[#282829]/70">
+                        Dirección: {[empresa?.contacto?.direccion, empresa?.contacto?.ciudad, empresa?.contacto?.departamento].filter(Boolean).join(', ')}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="text-left sm:text-right">
@@ -598,28 +618,6 @@ export function NominaView({
               </div>
               <div className="text-2xl sm:text-3xl font-black tracking-tight text-[#00FF00]">
                 {formatMonedaCOP(miLiquidacion.netoAPagar)}
-              </div>
-            </div>
-
-            {/* Sección Informativa: Aportes Empleador & Provisiones Sociales (Transparencia CST) */}
-            <div className="p-3.5 bg-white rounded-xl border border-[#8FA7D6] text-[11px] mb-6">
-              <div className="font-bold text-[#18235C] mb-1.5 flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#00FF00]" />
-                Aportes y Provisiones Patronales asumidos por B GROUP INGENIERIA S.A.S. (Beneficio social, no deducible de su sueldo):
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[#282829]">
-                <div>
-                  Pensión Empleador (12%): <strong className="text-[#18235C]">{formatMonedaCOP(miLiquidacion.aportesEmpresa.pensionEmpleador)}</strong>
-                </div>
-                <div>
-                  ARL Riesgo {miLiquidacion.claseRiesgoARL}: <strong className="text-[#18235C]">{formatMonedaCOP(miLiquidacion.aportesEmpresa.arl)}</strong>
-                </div>
-                <div>
-                  Caja Compensación (4%): <strong className="text-[#18235C]">{formatMonedaCOP(miLiquidacion.aportesEmpresa.cajaCompensacion)}</strong>
-                </div>
-                <div>
-                  Cesantías & Prima (16.66%): <strong className="text-[#18235C]">{formatMonedaCOP(miLiquidacion.provisiones.cesantias + miLiquidacion.provisiones.primaServicios)}</strong>
-                </div>
               </div>
             </div>
 
@@ -1551,30 +1549,44 @@ export function NominaView({
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white border border-[#18235C] rounded-xl text-xs font-bold flex items-center gap-2 transition-colors shadow-sm"
+                onClick={() => descargarElementoComoPdf('area-impresion-desprendible-admin', `Desprendible_${selectedPeriodoCodigo}_${empleadoDesprendibleId}`)}
+                className="px-4 py-2 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] rounded-xl text-xs font-bold flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
+                title="Exportar archivo PDF directamente a su equipo"
               >
-                <Printer className="w-3.5 h-3.5 text-[#8FA7D6]" />
-                Imprimir Desprendible
+                <FileDown className="w-3.5 h-3.5 text-[#18235C]" />
+                <span>Exportar a PDF</span>
               </button>
             </div>
           </div>
 
           {/* Formato Oficial de Colilla de Pago Colombiana */}
           {liquidacionDesprendible && (
-            <div className="bg-[#FFFFFF] rounded-2xl border-2 border-[#8FA7D6] p-6 sm:p-8 max-w-4xl mx-auto shadow-md print:border-none print:shadow-none print:p-0">
+            <div id="area-impresion-desprendible-admin" className="documento-imprimible bg-[#FFFFFF] rounded-2xl border-2 border-[#8FA7D6] p-6 sm:p-8 max-w-4xl mx-auto shadow-md print:border-none print:shadow-none print:p-0">
               {/* Encabezado Corporativo Legal */}
               <div className="border-b-2 border-[#18235C] pb-4 mb-5">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <div>
-                    <h2 className="text-xl font-black text-[#18235C] tracking-tight">
-                      B GROUP INGENIERIA S.A.S.
-                    </h2>
-                    <div className="text-xs text-[#282829] font-medium">
-                      NIT: 900.995.99-2 | Actividad Económica: Ingeniería, Telecomunicaciones & Consultoría
-                    </div>
-                    <div className="text-xs text-[#282829]/70">
-                      Dirección: Carrera 7 # 71-21 Torre A, Piso 9 • Bogotá D.C., Colombia
+                  <div className="flex items-center gap-3">
+                    {empresa?.identidadVisual?.logoUrl ? (
+                      <img
+                        src={empresa.identidadVisual.logoUrl}
+                        alt={empresa.nombreComercial || 'Logo'}
+                        className="max-h-14 w-auto object-contain"
+                      />
+                    ) : null}
+                    <div>
+                      <h2 className="text-xl font-black text-[#18235C] tracking-tight">
+                        {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}
+                      </h2>
+                      {empresa?.nit && (
+                        <div className="text-xs text-[#282829] font-medium">
+                          NIT: {empresa.nit}{empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}
+                        </div>
+                      )}
+                      {[empresa?.contacto?.direccion, empresa?.contacto?.ciudad, empresa?.contacto?.departamento].filter(Boolean).length > 0 && (
+                        <div className="text-xs text-[#282829]/70">
+                          Dirección: {[empresa?.contacto?.direccion, empresa?.contacto?.ciudad, empresa?.contacto?.departamento].filter(Boolean).join(', ')}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="text-left sm:text-right">
@@ -1718,40 +1730,6 @@ export function NominaView({
                 </div>
                 <div className="text-2xl font-black tracking-tight text-[#00FF00]">
                   {formatMonedaCOP(liquidacionDesprendible.netoAPagar)}
-                </div>
-              </div>
-
-              {/* Sección Informativa: Aportes Empleador & Provisiones Sociales (Transparencia CST) */}
-              <div className="p-4 bg-[#8FA7D6]/10 rounded-xl border border-[#8FA7D6] text-[11px] mb-6">
-                <div className="font-bold text-[#18235C] mb-2 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-[#18235C]" />
-                  Aportes y Provisiones Patronales asumidos por la empresa (No deducibles del trabajador):
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[#282829]">
-                  <div>
-                    Pensión Empleador (12%): <strong className="text-[#18235C]">{formatMonedaCOP(liquidacionDesprendible.aportesEmpresa.pensionEmpleador)}</strong>
-                  </div>
-                  <div>
-                    ARL Riesgo {liquidacionDesprendible.claseRiesgoARL}: <strong className="text-[#18235C]">{formatMonedaCOP(liquidacionDesprendible.aportesEmpresa.arl)}</strong>
-                  </div>
-                  <div>
-                    Caja Compensación (4%): <strong className="text-[#18235C]">{formatMonedaCOP(liquidacionDesprendible.aportesEmpresa.cajaCompensacion)}</strong>
-                  </div>
-                  <div>
-                    Salud Patronal (8.5%): <strong className="text-[#18235C]">{liquidacionDesprendible.aportesEmpresa.exoneradoArt114_1 ? 'Exonerado Art 114-1' : formatMonedaCOP(liquidacionDesprendible.aportesEmpresa.saludEmpleador)}</strong>
-                  </div>
-                  <div>
-                    Cesantías (8.33%): <strong className="text-[#18235C]">{formatMonedaCOP(liquidacionDesprendible.provisiones.cesantias)}</strong>
-                  </div>
-                  <div>
-                    Intereses Cesantías (1%): <strong className="text-[#18235C]">{formatMonedaCOP(liquidacionDesprendible.provisiones.interesesCesantias)}</strong>
-                  </div>
-                  <div>
-                    Prima Servicios (8.33%): <strong className="text-[#18235C]">{formatMonedaCOP(liquidacionDesprendible.provisiones.primaServicios)}</strong>
-                  </div>
-                  <div>
-                    Vacaciones (4.17%): <strong className="text-[#18235C]">{formatMonedaCOP(liquidacionDesprendible.provisiones.vacaciones)}</strong>
-                  </div>
                 </div>
               </div>
 

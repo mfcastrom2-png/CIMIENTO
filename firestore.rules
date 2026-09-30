@@ -282,6 +282,17 @@ service cloud.firestore {
       allow write: if isSSTorAdmin();
     }
 
+    // 13. Configuración del Sistema y Buzón de Correo Corporativo (Exclusivo Administradores)
+    match /configuracion_sistema/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /bitacora_correos/{logId} {
+      allow read: if isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
     // Default deny catch-all
     match /{document=**} {
       allow read, write: if false;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UsuarioSistema } from '../types';
+import { exportarAPdf } from '../utils/printUtils';
 import {
   Check,
   CheckCircle2,
@@ -11,7 +12,8 @@ import {
   ShieldCheck,
   AlertTriangle,
   X,
-  Share2
+  Share2,
+  FileDown
 } from 'lucide-react';
 import { enviarNotificacionCorreoNuevoUsuario } from '../lib/firebase';
 
@@ -129,7 +131,7 @@ export function ComprobanteNotificacionModal({
         </div>
 
         {/* Contenido scrolleable */}
-        <div className="p-6 space-y-4 text-xs overflow-y-auto flex-1 bg-[#FFFFFF]">
+        <div id="area-impresion-comprobante-notificacion" className="documento-imprimible p-6 space-y-4 text-xs overflow-y-auto flex-1 bg-[#FFFFFF]">
           {/* Banner de Estado de Envío Firebase Auth */}
           {resultadoFirebase?.success ? (
             <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-300 flex items-start gap-3">
@@ -314,13 +316,12 @@ export function ComprobanteNotificacionModal({
 
             <button
               type="button"
-              onClick={handleReenviar}
-              disabled={reenviando}
-              className="px-3 py-1.5 rounded-lg bg-white border border-[#8FA7D6] hover:bg-[#8FA7D6]/15 text-[#18235C] font-bold transition-colors flex items-center gap-1.5 text-xs disabled:opacity-50"
-              title="Reenviar enlace de activación oficial por Firebase"
+              onClick={() => exportarAPdf('area-impresion-comprobante-notificacion', `Comprobante_Activacion_${usuario.documento}`)}
+              className="px-3 py-1.5 rounded-lg bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] font-bold transition-colors flex items-center gap-1.5 text-xs shadow-xs cursor-pointer"
+              title="Exportar acta de activación a archivo PDF"
             >
-              <Send className={`w-3.5 h-3.5 ${reenviando ? 'animate-spin' : ''}`} />
-              <span>{reenviando ? 'Reenviando...' : 'Reenviar Firebase'}</span>
+              <FileDown className="w-3.5 h-3.5" />
+              <span>Exportar a PDF</span>
             </button>
           </div>
 

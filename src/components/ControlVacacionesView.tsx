@@ -6,7 +6,8 @@ import {
   Role,
   Solicitud,
   SolicitudVacacionDetalle,
-  UsuarioSistema
+  UsuarioSistema,
+  ConfiguracionEmpresa
 } from '../types';
 import {
   INITIAL_CONTROL_VACACIONES,
@@ -56,6 +57,7 @@ interface ControlVacacionesViewProps {
   currentEmpleadoId?: string;
   currentUser?: UsuarioSistema | null;
   isSuperAdmin?: boolean;
+  empresa?: ConfiguracionEmpresa;
   onAddSolicitudGeneral?: (solicitud: Solicitud) => void;
 }
 
@@ -155,6 +157,7 @@ export function ControlVacacionesView({
   currentEmpleadoId,
   currentUser,
   isSuperAdmin,
+  empresa,
   onAddSolicitudGeneral
 }: ControlVacacionesViewProps) {
   const [controles, setControles] = useState<ControlVacacionesEmpleado[]>(() => {
@@ -1951,7 +1954,9 @@ export function ControlVacacionesView({
             <div className="p-4 border border-[#8FA7D6]/40 rounded-lg space-y-4 bg-white text-xs">
               <div className="flex justify-between items-start border-b border-[#8FA7D6]/20 pb-3">
                 <div>
-                  <h4 className="font-bold text-sm text-[#18235C]">B GROUP INGENIERIA S.A.S. - NIT 900.995.99-2</h4>
+                  <h4 className="font-bold text-sm text-[#18235C]">
+                    {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}{empresa?.nit ? ` - NIT ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : ''}
+                  </h4>
                   <div className="text-[11px] text-[#282829]/70">Libro de Registro y Control de Vacaciones del Personal</div>
                 </div>
                 <div className="text-right text-[10px] text-[#282829]/70">

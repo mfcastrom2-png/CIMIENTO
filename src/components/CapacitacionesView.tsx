@@ -19,6 +19,10 @@ import {
   eliminarCapacitacionFB
 } from '../lib/firebase';
 import {
+  exportarContenedorAPDF,
+  imprimirDocumento
+} from '../utils/printUtils';
+import {
   AlertCircle,
   Award,
   Trash2,
@@ -52,6 +56,7 @@ import {
   Timer,
   Edit,
   Download,
+  FileDown,
   FileSpreadsheet,
   CheckSquare,
   BarChart3,
@@ -2917,7 +2922,7 @@ export function CapacitacionesView({
       {/* MODAL DE CERTIFICADO DE CONSTANCIA OFICIAL */}
       {certificadoModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border-2 border-[#18235C] max-w-2xl w-full p-8 shadow-2xl relative my-8 print:border-none print:shadow-none">
+          <div id="area-impresion-constancia-capacitacion" className="documento-imprimible bg-white rounded-2xl border-2 border-[#18235C] max-w-2xl w-full p-8 shadow-2xl relative my-8 print:border-none print:shadow-none">
             <button
               onClick={() => setCertificadoModal(null)}
               className="absolute top-4 right-4 text-[#282829] hover:text-[#18235C] font-bold p-1 print:hidden cursor-pointer"
@@ -2996,17 +3001,20 @@ export function CapacitacionesView({
                   <div className="border-t border-[#18235C] pt-1 font-bold text-[#18235C]">
                     Gestión del Talento & SG-SST
                   </div>
-                  <div className="text-[10px] text-[#282829]">B GROUP INGENIERIA S.A.S. — NIT 900.995.99-2</div>
+                  <div className="text-[10px] text-[#282829]">
+                    {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}{empresa?.nit ? ` — NIT ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : ''}
+                  </div>
                 </div>
               </div>
 
               <div className="flex justify-center gap-3 pt-4 print:hidden">
                 <button
-                  onClick={() => window.print()}
-                  className="px-5 py-2.5 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  onClick={() => exportarContenedorAPDF('area-impresion-constancia-capacitacion', `Constancia_Capacitacion_${certificadoModal.capacitacion.codigo}_${certificadoModal.empleado.documento}`)}
+                  className="px-5 py-2.5 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  title="Exportar constancia a archivo PDF descargable"
                 >
-                  <Printer className="w-4 h-4 text-[#00FF00]" />
-                  <span>Imprimir Constancia</span>
+                  <FileDown className="w-4 h-4 text-[#18235C]" />
+                  <span>Exportar a PDF</span>
                 </button>
                 <button
                   onClick={() => setCertificadoModal(null)}
@@ -3023,7 +3031,7 @@ export function CapacitacionesView({
       {/* MODAL DE ACTA DE ASISTENCIA Y ACREDITACIÓN DEL CURSO (SG-SST) */}
       {actaAsistenciaCap && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-[#8FA7D6] max-w-3xl w-full p-6 sm:p-8 shadow-2xl relative my-8 print:border-none print:shadow-none space-y-5">
+          <div id="area-impresion-acta-capacitacion" className="documento-imprimible bg-white rounded-2xl border border-[#8FA7D6] max-w-3xl w-full p-6 sm:p-8 shadow-2xl relative my-8 print:border-none print:shadow-none space-y-5">
             <button
               onClick={() => setActaAsistenciaCap(null)}
               className="absolute top-4 right-4 text-[#282829] hover:text-[#18235C] font-bold p-1 print:hidden cursor-pointer"
@@ -3034,7 +3042,9 @@ export function CapacitacionesView({
             {/* Encabezado Institucional del Acta */}
             <div className="border-b border-[#8FA7D6] pb-4 space-y-1">
               <div className="flex items-center justify-between text-xs text-[#282829]">
-                <span className="font-bold text-[#18235C]">B GROUP INGENIERIA S.A.S. • NIT 900.995.99-2</span>
+                <span className="font-bold text-[#18235C]">
+                  {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}{empresa?.nit ? ` • NIT ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : ''}
+                </span>
                 <span className="font-mono">Código: {actaAsistenciaCap.codigo}</span>
               </div>
               <h3 className="text-lg font-bold font-serif text-[#18235C]">
@@ -3142,15 +3152,16 @@ export function CapacitacionesView({
 
             <div className="flex justify-end gap-2 pt-2 print:hidden">
               <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-[#18235C] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                onClick={() => exportarContenedorAPDF('area-impresion-acta-capacitacion', `Acta_Capacitacion_${actaAsistenciaCap.codigo}`)}
+                className="px-4 py-2 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                title="Exportar acta oficial a archivo PDF descargable"
               >
-                <Printer className="w-3.5 h-3.5 text-[#00FF00]" />
-                <span>Imprimir Acta Oficial</span>
+                <FileDown className="w-3.5 h-3.5 text-[#18235C]" />
+                <span>Exportar a PDF</span>
               </button>
               <button
                 onClick={() => setActaAsistenciaCap(null)}
-                className="px-4 py-2 border border-[#8FA7D6] text-[#282829] rounded-lg text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 border border-[#8FA7D6] text-[#282829] hover:bg-slate-50 rounded-lg text-xs font-semibold cursor-pointer"
               >
                 Cerrar
               </button>

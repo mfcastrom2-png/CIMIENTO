@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { EvaluacionDesempeno, Empleado, Cargo } from '../types';
 import {
   X,
@@ -15,6 +15,8 @@ import {
   Layers
 } from 'lucide-react';
 import { getNivelLabel } from '../services/evaluationEngine';
+import { imprimirDocumento, descargarElementoComoPdf } from '../utils/printUtils';
+import { Download, FileDown } from 'lucide-react';
 
 interface EvaluacionDetalleModalProps {
   evaluacion: EvaluacionDesempeno;
@@ -29,17 +31,29 @@ export const EvaluacionDetalleModal: React.FC<EvaluacionDetalleModalProps> = ({
   cargos,
   onClose,
 }) => {
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
   const empleado = empleados.find(e => e.id === evaluacion.empleadoId);
   const cargo = cargos.find(c => c.id === evaluacion.cargoId);
   const evaluador = empleados.find(e => e.id === evaluacion.evaluadorId);
 
+  const nombreArchivo = `Evaluacion_Desempeno_${evaluacion.periodo}_${empleado?.nombre?.replace(/\s+/g, '_') || 'Colaborador'}`;
+
+  const handleDescargarPdf = async () => {
+    setDescargandoPdf(true);
+    try {
+      await descargarElementoComoPdf('area-impresion-evaluacion-detalle', nombreArchivo);
+    } finally {
+      setDescargandoPdf(false);
+    }
+  };
+
   const handlePrint = () => {
-    window.print();
+    imprimirDocumento(nombreArchivo, 'area-impresion-evaluacion-detalle');
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white">
-      <div className="bg-white rounded-xl border border-[#8FA7D6]/40 max-w-4xl w-full my-auto shadow-2xl overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:shadow-none print:border-none">
+      <div className="documento-imprimible bg-white rounded-xl border border-[#8FA7D6]/40 max-w-4xl w-full my-auto shadow-2xl overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:shadow-none print:border-none">
         {/* Header Modal */}
         <div className="bg-[#18235C] text-white px-6 py-4 flex items-center justify-between shrink-0 print:bg-[#18235C] print:text-white">
           <div className="flex items-center gap-3">
@@ -63,18 +77,28 @@ export const EvaluacionDetalleModal: React.FC<EvaluacionDetalleModalProps> = ({
 
           <div className="flex items-center gap-2 print:hidden">
             <button
+              id="btn-descargar-pdf-evaluacion"
+              onClick={handleDescargarPdf}
+              disabled={descargandoPdf}
+              className="px-3 py-1.5 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              title="Exportar archivo PDF directamente a su equipo"
+            >
+              <FileDown className={`w-3.5 h-3.5 ${descargandoPdf ? 'animate-bounce' : ''}`} />
+              <span>{descargandoPdf ? 'Generando PDF...' : 'Exportar a PDF'}</span>
+            </button>
+            <button
               id="btn-imprimir-evaluacion-detalle"
               onClick={handlePrint}
-              className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1.5 text-xs font-semibold"
-              title="Imprimir / Exportar PDF"
+              className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+              title="Imprimir"
             >
-              <Printer className="w-4 h-4 text-[#00FF00]" />
-              <span>Imprimir / PDF</span>
+              <Printer className="w-4 h-4 text-white" />
+              <span>Imprimir</span>
             </button>
             <button
               id="btn-cerrar-evaluacion-detalle-top"
               onClick={onClose}
-              className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -82,7 +106,7 @@ export const EvaluacionDetalleModal: React.FC<EvaluacionDetalleModalProps> = ({
         </div>
 
         {/* Modal Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 print:overflow-visible">
+        <div id="area-impresion-evaluacion-detalle" className="flex-1 overflow-y-auto p-6 space-y-6 print:overflow-visible bg-white">
           {/* Ficha de Identificación */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-gradient-to-br from-[#18235C]/5 to-transparent p-4 rounded-xl border border-[#8FA7D6]/30 text-xs">
             <div>

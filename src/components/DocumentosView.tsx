@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Cargo, Empleado, EvaluacionDesempeno, ConfiguracionEmpresa } from '../types';
+import { exportarContenedorAPDF, imprimirDocumento } from '../utils/printUtils';
 import {
   FileText,
   Printer,
@@ -8,7 +9,8 @@ import {
   Briefcase,
   Building,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  FileDown
 } from 'lucide-react';
 
 interface DocumentosViewProps {
@@ -29,13 +31,27 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
   const [selectedDocType, setSelectedDocType] = useState<'ficha' | 'acta_eval'>('ficha');
   const [selectedCargoId, setSelectedCargoId] = useState<string>(cargos[0]?.id || '');
   const [selectedEmpleadoId, setSelectedEmpleadoId] = useState<string>(empleados[0]?.id || '');
+  const [exportandoPdf, setExportandoPdf] = useState(false);
 
   const cargo = cargos.find(c => c.id === selectedCargoId) || cargos[0];
   const empleado = empleados.find(e => e.id === selectedEmpleadoId) || empleados[0];
   const empCargo = cargos.find(c => c.id === empleado?.cargoId);
 
+  const nombreArchivoExportacion = selectedDocType === 'ficha'
+    ? `Manual_Cargo_${cargo?.nombre || 'Ficha'}`
+    : `Acta_Evaluacion_${empleado?.nombre || 'Empleado'}`;
+
+  const handleExportarPdf = async () => {
+    setExportandoPdf(true);
+    try {
+      await exportarContenedorAPDF('area-impresion-repositorio-documentos', nombreArchivoExportacion);
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   const handlePrint = () => {
-    window.print();
+    imprimirDocumento(nombreArchivoExportacion, 'area-impresion-repositorio-documentos');
   };
 
   return (
@@ -48,7 +64,7 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               Gestión Documental Oficial
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#8FA7D6]/15 text-[#18235C] border border-[#8FA7D6]/30">
-              {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
+              {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#18235C]">
@@ -59,14 +75,18 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
           </p>
         </div>
 
-        <button
-          id="btn-imprimir-documento"
-          onClick={handlePrint}
-          className="px-4 py-2 bg-[#18235C] hover:bg-[#18235C]/90 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
-        >
-          <Printer className="w-4 h-4 text-[#00FF00]" />
-          <span>Imprimir / Exportar Documento</span>
-        </button>
+        <div>
+          <button
+            id="btn-exportar-pdf-documento"
+            onClick={handleExportarPdf}
+            disabled={exportandoPdf}
+            className="px-4 py-2 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            title="Exportar documento en formato PDF descargable"
+          >
+            <FileDown className={`w-4 h-4 ${exportandoPdf ? 'animate-bounce' : ''}`} />
+            <span>{exportandoPdf ? 'Generando PDF...' : 'Exportar a PDF'}</span>
+          </button>
+        </div>
       </div>
 
 
@@ -135,7 +155,7 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
       </div>
 
       {/* Document Sheet Layout (Paper Preview) */}
-      <div className="bg-white rounded-xl border border-[#8FA7D6]/40 p-8 sm:p-12 shadow-sm max-w-4xl mx-auto print:border-none print:shadow-none print:p-0">
+      <div id="area-impresion-repositorio-documentos" className="documento-imprimible bg-white rounded-xl border border-[#8FA7D6]/40 p-8 sm:p-12 shadow-sm max-w-4xl mx-auto print:border-none print:shadow-none print:p-0">
         {/* Plantilla 1: Ficha de Cargo */}
         {selectedDocType === 'ficha' && cargo && (
           <div className="space-y-6 text-xs text-[#282829]">
@@ -155,7 +175,7 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
                 )}
                 <div>
                   <span className="text-lg sm:text-xl font-bold text-[#18235C] block">
-                    {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'} — GESTIÓN HUMANA
+                    {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'} — GESTIÓN HUMANA
                   </span>
                   <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold">
                     Manual Específico de Funciones y Competencias Laborales
@@ -290,7 +310,7 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
                     ACTA DE EVALUACIÓN TÉCNICA DE DESEMPEÑO
                   </span>
                   <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold">
-                    Modelo Cuantitativo de 100 Puntos · {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'}
+                    Modelo Cuantitativo de 100 Puntos · {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}
                   </span>
                 </div>
               </div>
