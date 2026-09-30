@@ -14,8 +14,8 @@ export const generarCartaBienvenida = (
   buzonConfig?: ConfiguracionBuzonCorreo
 ): string => {
   const url = originUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://bgroup-gh.web.app');
-  const nombreOrg = empresa?.razonSocial || empresa?.nombreComercial || 'CIMIENTO S.A.S.';
-  const nitOrg = empresa?.nit ? `NIT: ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : 'NIT: 900.995.99-2';
+  const nombreOrg = empresa?.razonSocial || empresa?.nombreComercial || 'Empresa';
+  const nitOrg = empresa?.nit ? `NIT: ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : '';
   const ciudadOrg = empresa?.contacto?.ciudad || 'Bogotá D.C.';
   const emailRemitente = buzonConfig?.emailRemitente || empresa?.contacto?.emailContactoGH || 'gestionhumana@cimiento.com.co';
 

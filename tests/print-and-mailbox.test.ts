@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { imprimirDocumento } from '../src/utils/printUtils';
-import { exportarContenedorAPDF } from '../src/utils/pdfExport';
+import {
+  imprimirDocumento,
+  imprimirDocumentoConSecciones,
+  exportarAPdfConSecciones,
+  aplicarExclusionSecciones
+} from '../src/utils/printUtils';
+import {
+  exportarContenedorAPDF,
+  generarEstilosImpresionInyectados,
+  sanearTextoCssSinOklab,
+  inyectarEstilosImpresionEnClon
+} from '../src/utils/pdfExport';
 import {
   CONFIG_BUZON_DEFAULT,
   probarConexionBuzon,
@@ -22,6 +32,72 @@ describe('Suite de Pruebas: Impresión Oficial de Documentos (printUtils.ts & pd
     expect(typeof exportarContenedorAPDF).toBe('function');
     const res = await exportarContenedorAPDF('.selector-inexistente-test', 'test.pdf');
     expect(res).toBe(false); // Retorna false amigablemente cuando el selector no existe en el DOM de prueba
+  });
+
+  it('Debe generar estilos CSS de impresión inyectados con protección de fondos grises y reglas de src/index.css', () => {
+    const css = generarEstilosImpresionInyectados();
+    expect(css).toContain('.documento-imprimible');
+    expect(css).toContain('bg-slate-50');
+    expect(css).toContain('#F8FAFC');
+    expect(css).toContain('#F1F5F9');
+    expect(css).toContain('#FFFFFF');
+    expect(css).toContain('print-color-adjust: exact');
+    expect(css).toContain('display: none !important');
+    expect(css).toContain('.margen-personalizado-cst');
+    expect(css).toContain('.tipo-carta');
+    expect(css).toContain('.tipo-contrato');
+  });
+
+  it('Debe sanear funciones oklab/oklch sin forzar fondos al azul institucional', () => {
+    const cssConOklab = 'background-color: oklab(0.9 0 0); color: oklch(0.2 0.05 240);';
+    const saneado = sanearTextoCssSinOklab(cssConOklab);
+    expect(saneado).not.toContain('oklab(');
+    expect(saneado).not.toContain('oklch(');
+    expect(saneado).not.toContain('#18235C');
+  });
+
+  it('Debe inyectar correctamente el elemento style en el documento clonado', () => {
+    const elementos: any[] = [];
+    const fakeDoc = {
+      getElementById: () => null,
+      createElement: () => {
+        const el: any = {
+          id: '',
+          setAttribute: (k: string, v: string) => { el[k] = v; },
+          style: { setProperty: (k: string, v: string) => { el.style[k] = v; } },
+          textContent: ''
+        };
+        return el;
+      },
+      querySelectorAll: () => [],
+      head: {
+        appendChild: (child: any) => { elementos.push(child); }
+      }
+    } as unknown as Document;
+
+    const target: any = {
+      style: {
+        setProperty: () => {}
+      }
+    };
+
+    inyectarEstilosImpresionEnClon(fakeDoc, target);
+    expect(elementos.length).toBeGreaterThan(0);
+    expect(elementos[0].id).toBe('pdf-export-dynamic-print-styles');
+    expect(elementos[0].textContent).toContain('.documento-imprimible');
+    expect(elementos[0].textContent).toContain('bg-slate-50');
+  });
+
+  it('Debe manejar aplicarExclusionSecciones y retornar función de restauración sin errores en entornos seguros', () => {
+    const restoreFn = aplicarExclusionSecciones('contenedor-inexistente', ['sec-1']);
+    expect(typeof restoreFn).toBe('function');
+    expect(() => restoreFn()).not.toThrow();
+  });
+
+  it('Debe ejecutar imprimirDocumentoConSecciones y exportarAPdfConSecciones amigablemente', async () => {
+    expect(() => imprimirDocumentoConSecciones('Doc_Test', 'elem-id', ['sec-1'])).not.toThrow();
+    const res = await exportarAPdfConSecciones('elem-id', 'test.pdf', ['sec-1']);
+    expect(res).toBe(false);
   });
 });
 

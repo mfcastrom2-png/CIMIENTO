@@ -12,6 +12,7 @@ import {
   ConfiguracionEmpresa
 } from '../types';
 import { CAPACITACIONES_INICIALES } from '../data/capacitacionesData';
+import { useCompanySyncOptional } from '../context/SyncContext';
 import {
   limpiarCapacitacionesFB,
   guardarCapacitacionFB,
@@ -89,6 +90,8 @@ export function CapacitacionesView({
   currentUser,
   empresa
 }: CapacitacionesViewProps) {
+  const syncContext = useCompanySyncOptional();
+  const empresaActiva = empresa || syncContext?.empresa;
   const isSuperAdmin = rolSistema === 'superadmin';
   const esAdmin = userRole !== 'empleado' && (rolSistema === 'superadmin' || rolSistema === 'admin_gh' || userRole === 'admin');
 
@@ -2932,10 +2935,10 @@ export function CapacitacionesView({
 
             <div className="text-center space-y-4">
               <div className="flex flex-col items-center justify-center gap-2 mb-1">
-                {empresa?.identidadVisual?.logoUrl ? (
+                {empresaActiva?.identidadVisual?.logoUrl ? (
                   <img
-                    src={empresa.identidadVisual.logoUrl}
-                    alt={empresa.nombreComercial || 'Logo'}
+                    src={empresaActiva.identidadVisual.logoUrl}
+                    alt={empresaActiva.nombreComercial || 'Logo'}
                     className="max-h-16 w-auto max-w-[240px] object-contain"
                   />
                 ) : (
@@ -2945,7 +2948,7 @@ export function CapacitacionesView({
                 )}
               </div>
               <div className="text-xs uppercase tracking-widest text-[#18235C] font-bold">
-                {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'} • SISTEMA DE GESTIÓN SST
+                {empresaActiva?.razonSocial || empresaActiva?.nombreComercial || 'Empresa'}{empresaActiva?.nit ? ` • NIT ${empresaActiva.nit}${empresaActiva.digitoVerificacion ? `-${empresaActiva.digitoVerificacion}` : ''}` : ''} • SISTEMA DE GESTIÓN SST
               </div>
               <h2 className="text-xl sm:text-2xl font-bold font-serif text-[#18235C] tracking-tight uppercase">
                 Constancia Oficial de Capacitación y Competencias
@@ -3002,7 +3005,7 @@ export function CapacitacionesView({
                     Gestión del Talento & SG-SST
                   </div>
                   <div className="text-[10px] text-[#282829]">
-                    {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}{empresa?.nit ? ` — NIT ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : ''}
+                    {empresaActiva?.razonSocial || empresaActiva?.nombreComercial || 'Empresa'}{empresaActiva?.nit ? ` — NIT ${empresaActiva.nit}${empresaActiva.digitoVerificacion ? `-${empresaActiva.digitoVerificacion}` : ''}` : ''}
                   </div>
                 </div>
               </div>
@@ -3043,7 +3046,7 @@ export function CapacitacionesView({
             <div className="border-b border-[#8FA7D6] pb-4 space-y-1">
               <div className="flex items-center justify-between text-xs text-[#282829]">
                 <span className="font-bold text-[#18235C]">
-                  {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}{empresa?.nit ? ` • NIT ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : ''}
+                  {empresaActiva?.razonSocial || empresaActiva?.nombreComercial || 'Empresa'}{empresaActiva?.nit ? ` • NIT ${empresaActiva.nit}${empresaActiva.digitoVerificacion ? `-${empresaActiva.digitoVerificacion}` : ''}` : ''}
                 </span>
                 <span className="font-mono">Código: {actaAsistenciaCap.codigo}</span>
               </div>

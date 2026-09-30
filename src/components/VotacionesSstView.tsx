@@ -8,6 +8,7 @@ import {
   ConfiguracionEmpresa
 } from '../types';
 import { INITIAL_PROCESOS_VOTACION } from '../data/usuariosYVotacionesData';
+import { useCompanySyncOptional } from '../context/SyncContext';
 import {
   AlertCircle,
   Award,
@@ -51,6 +52,8 @@ export function VotacionesSstView({
   empleados = [],
   empresa
 }: VotacionesSstViewProps) {
+  const syncContext = useCompanySyncOptional();
+  const empresaActiva = empresa || syncContext?.empresa;
   const [procesos, setProcesos] = useState<ProcesoVotacionSST[]>(() => {
     const limpio = typeof window !== 'undefined' && localStorage.getItem('bgroup_datos_limpios') === 'true';
     if (limpio || empleados.length === 0) {
@@ -844,15 +847,15 @@ export function VotacionesSstView({
             {/* Certificado con formato oficial imprimible */}
             <div className="p-5 border-2 border-[#18235C]/30 rounded-xl bg-[#FFFFFF] text-center space-y-3">
               <div className="flex flex-col items-center justify-center gap-2 mb-1">
-                {empresa?.identidadVisual?.logoUrl ? (
+                {empresaActiva?.identidadVisual?.logoUrl ? (
                   <img
-                    src={empresa.identidadVisual.logoUrl}
-                    alt={empresa.nombreComercial || 'Logo'}
+                    src={empresaActiva.identidadVisual.logoUrl}
+                    alt={empresaActiva.nombreComercial || 'Logo'}
                     className="max-h-14 w-auto max-w-[220px] object-contain"
                   />
                 ) : null}
                 <div className="text-xs font-bold tracking-widest text-[#18235C] uppercase">
-                  {empresa?.razonSocial || 'B GROUP INGENIERIA S.A.S.'} • SISTEMA DE GESTIÓN SST
+                  {empresaActiva?.razonSocial || empresaActiva?.nombreComercial || 'Empresa'}{empresaActiva?.nit ? ` • NIT ${empresaActiva.nit}${empresaActiva.digitoVerificacion ? `-${empresaActiva.digitoVerificacion}` : ''}` : ''} • SISTEMA DE GESTIÓN SST
                 </div>
               </div>
 
@@ -923,7 +926,7 @@ export function VotacionesSstView({
 
             <div className="text-xs space-y-3 text-[#282829] leading-relaxed p-4 bg-[#FFFFFF] rounded-lg border">
               <div className="font-bold text-[#18235C] text-center border-b pb-2">
-                ACTA DE APERTURA DE VOTACIONES - B GROUP INGENIERIA S.A.S.
+                ACTA DE APERTURA DE VOTACIONES - {empresaActiva?.razonSocial || empresaActiva?.nombreComercial || 'EMPRESA'}
               </div>
               <p>
                 En la ciudad de Bogotá D.C., a las 08:00 horas del {procesoActual.fechaApertura}, se reunieron los jurados de votación designados por la Dirección de Gestión Humana y los representantes de los trabajadores para dar formal apertura al proceso electoral del <strong>{procesoActual.tipo} (Periodo {procesoActual.periodo})</strong>.
@@ -978,7 +981,7 @@ export function VotacionesSstView({
                 ACTA DE ESCRUTINIO FINAL - {procesoActual.tipo.toUpperCase()} 2026-2028
               </div>
               <p>
-                Siendo las 17:00 horas, los jurados electorales procedieron al cierre de la urna digital y al cómputo y consolidación de los sufragios depositados por los trabajadores de B GROUP INGENIERIA S.A.S.
+                Siendo las 17:00 horas, los jurados electorales procedieron al cierre de la urna digital y al cómputo y consolidación de los sufragios depositados por los trabajadores de {empresaActiva?.razonSocial || empresaActiva?.nombreComercial || 'la empresa'}.
               </p>
 
               <div className="bg-white p-3 rounded border space-y-1">

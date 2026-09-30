@@ -105,7 +105,7 @@ interface SyncContextType {
   handleUpdateEmpresa: (empresa: ConfiguracionEmpresa) => Promise<void>;
 }
 
-const SyncContext = createContext<SyncContextType | undefined>(undefined);
+export const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, fbUser, authReady } = useAuth();
@@ -850,4 +850,8 @@ export const useCompanySync = (): SyncContextType => {
     throw new Error('useCompanySync debe ser usado dentro de un SyncProvider');
   }
   return context;
+};
+
+export const useCompanySyncOptional = (): SyncContextType | undefined => {
+  return useContext(SyncContext);
 };

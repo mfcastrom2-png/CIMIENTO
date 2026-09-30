@@ -110,6 +110,13 @@
     break-before: page !important;
   }
 
+  /* 7. Exclusión selectiva de secciones configuradas por el usuario */
+  .seccion-excluida-impresion,
+  [data-seccion-excluida="true"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
   .evitar-salto,
   .avoid-break,
   .card-imprimible,
@@ -142,6 +149,31 @@
 
   tfoot {
     display: table-footer-group !important;
+  }
+
+  /* 8. Márgenes ajustables y personalizables para diferentes tipos de documentos (cartas vs contratos) */
+  .margen-personalizado-cst {
+    box-sizing: border-box !important;
+    padding: var(--margen-impresion-top, 15mm) var(--margen-impresion-right, 18mm) var(--margen-impresion-bottom, 15mm) var(--margen-impresion-left, 18mm) !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Modificadores específicos por tipo de documento legal */
+  .margen-personalizado-cst.tipo-carta,
+  .margen-personalizado-cst[data-tipo-documento="carta"] {
+    padding: 20mm 20mm 15mm 20mm !important; /* Formato institucional formal para cartas y certificados */
+  }
+
+  .margen-personalizado-cst.tipo-contrato,
+  .margen-personalizado-cst[data-tipo-documento="contrato"] {
+    padding: 12mm 15mm 12mm 15mm !important; /* Mayor densidad y aprovechamiento de espacio para contratos y anexos laborales */
+  }
+
+  .margen-personalizado-cst.tipo-acta,
+  .margen-personalizado-cst[data-tipo-documento="acta"] {
+    padding: 15mm 18mm 15mm 18mm !important; /* Formato balanceado para manuales y actas técnicas */
   }
 
   /* Enlaces impresos limpios (no mostrar URLs) */

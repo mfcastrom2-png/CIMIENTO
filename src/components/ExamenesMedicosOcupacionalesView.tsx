@@ -7,6 +7,7 @@ import {
   ExamenOcupacionalEmpleado
 } from '../types';
 import { uid } from '../data/initialData';
+import { useCompanySyncOptional } from '../context/SyncContext';
 import {
   Stethoscope,
   Plus,
@@ -50,6 +51,14 @@ export const ExamenesMedicosOcupacionalesView: React.FC<ExamenesMedicosOcupacion
   userRole = 'admin',
   onUpdateEmpleado
 }) => {
+  const syncContext = useCompanySyncOptional();
+  const empresa = syncContext?.empresa;
+  const razonSocial = empresa?.razonSocial || empresa?.nombreComercial || 'Empresa';
+  const nitCompleto = empresa?.nit ? `NIT ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : '';
+  const direccion = (empresa as any)?.direccion || empresa?.contacto?.direccion || '';
+  const ciudad = empresa?.contacto?.ciudad || '';
+  const ubicacionCompleta = [direccion, ciudad].filter(Boolean).join(', ');
+
   // Filtros
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<string>('TODOS');
@@ -1382,8 +1391,10 @@ export const ExamenesMedicosOcupacionalesView: React.FC<ExamenesMedicosOcupacion
             <div className="p-6 border-2 border-slate-300 rounded-xl space-y-4 text-xs bg-slate-50/40">
               <div className="flex items-center justify-between border-b-2 border-slate-300 pb-3">
                 <div>
-                  <h2 className="font-bold text-base font-serif text-[#18235C]">B GROUP INGENIERIA S.A.S.</h2>
-                  <p className="text-[11px] text-slate-600">NIT: 901.458.789-2 • Sistema de Gestión SG-SST</p>
+                  <h2 className="font-bold text-base font-serif text-[#18235C]">{razonSocial}</h2>
+                  <p className="text-[11px] text-slate-600">
+                    {[nitCompleto, ubicacionCompleta, 'Sistema de Gestión SG-SST'].filter(Boolean).join(' • ')}
+                  </p>
                 </div>
                 <div className="text-right">
                   <div className="text-[10px] font-bold text-slate-500 uppercase">Orden Médica Ocupacional</div>

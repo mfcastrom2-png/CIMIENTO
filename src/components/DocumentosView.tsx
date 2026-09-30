@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import { Cargo, Empleado, EvaluacionDesempeno, ConfiguracionEmpresa } from '../types';
-import { exportarContenedorAPDF, imprimirDocumento } from '../utils/printUtils';
+import { exportarContenedorAPDF } from '../utils/printUtils';
+import { useCompanySyncOptional } from '../context/SyncContext';
 import {
   FileText,
+  FileDown,
   Printer,
-  Download,
-  Award,
-  Briefcase,
-  Building,
-  CheckCircle2,
-  ChevronRight,
-  FileDown
+  Sliders,
+  Eye
 } from 'lucide-react';
+import {
+  PrevisualizacionImpresionModal,
+  SeccionImprimible
+} from './PrevisualizacionImpresionModal';
 
 interface DocumentosViewProps {
   cargos: Cargo[];
   empleados: Empleado[];
   evaluaciones: EvaluacionDesempeno[];
-  onOpenEvaluacionDetalle: (evaluacionId: string) => void;
+  onOpenEvaluacionDetalle?: (evaluacionId: string) => void;
   empresa?: ConfiguracionEmpresa;
 }
 
@@ -25,13 +26,27 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
   cargos,
   empleados,
   evaluaciones,
-  onOpenEvaluacionDetalle,
   empresa
 }) => {
   const [selectedDocType, setSelectedDocType] = useState<'ficha' | 'acta_eval'>('ficha');
   const [selectedCargoId, setSelectedCargoId] = useState<string>(cargos[0]?.id || '');
   const [selectedEmpleadoId, setSelectedEmpleadoId] = useState<string>(empleados[0]?.id || '');
   const [exportandoPdf, setExportandoPdf] = useState(false);
+  const [modalPreviewOpen, setModalPreviewOpen] = useState(false);
+
+  // Consumo dinámico del estado global con fallback a props
+  const syncContext = useCompanySyncOptional();
+  const empresaActiva = empresa || syncContext?.empresa;
+
+  const razonSocial = empresaActiva?.razonSocial || empresaActiva?.nombreComercial || 'Empresa';
+  const nit = empresaActiva?.nit || '';
+  const digitoVerificacion = empresaActiva?.digitoVerificacion || '';
+  const nitCompleto = nit ? `NIT ${nit}${digitoVerificacion ? `-${digitoVerificacion}` : ''}` : '';
+  const direccion = (empresaActiva as any)?.direccion || empresaActiva?.contacto?.direccion || '';
+  const ciudad = empresaActiva?.contacto?.ciudad || '';
+  const departamento = empresaActiva?.contacto?.departamento || '';
+  const ubicacionCompleta = [direccion, ciudad, departamento].filter(Boolean).join(', ');
+  const logoUrl = empresaActiva?.identidadVisual?.logoUrl;
 
   const cargo = cargos.find(c => c.id === selectedCargoId) || cargos[0];
   const empleado = empleados.find(e => e.id === selectedEmpleadoId) || empleados[0];
@@ -41,17 +56,84 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
     ? `Manual_Cargo_${cargo?.nombre || 'Ficha'}`
     : `Acta_Evaluacion_${empleado?.nombre || 'Empleado'}`;
 
-  const handleExportarPdf = async () => {
+  // Secciones configurables para la previsualización e impresión
+  const seccionesFicha: SeccionImprimible[] = [
+    {
+      id: 'encabezado-ficha',
+      nombre: '1. Encabezado e Identificación',
+      descripcion: 'Razón social, NIT, código de manual, versión y modalidad.',
+      requerido: true,
+      seleccionado: true
+    },
+    {
+      id: 'proposito-ficha',
+      nombre: '2. Propósito Principal del Cargo',
+      descripcion: 'Misión y objetivo estratégico del puesto.',
+      seleccionado: true
+    },
+    {
+      id: 'funciones-ficha',
+      nombre: '3. Funciones y Responsabilidades',
+      descripcion: 'Actividades esenciales, condiciones y resultados esperados.',
+      seleccionado: true
+    },
+    {
+      id: 'indicadores-ficha',
+      nombre: '4. Indicadores de Gestión (50%)',
+      descripcion: 'Fórmulas, metas cuantitativas y ponderaciones.',
+      seleccionado: true
+    },
+    {
+      id: 'competencias-ficha',
+      nombre: '5. Competencias Requeridas (25%)',
+      descripcion: 'Niveles de comportamiento y conductas observables.',
+      seleccionado: true
+    },
+    {
+      id: 'firmas-ficha',
+      nombre: '6. Firmas y Validación Institucional',
+      descripcion: 'Sello de aprobación de GH y compromiso del colaborador.',
+      seleccionado: true
+    }
+  ];
+
+  const seccionesActa: SeccionImprimible[] = [
+    {
+      id: 'encabezado-acta',
+      nombre: '1. Encabezado y Datos del Colaborador',
+      descripcion: 'Cédula, cargo, salario y período evaluado.',
+      requerido: true,
+      seleccionado: true
+    },
+    {
+      id: 'consolidado-acta',
+      nombre: '2. Consolidado Técnico (100 Pts)',
+      descripcion: 'Puntajes de Indicadores, Competencias, SG-SST y Mejora.',
+      seleccionado: true
+    },
+    {
+      id: 'compromisos-acta',
+      nombre: '3. Plan de Desarrollo y Compromisos',
+      descripcion: 'Acuerdos de fortalecimiento técnico y capacitación.',
+      seleccionado: true
+    },
+    {
+      id: 'firmas-acta',
+      nombre: '4. Firmas y Constancia de Retroalimentación',
+      descripcion: 'Firmas del jefe inmediato evaluador y del colaborador.',
+      seleccionado: true
+    }
+  ];
+
+  const seccionesActivas = selectedDocType === 'ficha' ? seccionesFicha : seccionesActa;
+
+  const handleExportarPdfDirecto = async () => {
     setExportandoPdf(true);
     try {
       await exportarContenedorAPDF('area-impresion-repositorio-documentos', nombreArchivoExportacion);
     } finally {
       setExportandoPdf(false);
     }
-  };
-
-  const handlePrint = () => {
-    imprimirDocumento(nombreArchivoExportacion, 'area-impresion-repositorio-documentos');
   };
 
   return (
@@ -64,31 +146,40 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               Gestión Documental Oficial
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#8FA7D6]/15 text-[#18235C] border border-[#8FA7D6]/30">
-              {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}
+              {razonSocial}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#18235C]">
             Repositorio y Generador de Documentos
           </h1>
           <p className="text-xs sm:text-sm text-[#282829]/70 mt-1 max-w-2xl">
-            Generación formal y exportación de manuales específicos de funciones y actas oficiales de evaluación técnica de desempeño de 100 puntos.
+            Generación formal, previsualización interactiva por secciones y exportación de manuales de cargos y actas de evaluación de 100 puntos.
           </p>
         </div>
 
-        <div>
+        <div className="flex items-center gap-2">
+          <button
+            id="btn-previsualizar-impresion"
+            onClick={() => setModalPreviewOpen(true)}
+            className="px-3.5 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            title="Abrir modal de previsualización y selección de secciones para imprimir"
+          >
+            <Printer className="w-4 h-4 text-[#00FF00]" />
+            <span>Previsualizar e Imprimir</span>
+          </button>
+
           <button
             id="btn-exportar-pdf-documento"
-            onClick={handleExportarPdf}
+            onClick={handleExportarPdfDirecto}
             disabled={exportandoPdf}
-            className="px-4 py-2 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-2 bg-[#00FF00] hover:bg-emerald-400 text-[#18235C] text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
             title="Exportar documento en formato PDF descargable"
           >
             <FileDown className={`w-4 h-4 ${exportandoPdf ? 'animate-bounce' : ''}`} />
-            <span>{exportandoPdf ? 'Generando PDF...' : 'Exportar a PDF'}</span>
+            <span>{exportandoPdf ? 'Generando...' : 'Exportar a PDF'}</span>
           </button>
         </div>
       </div>
-
 
       {/* Control Selector (Hidden during print) */}
       <div className="bg-white p-4 rounded-xl border border-[#8FA7D6]/30 shadow-xs space-y-4 print:hidden">
@@ -159,49 +250,56 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
         {/* Plantilla 1: Ficha de Cargo */}
         {selectedDocType === 'ficha' && cargo && (
           <div className="space-y-6 text-xs text-[#282829]">
-            {/* Header Documento */}
-            <div className="border-b-2 border-[#18235C] pb-4 flex justify-between items-center gap-4">
-              <div className="flex items-center gap-4">
-                {empresa?.identidadVisual?.logoUrl ? (
-                  <img
-                    src={empresa.identidadVisual.logoUrl}
-                    alt={empresa.nombreComercial || 'Logo'}
-                    className="max-h-16 w-auto max-w-[200px] object-contain shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-12 bg-[#18235C] text-[#00FF00] font-black text-xl flex items-center justify-center rounded-lg shrink-0">
-                    {empresa?.nombreComercial ? empresa.nombreComercial.charAt(0) : 'B'}
+            {/* Sección 1: Header Documento e Identificación */}
+            <div data-seccion-id="encabezado-ficha" className="seccion-imprimible space-y-4">
+              <div className="border-b-2 border-[#18235C] pb-4 flex justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={razonSocial}
+                      className="max-h-16 w-auto max-w-[200px] object-contain shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-[#18235C] text-[#00FF00] font-black text-xl flex items-center justify-center rounded-lg shrink-0">
+                      {razonSocial ? razonSocial.charAt(0).toUpperCase() : 'E'}
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-lg sm:text-xl font-bold text-[#18235C] block">
+                      {razonSocial} — GESTIÓN HUMANA
+                    </span>
+                    <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-[#282829]/80 font-medium">
+                      {nitCompleto && <span>{nitCompleto}</span>}
+                      {nitCompleto && ubicacionCompleta && <span>•</span>}
+                      {ubicacionCompleta && <span>{ubicacionCompleta}</span>}
+                    </div>
+                    <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold block mt-0.5">
+                      Manual Específico de Funciones y Competencias Laborales
+                    </span>
                   </div>
-                )}
-                <div>
-                  <span className="text-lg sm:text-xl font-bold text-[#18235C] block">
-                    {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'} — GESTIÓN HUMANA
-                  </span>
-                  <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold">
-                    Manual Específico de Funciones y Competencias Laborales
-                  </span>
+                </div>
+                <div className="text-right text-[11px] font-mono text-[#282829]/70 shrink-0">
+                  <div>Código: {cargo.ficha.identificacion.codigo || 'GH-MC-001'}</div>
+                  <div>Versión: {cargo.ficha.identificacion.version || '1.0'}</div>
+                  <div>Fecha: {cargo.ficha.historial[0]?.fecha || '2026-09'}</div>
                 </div>
               </div>
-              <div className="text-right text-[11px] font-mono text-[#282829]/70 shrink-0">
-                <div>Código: {cargo.ficha.identificacion.codigo || 'GH-MC-001'}</div>
-                <div>Versión: {cargo.ficha.identificacion.version || '1.0'}</div>
-                <div>Fecha: {cargo.ficha.historial[0]?.fecha || '2026-09'}</div>
+
+              <div className="bg-gradient-to-br from-[#18235C]/5 to-transparent p-4 rounded-lg border border-[#8FA7D6]/30">
+                <h2 className="text-lg font-bold text-[#18235C]">
+                  {cargo.nombre}
+                </h2>
+                <div className="grid grid-cols-3 gap-2 mt-2 text-[11px] text-[#282829]/70">
+                  <div>Área / Proceso: <strong className="text-[#18235C]">{cargo.ficha.identificacion.area || cargo.ficha.identificacion.proceso}</strong></div>
+                  <div>Familia / Nivel: <strong className="text-[#18235C]">{cargo.ficha.identificacion.familia}</strong></div>
+                  <div>Modalidad: <strong className="text-[#18235C]">{cargo.ficha.identificacion.modalidad}</strong></div>
+                </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-[#18235C]/5 to-transparent p-4 rounded-lg border border-[#8FA7D6]/30">
-              <h2 className="text-lg font-bold text-[#18235C]">
-                {cargo.nombre}
-              </h2>
-              <div className="grid grid-cols-3 gap-2 mt-2 text-[11px] text-[#282829]/70">
-                <div>Área / Proceso: <strong className="text-[#18235C]">{cargo.ficha.identificacion.area || cargo.ficha.identificacion.proceso}</strong></div>
-                <div>Familia / Nivel: <strong className="text-[#18235C]">{cargo.ficha.identificacion.familia}</strong></div>
-                <div>Modalidad: <strong className="text-[#18235C]">{cargo.ficha.identificacion.modalidad}</strong></div>
-              </div>
-            </div>
-
-            {/* Propósito */}
-            <div>
+            {/* Sección 2: Propósito */}
+            <div data-seccion-id="proposito-ficha" className="seccion-imprimible">
               <h3 className="font-bold text-[#18235C] text-sm uppercase tracking-wide border-b border-[#8FA7D6]/30 pb-1 mb-2">
                 1. Propósito Principal del Cargo
               </h3>
@@ -210,8 +308,8 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               </p>
             </div>
 
-            {/* Funciones Esenciales */}
-            <div>
+            {/* Sección 3: Funciones Esenciales */}
+            <div data-seccion-id="funciones-ficha" className="seccion-imprimible">
               <h3 className="font-bold text-[#18235C] text-sm uppercase tracking-wide border-b border-[#8FA7D6]/30 pb-1 mb-2">
                 2. Funciones Esenciales y Responsabilidades
               </h3>
@@ -230,8 +328,8 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               </div>
             </div>
 
-            {/* Indicadores de Gestión */}
-            <div>
+            {/* Sección 4: Indicadores de Gestión */}
+            <div data-seccion-id="indicadores-ficha" className="seccion-imprimible">
               <h3 className="font-bold text-[#18235C] text-sm uppercase tracking-wide border-b border-[#8FA7D6]/30 pb-1 mb-2">
                 3. Indicadores de Gestión (Base para Evaluación del 50%)
               </h3>
@@ -257,8 +355,8 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               </table>
             </div>
 
-            {/* Competencias Requeridas */}
-            <div>
+            {/* Sección 5: Competencias Requeridas */}
+            <div data-seccion-id="competencias-ficha" className="seccion-imprimible">
               <h3 className="font-bold text-[#18235C] text-sm uppercase tracking-wide border-b border-[#8FA7D6]/30 pb-1 mb-2">
                 4. Competencias Requeridas (Base para Evaluación del 25%)
               </h3>
@@ -275,11 +373,11 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               </div>
             </div>
 
-            {/* Firmas */}
-            <div className="grid grid-cols-2 gap-8 pt-8 border-t border-[#8FA7D6]/30">
+            {/* Sección 6: Firmas */}
+            <div data-seccion-id="firmas-ficha" className="seccion-imprimible grid grid-cols-2 gap-8 pt-8 border-t border-[#8FA7D6]/30">
               <div className="border-t border-[#18235C] pt-2 text-center">
                 <span className="font-bold text-[#18235C] block">Aprobado por: Gerencia de Gestión Humana</span>
-                <span className="text-[10px] text-[#282829]/70">Firma y Sello de Validación · B GROUP</span>
+                <span className="text-[10px] text-[#282829]/70">Firma y Sello de Validación · {razonSocial}</span>
               </div>
               <div className="border-t border-[#18235C] pt-2 text-center">
                 <span className="font-bold text-[#18235C] block">Recibido por: Colaborador Asignado</span>
@@ -292,43 +390,51 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
         {/* Plantilla 2: Acta de Evaluación Técnica */}
         {selectedDocType === 'acta_eval' && (
           <div className="space-y-6 text-xs text-[#282829]">
-            <div className="border-b-2 border-[#18235C] pb-4 flex justify-between items-center gap-4">
-              <div className="flex items-center gap-4">
-                {empresa?.identidadVisual?.logoUrl ? (
-                  <img
-                    src={empresa.identidadVisual.logoUrl}
-                    alt={empresa.nombreComercial || 'Logo'}
-                    className="max-h-16 w-auto max-w-[200px] object-contain shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-12 bg-[#18235C] text-[#00FF00] font-black text-xl flex items-center justify-center rounded-lg shrink-0">
-                    {empresa?.nombreComercial ? empresa.nombreComercial.charAt(0) : 'B'}
+            {/* Sección 1: Encabezado y Datos del Colaborador */}
+            <div data-seccion-id="encabezado-acta" className="seccion-imprimible space-y-4">
+              <div className="border-b-2 border-[#18235C] pb-4 flex justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={razonSocial}
+                      className="max-h-16 w-auto max-w-[200px] object-contain shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-[#18235C] text-[#00FF00] font-black text-xl flex items-center justify-center rounded-lg shrink-0">
+                      {razonSocial ? razonSocial.charAt(0).toUpperCase() : 'E'}
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-lg sm:text-xl font-bold text-[#18235C] block">
+                      ACTA DE EVALUACIÓN TÉCNICA DE DESEMPEÑO
+                    </span>
+                    <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-[#282829]/80 font-medium">
+                      <span className="font-semibold text-[#18235C]">{razonSocial}</span>
+                      {nitCompleto && <span>• {nitCompleto}</span>}
+                      {ubicacionCompleta && <span>• {ubicacionCompleta}</span>}
+                    </div>
+                    <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold block mt-0.5">
+                      Modelo Cuantitativo de 100 Puntos
+                    </span>
                   </div>
-                )}
-                <div>
-                  <span className="text-lg sm:text-xl font-bold text-[#18235C] block">
-                    ACTA DE EVALUACIÓN TÉCNICA DE DESEMPEÑO
-                  </span>
-                  <span className="text-[11px] text-[#282829]/70 uppercase tracking-wider font-semibold">
-                    Modelo Cuantitativo de 100 Puntos · {empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}
-                  </span>
+                </div>
+                <div className="text-right text-[11px] font-mono text-[#282829]/70 shrink-0">
+                  <div>Fecha: {new Date().toLocaleDateString('es-CO')}</div>
+                  <div>Período: 2026 - S1</div>
                 </div>
               </div>
-              <div className="text-right text-[11px] font-mono text-[#282829]/70 shrink-0">
-                <div>Fecha: {new Date().toLocaleDateString('es-CO')}</div>
-                <div>Período: 2026 - S1</div>
+
+              <div className="p-4 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div>Colaborador: <strong className="block text-sm text-[#18235C]">{empleado.nombre}</strong></div>
+                <div>Cargo: <strong className="block text-sm text-[#18235C]">{empCargo?.nombre}</strong></div>
+                <div>Cédula: <strong className="block text-sm text-[#282829]">{empleado.documento}</strong></div>
+                <div>Salario: <strong className="block text-sm text-[#282829]">{empleado.contrato.salario}</strong></div>
               </div>
             </div>
 
-            <div className="p-4 bg-gradient-to-br from-[#18235C]/5 to-transparent rounded-lg border border-[#8FA7D6]/30 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div>Colaborador: <strong className="block text-sm text-[#18235C]">{empleado.nombre}</strong></div>
-              <div>Cargo: <strong className="block text-sm text-[#18235C]">{empCargo?.nombre}</strong></div>
-              <div>Cédula: <strong className="block text-sm text-[#282829]">{empleado.documento}</strong></div>
-              <div>Salario: <strong className="block text-sm text-[#282829]">{empleado.contrato.salario}</strong></div>
-            </div>
-
-            {/* Resumen de los 4 componentes */}
-            <div className="space-y-2">
+            {/* Sección 2: Consolidado Oficial de Calificación */}
+            <div data-seccion-id="consolidado-acta" className="seccion-imprimible space-y-2">
               <h3 className="font-bold text-[#18235C] text-sm uppercase tracking-wide">
                 Consolidado Oficial de Calificación Técnica
               </h3>
@@ -376,18 +482,19 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               </table>
             </div>
 
-            <div className="p-4 bg-slate-50 rounded-lg border border-[#8FA7D6]/30 space-y-1">
+            {/* Sección 3: Compromisos del Plan de Desarrollo */}
+            <div data-seccion-id="compromisos-acta" className="seccion-imprimible p-4 bg-slate-50 rounded-lg border border-[#8FA7D6]/30 space-y-1">
               <strong className="block text-[#18235C]">Compromiso del Plan de Desarrollo:</strong>
               <p className="text-[#282829]/70">
                 Se acuerda fortalecer la documentación técnica de tickets N2 y participar en el taller de escalamiento de incidencias antes del 30 de abril de 2026.
               </p>
             </div>
 
-            {/* Firmas */}
-            <div className="grid grid-cols-2 gap-8 pt-8 border-t border-[#8FA7D6]/30">
+            {/* Sección 4: Firmas */}
+            <div data-seccion-id="firmas-acta" className="seccion-imprimible grid grid-cols-2 gap-8 pt-8 border-t border-[#8FA7D6]/30">
               <div className="border-t border-[#18235C] pt-2 text-center">
                 <span className="font-bold text-[#18235C] block">Firma Evaluador (Jefe Inmediato)</span>
-                <span className="text-[10px] text-[#282829]/70">Certifica veracidad de evidencias y calificaciones</span>
+                <span className="text-[10px] text-[#282829]/70">Certifica veracidad de evidencias y calificaciones · {razonSocial}</span>
               </div>
               <div className="border-t border-[#18235C] pt-2 text-center">
                 <span className="font-bold text-[#18235C] block">Firma Colaborador Evaluado</span>
@@ -397,6 +504,17 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal de Previsualización y Configuración de Impresión por Secciones */}
+      <PrevisualizacionImpresionModal
+        isOpen={modalPreviewOpen}
+        onClose={() => setModalPreviewOpen(false)}
+        tituloDocumento={selectedDocType === 'ficha' ? `Manual de Cargo: ${cargo?.nombre}` : `Acta de Evaluación: ${empleado?.nombre}`}
+        subtitulo={selectedDocType === 'ficha' ? (cargo?.ficha.identificacion.codigo || 'GH-MC-001') : (empCargo?.nombre || 'Evaluación')}
+        nombreArchivo={nombreArchivoExportacion}
+        elementoContenedorId="area-impresion-repositorio-documentos"
+        seccionesDisponibles={seccionesActivas}
+      />
     </div>
   );
 };

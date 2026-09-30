@@ -91,7 +91,11 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
   const [nuevoDocObs, setNuevoDocObs] = useState('');
 
   const handleDescargarDocumento = (nombreArchivo: string, tipo: string = 'Documento') => {
-    const contenido = `EXPEDIENTE DIGITAL DE TALENTO HUMANO\nB GROUP INGENIERIA S.A.S.\n---------------------------------------\nColaborador: ${empleado.nombre}\nDocumento: ${empleado.documento}\nTipo de Archivo: ${tipo}\nNombre del Documento: ${nombreArchivo}\nFecha de Emisión: ${new Date().toLocaleDateString('es-CO')}\nEstado: Documento Válido y Certificado en Plataforma`;
+    const nombreOrg = empresa?.razonSocial || empresa?.nombreComercial || 'EMPRESA';
+    const nitOrg = empresa?.nit ? `NIT: ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : '';
+    const dirOrg = (empresa as any)?.direccion || empresa?.contacto?.direccion ? `Dirección: ${(empresa as any)?.direccion || empresa?.contacto?.direccion}` : '';
+    const encabezadoOrg = [nombreOrg, nitOrg, dirOrg].filter(Boolean).join('\n');
+    const contenido = `EXPEDIENTE DIGITAL DE TALENTO HUMANO\n${encabezadoOrg}\n---------------------------------------\nColaborador: ${empleado.nombre}\nDocumento: ${empleado.documento}\nTipo de Archivo: ${tipo}\nNombre del Documento: ${nombreArchivo}\nFecha de Emisión: ${new Date().toLocaleDateString('es-CO')}\nEstado: Documento Válido y Certificado en Plataforma`;
     const blob = new Blob([contenido], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
