@@ -1,29 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  ActaComiteSST,
   CicloPHVA,
-  EstadisticaSiniestralidadSST,
   EstandarMinimoSST,
   EstadoEstandar,
-  PeligroRiesgoGTC45
-} from '../types';
-import {
-  ACTAS_COMITES_INICIALES,
-  ESTADISTICAS_SINIESTRALIDAD_INICIALES,
-  ESTANDARES_0312_2019_INICIALES,
-  PELIGROS_GTC45_INICIALES
-} from '../data/sstData';
-import { VotacionesSstView } from './VotacionesSstView';
-import { EppInventarioView } from './EppInventarioView';
-import { ExamenesMedicosOcupacionalesView } from './ExamenesMedicosOcupacionalesView';
-import {
+  PeligroRiesgoGTC45,
   Empleado,
   Cargo,
   AreaOrganizacion,
+  ProcesoOrganizacion,
   Role
 } from '../types';
 import {
-  Activity,
+  ESTANDARES_0312_2019_INICIALES,
+  PELIGROS_GTC45_INICIALES
+} from '../data/sstData';
+import { MatrizRiesgosGTC45View } from './MatrizRiesgosGTC45View';
+import {
   AlertCircle,
   AlertOctagon,
   AlertTriangle,
@@ -56,14 +48,13 @@ import {
   Shield,
   ShieldAlert,
   ShieldCheck,
-  Stethoscope,
   TrendingDown,
   TrendingUp,
   UserCheck,
   Users,
-  Vote,
-  Warehouse,
-  XCircle
+  XCircle,
+  Target,
+  ArrowUpRight
 } from 'lucide-react';
 
 interface SstViewProps {
@@ -72,8 +63,10 @@ interface SstViewProps {
   empleados?: Empleado[];
   cargos?: Cargo[];
   areas?: AreaOrganizacion[];
-  initialTab?: 'estandares' | 'gtc45' | 'comites' | 'epps' | 'votaciones' | 'indicadores' | 'planMejora' | 'examenes';
+  procesos?: ProcesoOrganizacion[];
+  initialTab?: 'estandares' | 'gtc45' | 'planMejora';
   onUpdateEmpleado?: (empleado: Empleado) => Promise<void> | void;
+  onNavigate?: (view: string) => void;
 }
 
 export function SstView({
@@ -82,21 +75,23 @@ export function SstView({
   empleados = [],
   cargos = [],
   areas = [],
+  procesos = [],
   initialTab,
-  onUpdateEmpleado
+  onUpdateEmpleado,
+  onNavigate
 }: SstViewProps) {
   const [estandares, setEstandares] = useState<EstandarMinimoSST[]>(ESTANDARES_0312_2019_INICIALES);
   const [peligros, setPeligros] = useState<PeligroRiesgoGTC45[]>(PELIGROS_GTC45_INICIALES);
-  const [actas, setActas] = useState<ActaComiteSST[]>(ACTAS_COMITES_INICIALES);
-  const [estadisticas] = useState<EstadisticaSiniestralidadSST[]>(ESTADISTICAS_SINIESTRALIDAD_INICIALES);
 
-  const [activeTab, setActiveTab] = useState<'estandares' | 'gtc45' | 'comites' | 'epps' | 'votaciones' | 'indicadores' | 'planMejora' | 'examenes'>(
-    initialTab || (userRole === 'empleado' ? 'votaciones' : 'estandares')
+  const [activeTab, setActiveTab] = useState<'estandares' | 'gtc45' | 'planMejora'>(
+    (initialTab as any) || 'estandares'
   );
 
-  const totalExamenesCount = useMemo(() => {
-    return empleados.reduce((acc, emp) => acc + (emp.sst?.examenesOcupacionales?.length || 0), 0);
-  }, [empleados]);
+  useEffect(() => {
+    if (initialTab && (initialTab === 'estandares' || initialTab === 'gtc45' || initialTab === 'planMejora')) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const [filtroCiclo, setFiltroCiclo] = useState<string>('TODOS');
   const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
   const [searchEstandar, setSearchEstandar] = useState<string>('');
@@ -304,56 +299,6 @@ export function SstView({
             Matriz de Peligros y Riesgos (GTC 45)
           </button>
           <button
-            onClick={() => setActiveTab('comites')}
-            className={`pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
-              activeTab === 'comites'
-                ? 'border-[#18235C] text-[#18235C]'
-                : 'border-transparent text-[#282829] hover:text-[#18235C]'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            COPASST & Comité Convivencia
-          </button>
-          <button
-            onClick={() => setActiveTab('epps')}
-            className={`pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
-              activeTab === 'epps'
-                ? 'border-[#18235C] text-[#18235C]'
-                : 'border-transparent text-[#282829] hover:text-[#18235C]'
-            }`}
-          >
-            <Warehouse className="w-3.5 h-3.5 text-[#B5842A]" />
-            Inventario & Dotación EPPs
-            <span className="px-1.5 py-0.2 bg-[#B5842A] text-white rounded-full text-[10px]">
-              Almacén
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('votaciones')}
-            className={`pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
-              activeTab === 'votaciones'
-                ? 'border-[#18235C] text-[#18235C]'
-                : 'border-transparent text-[#282829] hover:text-[#18235C]'
-            }`}
-          >
-            <Vote className="w-3.5 h-3.5" />
-            Votaciones y Elecciones
-            <span className="px-1.5 py-0.2 bg-[#18235C] text-white rounded-full text-[10px]">
-              2026
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('indicadores')}
-            className={`pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
-              activeTab === 'indicadores'
-                ? 'border-[#18235C] text-[#18235C]'
-                : 'border-transparent text-[#282829] hover:text-[#18235C]'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            Indicadores de Siniestralidad
-          </button>
-          <button
             onClick={() => setActiveTab('planMejora')}
             className={`pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
               activeTab === 'planMejora'
@@ -369,20 +314,18 @@ export function SstView({
               </span>
             )}
           </button>
-          <button
-            onClick={() => setActiveTab('examenes')}
-            className={`pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
-              activeTab === 'examenes'
-                ? 'border-[#18235C] text-[#18235C]'
-                : 'border-transparent text-[#282829] hover:text-[#18235C]'
-            }`}
-          >
-            <Stethoscope className="w-3.5 h-3.5 text-[#18235C]" />
-            Exámenes Médicos Ocupacionales
-            <span className="px-1.5 py-0.2 bg-[#18235C] text-white rounded-full text-[10px]">
-              {totalExamenesCount}
-            </span>
-          </button>
+
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('indicadores-sst')}
+              className="pb-2.5 whitespace-nowrap transition-colors border-b-2 border-transparent text-[#18235C] hover:text-[#101740] flex items-center gap-1.5 cursor-pointer ml-auto font-bold"
+              title="Abrir módulo especializado de Indicadores SG-SST (Arts. 30, 31, 32 Res. 0312)"
+            >
+              <Target className="w-3.5 h-3.5 text-[#00FF00]" />
+              <span>Indicadores SG-SST (PHVA)</span>
+              <ArrowUpRight className="w-3 h-3 text-slate-400" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -645,262 +588,13 @@ export function SstView({
 
       {/* TAB 2: MATRIZ DE PELIGROS Y RIESGOS (GTC 45) */}
       {activeTab === 'gtc45' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-[#8FA7D6] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-            <div>
-              <h3 className="font-bold text-sm text-[#18235C] flex items-center gap-2">
-                <Layers className="w-4 h-4 text-[#18235C]" />
-                Matriz de Identificación de Peligros, Evaluación y Valoración de Riesgos
-              </h3>
-              <p className="text-xs text-[#282829] mt-0.5">
-                Metodología Guía Técnica Colombiana GTC 45 (Segunda Actualización) adaptada a operaciones ISP y actividades de oficina.
-              </p>
-            </div>
-            <div className="text-xs font-semibold px-3 py-1 rounded bg-[#18235C]/10 text-[#18235C] border border-[#18235C]/20">
-              {peligros.length} Peligros Priorizados Evaluados
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            {peligros.map(p => (
-              <div key={p.id} className="bg-white rounded-xl border border-[#8FA7D6] p-5 shadow-sm space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#8FA7D6] pb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#18235C] text-white uppercase tracking-wider">
-                        {p.proceso}
-                      </span>
-                      <span className="text-xs font-semibold text-[#18235C]">{p.zonaLugar}</span>
-                    </div>
-                    <h4 className="text-sm font-bold text-[#18235C] mt-1">
-                      {p.actividad} {p.rutinaria ? '(Rutinaria)' : '(No rutinaria)'}
-                    </h4>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                      p.interpretacionRiesgo === 'I' ? 'bg-[#E57373]/15 text-[#8A2525] border-[#E57373]/30' :
-                      p.interpretacionRiesgo === 'II' ? 'bg-[#F5EAD4] text-[#B5842A] border-[#B5842A]/30' :
-                      'bg-[#18235C]/10 text-[#18235C] border-[#18235C]/30'
-                    }`}>
-                      Nivel de Riesgo {p.interpretacionRiesgo} • {p.aceptabilidadRiesgo}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 bg-[#FFFFFF] rounded border border-[#8FA7D6]">
-                    <div className="text-[10px] font-bold text-[#282829] uppercase mb-1">
-                      Clasificación: {p.clasificacionPeligro}
-                    </div>
-                    <div className="font-medium text-[#18235C]">{p.descripcionPeligro}</div>
-                    <div className="text-[11px] text-[#E57373] font-semibold mt-1">
-                      Efectos: {p.efectosPosibles}
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-[#FFFFFF] rounded border border-[#8FA7D6]">
-                    <div className="text-[10px] font-bold text-[#282829] uppercase mb-1">
-                      Controles Existentes
-                    </div>
-                    <ul className="space-y-1 text-[#282829] text-[11px]">
-                      <li>• <strong>Fuente:</strong> {p.controlesExistentes.fuente}</li>
-                      <li>• <strong>Medio:</strong> {p.controlesExistentes.medio}</li>
-                      <li>• <strong>Individuo:</strong> {p.controlesExistentes.individuo}</li>
-                    </ul>
-                  </div>
-
-                  <div className="p-3 bg-[#FFFFFF] rounded border border-[#8FA7D6]">
-                    <div className="text-[10px] font-bold text-[#282829] uppercase mb-1">
-                      Evaluación Cuantitativa GTC 45
-                    </div>
-                    <div className="grid grid-cols-2 gap-1 text-[11px] text-[#282829]">
-                      <div>ND (Deficiencia): <strong>{p.nivelDeficiencia}</strong></div>
-                      <div>NE (Exposición): <strong>{p.nivelExposicion}</strong></div>
-                      <div>NP (Probabilidad): <strong>{p.nivelProbabilidad} ({p.interpretacionProbabilidad})</strong></div>
-                      <div>NC (Consecuencia): <strong>{p.nivelConsecuencia}</strong></div>
-                    </div>
-                    <div className="text-xs font-bold text-[#18235C] mt-1 pt-1 border-t border-[#8FA7D6]">
-                      NR = NP × NC = {p.nivelRiesgo}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Medidas de intervención jerárquica */}
-                <div className="p-3 bg-[#18235C]/5 rounded-lg border border-[#18235C]/20 text-xs">
-                  <div className="font-bold text-[#18235C] mb-1.5 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Medidas de Intervención por Jerarquía de Controles:
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-[11px] text-[#282829]">
-                    <div>
-                      <strong className="text-[#18235C]">Controles de Ingeniería:</strong> {p.medidasIntervencion.controlesIngenieria}
-                    </div>
-                    <div>
-                      <strong className="text-[#18235C]">Controles Administrativos:</strong> {p.medidasIntervencion.controlesAdministrativos}
-                    </div>
-                    <div>
-                      <strong className="text-[#18235C]">EPP Específicos:</strong> {p.medidasIntervencion.epp}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: COPASST & COMITÉ DE CONVIVENCIA */}
-      {activeTab === 'comites' && (
-        <div className="space-y-6">
-          {/* Banner de Acceso a Votaciones */}
-          <div className="p-4 bg-gradient-to-r from-[#18235C]/10 to-[#FFFFFF] border border-[#18235C]/30 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#18235C] text-white flex items-center justify-center shrink-0">
-                <Vote className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="font-bold text-xs sm:text-sm text-[#18235C]">
-                  Proceso de Elecciones Electrónicas COPASST y Convivencia en Curso
-                </h4>
-                <p className="text-[11px] text-[#282829]">
-                  Sufragio secreto digital para los representantes de los trabajadores (Periodo 2026-2028).
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setActiveTab('votaciones')}
-              className="px-3.5 py-1.5 bg-[#18235C] hover:bg-[#24493F] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 shadow-2xs"
-            >
-              <span>Ingresar a Votaciones & Tarjetón</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {actas.map(acta => (
-              <div key={acta.id} className="bg-white rounded-xl border border-[#8FA7D6] p-5 shadow-sm space-y-4">
-                <div className="flex justify-between items-start border-b border-[#8FA7D6] pb-3">
-                  <div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#18235C]/10 text-[#18235C]">
-                      {acta.tipo}
-                    </span>
-                    <h3 className="font-bold text-sm text-[#18235C] mt-1">
-                      {acta.numeroActa}
-                    </h3>
-                    <div className="text-xs text-[#282829]">
-                      Fecha: {acta.fecha} • {acta.lugar}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-xs">
-                  <div className="font-semibold text-[#18235C] mb-1">Integrantes Asistentes:</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {acta.asistentes.map((a, i) => (
-                      <span key={i} className="px-2 py-0.5 bg-[#FFFFFF] border border-[#8FA7D6] rounded text-[11px] text-[#282829]">
-                        {a}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="text-xs">
-                  <div className="font-semibold text-[#18235C] mb-1">Temas Tratados:</div>
-                  <p className="text-[#282829] bg-[#FFFFFF] p-2.5 rounded border border-[#8FA7D6] leading-relaxed">
-                    {acta.temasTratados}
-                  </p>
-                </div>
-
-                <div className="text-xs">
-                  <div className="font-semibold text-[#18235C] mb-1.5">Compromisos y Seguimiento:</div>
-                  <div className="space-y-1.5">
-                    {acta.compromisos.map((c, i) => (
-                      <div key={i} className="p-2 bg-[#FFFFFF] rounded border border-[#8FA7D6] flex items-center justify-between gap-2">
-                        <div>
-                          <div className="font-medium text-[#18235C]">{c.tarea}</div>
-                          <div className="text-[10px] text-[#282829]">
-                            Responsable: {c.responsable} • Límite: {c.fechaLimite}
-                          </div>
-                        </div>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                          c.estado === 'Cumplido' ? 'bg-[#18235C]/15 text-[#18235C]' : 'bg-[#B5842A]/15 text-[#B5842A]'
-                        }`}>
-                          {c.estado}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3.5: VOTACIONES COPASST & CONVIVENCIA */}
-      {activeTab === 'votaciones' && (
-        <VotacionesSstView
-          userRole={userRole}
-          currentEmpleadoId={currentEmpleadoId}
+        <MatrizRiesgosGTC45View
+          cargos={cargos}
+          areas={areas}
+          procesos={procesos}
           empleados={empleados}
-        />
-      )}
-
-      {/* TAB 3.6: INVENTARIO Y DOTACIÓN DE EPPS */}
-      {activeTab === 'epps' && (
-        <EppInventarioView
           userRole={userRole}
-          currentEmpleadoId={currentEmpleadoId}
-          empleados={empleados}
         />
-      )}
-
-      {/* TAB 4: INDICADORES DE SINIESTRALIDAD */}
-      {activeTab === 'indicadores' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-[#8FA7D6] p-5 shadow-sm">
-            <h3 className="font-bold text-sm text-[#18235C] flex items-center gap-2 mb-1">
-              <Activity className="w-4 h-4 text-[#18235C]" />
-              Indicadores Mínimos de Seguridad y Salud en el Trabajo (Resolución 0312 Art. 30)
-            </h3>
-            <p className="text-xs text-[#282829] mb-5">
-              Registro histórico de frecuencia de accidentalidad (IF), severidad (IS), proporción de accidentes mortales y prevalencia de enfermedad laboral.
-            </p>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-[#F8FAFC] text-[#282829] border-b border-[#8FA7D6] uppercase tracking-wider text-[10px] font-bold">
-                    <th className="py-2.5 px-3">Período</th>
-                    <th className="py-2.5 px-3">HHT (Horas)</th>
-                    <th className="py-2.5 px-3">Trabajadores</th>
-                    <th className="py-2.5 px-3 text-center">Accidentes (AT)</th>
-                    <th className="py-2.5 px-3 text-center">Días Incapacidad</th>
-                    <th className="py-2.5 px-3 text-center">Índice Frecuencia (IF)</th>
-                    <th className="py-2.5 px-3 text-center">Índice Severidad (IS)</th>
-                    <th className="py-2.5 px-3 text-center">Ausentismo (%)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#8FA7D6]">
-                  {estadisticas.map((s, idx) => (
-                    <tr key={idx} className="hover:bg-[#FFFFFF]/80">
-                      <td className="py-2.5 px-3 font-semibold text-[#18235C]">{s.mesAno}</td>
-                      <td className="py-2.5 px-3 text-[#282829]">{s.horasHombreTrabajadas.toLocaleString()}</td>
-                      <td className="py-2.5 px-3 text-[#282829]">{s.numeroTrabajadores}</td>
-                      <td className="py-2.5 px-3 text-center font-semibold text-[#18235C]">{s.accidentesTrabajo}</td>
-                      <td className="py-2.5 px-3 text-center text-[#282829]">{s.diasIncapacidadAT}</td>
-                      <td className="py-2.5 px-3 text-center font-bold text-[#18235C]">{s.indiceFrecuenciaAT.toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-center font-bold text-[#18235C]">{s.indiceSeveridadAT.toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-center text-[#282829]">{s.tasaAusentismoPct}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* TAB 5: PLAN DE MEJORAMIENTO RES. 0312 */}
@@ -978,17 +672,6 @@ export function SstView({
             </div>
           )}
         </div>
-      )}
-
-      {/* TAB 8: EXÁMENES MÉDICOS OCUPACIONALES */}
-      {activeTab === 'examenes' && (
-        <ExamenesMedicosOcupacionalesView
-          empleados={empleados}
-          cargos={cargos}
-          areas={areas}
-          userRole={userRole}
-          onUpdateEmpleado={onUpdateEmpleado}
-        />
       )}
     </div>
   );

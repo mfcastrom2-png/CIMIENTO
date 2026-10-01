@@ -862,10 +862,22 @@ export interface EstandarMinimoSST {
 export interface PeligroRiesgoGTC45 {
   id: string;
   proceso: string;
+  areaId?: string;
+  areaNombre?: string;
+  cargoId?: string;
+  cargoNombre?: string;
+  cargosExpuestosIds?: string[];
+  cargosExpuestosNombres?: string[];
+  numeroExpuestos?: number;
+  peorConsecuencia?: string;
+  requisitoLegal?: boolean;
+  requisitoLegalDetalle?: string;
+  fechaEvaluacion?: string;
+  responsableEvaluacion?: string;
   zonaLugar: string;
   actividad: string;
   rutinaria: boolean;
-  clasificacionPeligro: 'Biológico' | 'Físico' | 'Químico' | 'Psicosocial' | 'Biomecánico' | 'Condiciones de Seguridad' | 'Fenómenos Naturales';
+  clasificacionPeligro: 'Biológico' | 'Físico' | 'Químico' | 'Psicosocial' | 'Biomecánico' | 'Condiciones de Seguridad' | 'Fenómenos Naturales' | string;
   descripcionPeligro: string;
   efectosPosibles: string;
   controlesExistentes: {
@@ -873,14 +885,14 @@ export interface PeligroRiesgoGTC45 {
     medio: string;
     individuo: string;
   };
-  nivelDeficiencia: number; // 2, 6, 10
+  nivelDeficiencia: number; // 0, 2, 6, 10
   nivelExposicion: number; // 1, 2, 3, 4
   nivelProbabilidad: number; // ND * NE
-  interpretacionProbabilidad: 'Baja' | 'Media' | 'Alta' | 'Muy Alta';
+  interpretacionProbabilidad: 'Baja' | 'Media' | 'Alta' | 'Muy Alta' | string;
   nivelConsecuencia: number; // 10, 25, 60, 100
   nivelRiesgo: number; // NP * NC
-  interpretacionRiesgo: 'I' | 'II' | 'III' | 'IV';
-  aceptabilidadRiesgo: 'No Aceptable' | 'No Aceptable o Aceptable con Control Específico' | 'Mejorable' | 'Aceptable';
+  interpretacionRiesgo: 'I' | 'II' | 'III' | 'IV' | string;
+  aceptabilidadRiesgo: 'No Aceptable' | 'No Aceptable o Aceptable con Control Específico' | 'Mejorable' | 'Aceptable' | string;
   medidasIntervencion: {
     eliminacion: string;
     sustitucion: string;
@@ -1357,5 +1369,104 @@ export interface RegistroEnvioCorreo {
   estado: 'Enviado' | 'Entregado' | 'Fallido';
   remitenteUtilizado: string;
   mensajeRespuesta?: string;
+}
+
+// ==========================================
+// 8. MÓDULO DE GESTIÓN, MEDICIÓN Y SEGUIMIENTO DE INDICADORES DEL SG-SST
+// Conforme a Resolución 0312 de 2019 (Arts. 30, 31, 32) y Decreto 1072 de 2015
+// ==========================================
+
+export type TipoIndicadorSST = 'Estructura' | 'Proceso' | 'Resultado' | 'Institucional';
+export type SentidoIndicadorSST = 'Mayor es mejor' | 'Menor es mejor' | 'Dentro de rango';
+export type PeriodicidadIndicadorSST = 'Mensual' | 'Bimestral' | 'Trimestral' | 'Semestral' | 'Anual';
+export type CicloPHVAIndicador = 'Planear' | 'Hacer' | 'Verificar' | 'Actuar';
+export type EstadoIndicadorSST = 'Activo' | 'Inactivo' | 'Histórico';
+export type SemaforoResultado = 'VERDE' | 'AMARILLO' | 'ROJO' | 'NO_CALCULABLE';
+
+export interface MedicionIndicadorSST {
+  id: string;
+  indicadorId: string;
+  periodo: string; // ej. "2026-01", "2026-T1"
+  fechaMedicion: string;
+  numeradorValor?: number;
+  denominadorValor?: number;
+  resultadoNumerico?: number | null; // null si no es calculable
+  resultadoFormateado: string; // ej. "85%", "12.4 días", "No calculable"
+  metaEsperada: number;
+  semaforo: SemaforoResultado;
+  cumpleMeta: boolean;
+  fuenteDatos: string;
+  responsableMedicion: string;
+  observaciones?: string;
+  evidenciasUrls?: string[];
+  analisisCausas?: {
+    identificado: boolean;
+    causaRaiz?: string;
+    riesgoAsociado?: string;
+    requiereAccion: boolean;
+    accionIdGenerada?: string;
+  };
+  fechaRegistro: string;
+  usuarioRegistro: string;
+}
+
+export interface AccionMejoraIndicadorSST {
+  id: string;
+  indicadorId: string;
+  indicadorNombre: string;
+  medicionId?: string;
+  periodoOrigen: string;
+  tipoAccion: 'Correctiva' | 'Preventiva' | 'Mejora' | 'Corrección Inmediata';
+  hallazgoDesviacion: string;
+  causaRaiz: string;
+  accionPropuesta: string;
+  responsableCargoId?: string;
+  responsableNombre: string;
+  fechaInicio: string;
+  fechaLimite: string;
+  prioridad: 'Alta' | 'Media' | 'Baja';
+  estado: 'Pendiente' | 'En ejecución' | 'Pendiente de verificación' | 'Cerrada Eficaz' | 'Cerrada No Eficaz';
+  porcentajeAvance: number; // 0 a 100
+  recursosRequeridos?: string;
+  fechaVerificacion?: string;
+  responsableVerificacion?: string;
+  resultadoVerificacion?: string;
+  esEficaz?: boolean;
+  justificacionEficacia?: string;
+  requiereNuevaAccion?: boolean;
+}
+
+export interface IndicadorSST {
+  id: string;
+  empresaId?: string;
+  codigo: string; // ej. "IND-EST-01"
+  nombre: string;
+  descripcion: string;
+  tipo: TipoIndicadorSST;
+  cicloPHVA: CicloPHVAIndicador;
+  procesoRelacionado: string;
+  areaId?: string;
+  areaNombre?: string;
+  estandar0312Relacionado?: string; // ej. "1.1.1", "2.1.1"
+  referenciaNormativa: string; // ej. "Resolución 0312/2019 Art. 30"
+  objetivoMedicion: string;
+  interpretacion: string;
+  unidadMedida: '%' | 'Tasa' | 'Días' | 'Número' | 'COP';
+  sentido: SentidoIndicadorSST;
+  formulaTexto: string;
+  nombreVariableNumerador: string;
+  nombreVariableDenominador: string;
+  factorMultiplicador: number; // 100 para %, 240000 para tasas ARL, 1 para números
+  meta: number;
+  limiteAmarillo: number; // Umbral de advertencia
+  rangoMin?: number; // Para sentido 'Dentro de rango'
+  rangoMax?: number; // Para sentido 'Dentro de rango'
+  periodicidad: PeriodicidadIndicadorSST;
+  responsableMedicionCargo?: string;
+  responsableAnalisisCargo?: string;
+  estado: EstadoIndicadorSST;
+  fechaCreacion: string;
+  mediciones?: MedicionIndicadorSST[];
+  acciones?: AccionMejoraIndicadorSST[];
 }
 

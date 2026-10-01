@@ -24,7 +24,9 @@ import {
   ShieldAlert,
   Stethoscope,
   Building2,
-  Mail
+  Mail,
+  Layers,
+  Target
 } from 'lucide-react';
 import { Role, UsuarioSistema, RolSistema, ConfiguracionEmpresa } from '../types';
 
@@ -365,7 +367,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
 
             {/* SECCIÓN SEGURIDAD & SST */}
-            {(tienePermiso('sst') || tienePermiso('epps') || esSST) && (
+            {(tienePermiso('sst') || tienePermiso('sst-examenes') || tienePermiso('examenes') || tienePermiso('epps') || esSST || rol === 'superadmin' || rol === 'admin_gh') && (
               <>
                 <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
                   Seguridad & SG-SST
@@ -391,20 +393,60 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
 
                 <button
-                  id="nav-sst-examenes"
-                  onClick={() => onNavigate('sst-examenes')}
+                  id="nav-matriz-gtc45"
+                  onClick={() => onNavigate('matriz-gtc45')}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'sst-examenes'
+                    currentView === 'matriz-gtc45' || currentView === 'matriz-riesgos'
                       ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
                       : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Stethoscope className={`w-4 h-4 ${currentView === 'sst-examenes' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                    <Layers className={`w-4 h-4 ${currentView === 'matriz-gtc45' || currentView === 'matriz-riesgos' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                    <span>Matriz de Riesgos</span>
+                  </div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    currentView === 'matriz-gtc45' || currentView === 'matriz-riesgos' ? 'bg-[#18235C] text-white' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
+                  }`}>
+                    GTC 45
+                  </span>
+                </button>
+
+                <button
+                  id="nav-indicadores-sst"
+                  onClick={() => onNavigate('indicadores-sst')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                    currentView === 'indicadores-sst' || currentView === 'sst-indicadores' || currentView === 'indicadores'
+                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Target className={`w-4 h-4 ${currentView === 'indicadores-sst' || currentView === 'sst-indicadores' || currentView === 'indicadores' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                    <span>Indicadores SG-SST</span>
+                  </div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    currentView === 'indicadores-sst' || currentView === 'sst-indicadores' || currentView === 'indicadores' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
+                  }`}>
+                    PHVA / 0312
+                  </span>
+                </button>
+
+                <button
+                  id="nav-sst-examenes"
+                  onClick={() => onNavigate('sst-examenes')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                    currentView === 'sst-examenes' || currentView === 'examenes-medicos' || currentView === 'examenes'
+                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Stethoscope className={`w-4 h-4 ${currentView === 'sst-examenes' || currentView === 'examenes-medicos' || currentView === 'examenes' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
                     <span>Exámenes Médicos</span>
                   </div>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    currentView === 'sst-examenes' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
+                    currentView === 'sst-examenes' || currentView === 'examenes-medicos' || currentView === 'examenes' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
                   }`}>
                     SST
                   </span>
@@ -433,14 +475,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   id="nav-votaciones-sst"
                   onClick={() => onNavigate('votaciones-sst')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
                     currentView === 'votaciones-sst'
                       ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
                       : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
                   }`}
                 >
-                  <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-                  <span>Votaciones</span>
+                  <div className="flex items-center gap-3">
+                    <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                    <span>Votaciones & Comités</span>
+                  </div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    currentView === 'votaciones-sst' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
+                  }`}>
+                    COPASST
+                  </span>
                 </button>
 
                 {tienePermiso('capacitaciones') && (

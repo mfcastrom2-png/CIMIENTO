@@ -22,6 +22,9 @@ import { DocumentosView } from './components/DocumentosView';
 import { NominaView } from './components/NominaView';
 import { ParametrosNominaView } from './components/ParametrosNominaView';
 import { SstView } from './components/SstView';
+import { MatrizRiesgosGTC45View } from './components/MatrizRiesgosGTC45View';
+import { IndicadoresSstView } from './components/IndicadoresSstView';
+import { ExamenesMedicosOcupacionalesView } from './components/ExamenesMedicosOcupacionalesView';
 import { CapacitacionesView } from './components/CapacitacionesView';
 import { UsuariosView } from './components/UsuariosView';
 import { ControlVacacionesView } from './components/ControlVacacionesView';
@@ -478,25 +481,113 @@ function AppLayout() {
                 path="/sst"
                 element={
                   <SstView
+                    key="sst-general"
                     userRole={userRole}
                     currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     empleados={empleados}
                     cargos={cargos}
                     areas={areas}
+                    procesos={procesos}
                     onUpdateEmpleado={handleUpdateEmpleado}
+                    onNavigate={(view) => navigate('/' + view)}
+                  />
+                }
+              />
+              <Route
+                path="/matriz-gtc45"
+                element={
+                  <MatrizRiesgosGTC45View
+                    cargos={cargos}
+                    areas={areas}
+                    procesos={procesos}
+                    empleados={empleados}
+                    userRole={userRole}
+                  />
+                }
+              />
+              <Route
+                path="/matriz-riesgos"
+                element={
+                  <MatrizRiesgosGTC45View
+                    cargos={cargos}
+                    areas={areas}
+                    procesos={procesos}
+                    empleados={empleados}
+                    userRole={userRole}
+                  />
+                }
+              />
+              <Route
+                path="/indicadores-sst"
+                element={
+                  <IndicadoresSstView
+                    cargos={cargos}
+                    areas={areas}
+                    procesos={procesos}
+                    empleados={empleados}
+                    userRole={userRole}
+                    onNavigate={(view) => navigate('/' + view)}
+                  />
+                }
+              />
+              <Route
+                path="/sst-indicadores"
+                element={
+                  <IndicadoresSstView
+                    cargos={cargos}
+                    areas={areas}
+                    procesos={procesos}
+                    empleados={empleados}
+                    userRole={userRole}
+                    onNavigate={(view) => navigate('/' + view)}
+                  />
+                }
+              />
+              <Route
+                path="/indicadores"
+                element={
+                  <IndicadoresSstView
+                    cargos={cargos}
+                    areas={areas}
+                    procesos={procesos}
+                    empleados={empleados}
+                    userRole={userRole}
+                    onNavigate={(view) => navigate('/' + view)}
                   />
                 }
               />
               <Route
                 path="/sst-examenes"
                 element={
-                  <SstView
-                    userRole={userRole}
-                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
+                  <ExamenesMedicosOcupacionalesView
                     empleados={empleados}
                     cargos={cargos}
                     areas={areas}
-                    initialTab="examenes"
+                    userRole={userRole}
+                    onUpdateEmpleado={handleUpdateEmpleado}
+                  />
+                }
+              />
+              <Route
+                path="/examenes-medicos"
+                element={
+                  <ExamenesMedicosOcupacionalesView
+                    empleados={empleados}
+                    cargos={cargos}
+                    areas={areas}
+                    userRole={userRole}
+                    onUpdateEmpleado={handleUpdateEmpleado}
+                  />
+                }
+              />
+              <Route
+                path="/examenes"
+                element={
+                  <ExamenesMedicosOcupacionalesView
+                    empleados={empleados}
+                    cargos={cargos}
+                    areas={areas}
+                    userRole={userRole}
                     onUpdateEmpleado={handleUpdateEmpleado}
                   />
                 }

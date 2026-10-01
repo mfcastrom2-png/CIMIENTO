@@ -35,6 +35,7 @@ import {
   ComponenteCumplimientoEvaluacion,
   ComponenteDesarrolloEvaluacion
 } from '../src/types';
+import { calcularGtc45 } from '../src/components/MatrizRiesgosGTC45View';
 
 describe('Suite de Pruebas: Motor de Evaluación de Desempeño (evaluationEngine)', () => {
   describe('Ponderación y Componentes de Evaluación (Total 100%)', () => {
@@ -596,3 +597,146 @@ describe('Suite de Pruebas: Días Festivos y Calendario Laboral Colombiano (fest
     expect(permiso.diasFestivosInvolucrados.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('Suite de Pruebas: Exámenes Médicos Ocupacionales (SG-SST)', () => {
+  const empleadoConExamenes: Empleado = {
+    id: 'emp-sst-1',
+    nombre: 'Juan Pérez SST',
+    documento: '1.234.567.890',
+    email: 'juan.perez@empresa.com',
+    telefono: '3001234567',
+    cargoId: 'c1',
+    areaId: 'a1',
+    formacion: 'Profesional en Ingeniería',
+    experiencia: '5 años en el sector',
+    activo: true,
+    estadoLaboral: 'Activo',
+    familia: [],
+    contrato: {
+      tipo: 'Término Indefinido',
+      salario: '$3.500.000',
+      inicio: '2025-01-10',
+      fin: 'Indefinido'
+    },
+    sst: {
+      examenesOcupacionales: [
+        {
+          id: 'ex-1',
+          fecha: '2025-01-10',
+          tipoExamen: 'Ingreso',
+          entidadIps: 'IPS Médica Laboral',
+          conceptoAptitud: 'Apto',
+          estado: 'Realizado',
+          fechaProximoExamen: '2026-01-10',
+          recomendaciones: 'Uso de protección auditiva',
+          confidencialMedico: true,
+          empleadoId: 'emp-sst-1',
+          empleadoNombre: 'Juan Pérez SST'
+        },
+        {
+          id: 'ex-2',
+          fecha: '2026-01-15',
+          tipoExamen: 'Periódico',
+          entidadIps: 'IPS Sanitas Ocupacional',
+          conceptoAptitud: 'Apto con Recomendaciones',
+          estado: 'Realizado',
+          fechaProximoExamen: '2027-01-15',
+          recomendaciones: 'Pausas activas y corrección postural',
+          confidencialMedico: true,
+          empleadoId: 'emp-sst-1',
+          empleadoNombre: 'Juan Pérez SST'
+        }
+      ]
+    }
+  };
+
+  it('Debe estructurar y consultar el historial ocupacional de un colaborador', () => {
+    const examenes = empleadoConExamenes.sst?.examenesOcupacionales || [];
+    expect(examenes.length).toBe(2);
+    expect(examenes[0].tipoExamen).toBe('Ingreso');
+    expect(examenes[0].conceptoAptitud).toBe('Apto');
+    expect(examenes[1].tipoExamen).toBe('Periódico');
+    expect(examenes[1].conceptoAptitud).toBe('Apto con Recomendaciones');
+  });
+
+  it('Debe validar cálculo de vigencia y fechas de próximo examen', () => {
+    const exVigente = empleadoConExamenes.sst?.examenesOcupacionales![1]!;
+    expect(new Date(exVigente.fechaProximoExamen!).getTime()).toBeGreaterThan(new Date(exVigente.fecha).getTime());
+  });
+
+  it('Debe clasificar correctamente alertas proactivas: vencido (< 0 días) vs próximo a vencer (<= 30 días)', () => {
+    const evaluarAlerta = (fechaProximo: string, fechaBaseRef: Date = new Date('2026-09-30')) => {
+      const prox = new Date(fechaProximo);
+      prox.setHours(0, 0, 0, 0);
+      const hoy = new Date(fechaBaseRef);
+      hoy.setHours(0, 0, 0, 0);
+      const diffMs = prox.getTime() - hoy.getTime();
+      const dias = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (dias < 0) return { estado: 'Vencido', dias, tieneAlerta: true };
+      if (dias <= 30) return { estado: 'ProximoVencer', dias, tieneAlerta: true };
+      return { estado: 'Vigente', dias, tieneAlerta: false };
+    };
+
+    // Caso 1: Vencido
+    const alertaVencido = evaluarAlerta('2026-09-15');
+    expect(alertaVencido.estado).toBe('Vencido');
+    expect(alertaVencido.tieneAlerta).toBe(true);
+    expect(alertaVencido.dias).toBeLessThan(0);
+
+    // Caso 2: Próximo a vencer en 15 días (dentro del umbral de 30 días)
+    const alertaProximo = evaluarAlerta('2026-10-15');
+    expect(alertaProximo.estado).toBe('ProximoVencer');
+    expect(alertaProximo.tieneAlerta).toBe(true);
+    expect(alertaProximo.dias).toBeGreaterThanOrEqual(0);
+    expect(alertaProximo.dias).toBeLessThanOrEqual(30);
+
+    // Caso 3: Vigente a largo plazo (> 30 días)
+    const alertaVigente = evaluarAlerta('2027-04-30');
+    expect(alertaVigente.estado).toBe('Vigente');
+    expect(alertaVigente.tieneAlerta).toBe(false);
+  });
+});
+
+describe('Suite de Pruebas: Matriz de Peligros y Riesgos GTC 45', () => {
+  it('Debe calcular correctamente el Nivel de Riesgo I (Crítico / No Aceptable)', () => {
+    // ND: 10 (Muy Alto), NE: 4 (Continua), NC: 100 (Mortal)
+    const res = calcularGtc45(10, 4, 100);
+    expect(res.np).toBe(40);
+    expect(res.interpProb).toBe('Muy Alta');
+    expect(res.nr).toBe(4000);
+    expect(res.interpRiesgo).toBe('I');
+    expect(res.aceptabilidad).toBe('No Aceptable');
+  });
+
+  it('Debe calcular correctamente el Nivel de Riesgo II (Alto / Control Específico)', () => {
+    // ND: 6 (Alto), NE: 2 (Ocasional) => NP = 12, NC: 25 (Grave) => NR = 300
+    const res = calcularGtc45(6, 2, 25);
+    expect(res.np).toBe(12);
+    expect(res.interpProb).toBe('Alta');
+    expect(res.nr).toBe(300);
+    expect(res.interpRiesgo).toBe('II');
+    expect(res.aceptabilidad).toBe('No Aceptable o Aceptable con Control Específico');
+  });
+
+  it('Debe calcular correctamente el Nivel de Riesgo III (Medio / Mejorable)', () => {
+    // ND: 2 (Medio), NE: 2 (Ocasional) => NP = 4, NC: 25 => NR = 100
+    const res = calcularGtc45(2, 2, 25);
+    expect(res.np).toBe(4);
+    expect(res.interpProb).toBe('Baja');
+    expect(res.nr).toBe(100);
+    expect(res.interpRiesgo).toBe('III');
+    expect(res.aceptabilidad).toBe('Mejorable');
+  });
+
+  it('Debe calcular correctamente el Nivel de Riesgo IV (Bajo / Aceptable)', () => {
+    // ND: 2 (Medio), NE: 1 (Esporádica) => NP = 2, NC: 10 (Leve) => NR = 20
+    const res = calcularGtc45(2, 1, 10);
+    expect(res.np).toBe(2);
+    expect(res.interpProb).toBe('Baja');
+    expect(res.nr).toBe(20);
+    expect(res.interpRiesgo).toBe('IV');
+    expect(res.aceptabilidad).toBe('Aceptable');
+  });
+});
+

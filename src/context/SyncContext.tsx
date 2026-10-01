@@ -237,16 +237,32 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setHayMasEmpleadosNube(resEmp.hayMas);
 
       if (carData && carData.length > 0) {
-        const seen = new Set<string>();
+        const seenId = new Set<string>();
+        const seenNombre = new Set<string>();
         const uniqueCargos = carData.filter(c => {
-          if (!c || !c.id || seen.has(c.id)) return false;
-          seen.add(c.id);
+          if (!c || !c.id || seenId.has(c.id)) return false;
+          const nomKey = c.nombre?.trim().toLowerCase();
+          if (nomKey && seenNombre.has(nomKey)) return false;
+          seenId.add(c.id);
+          if (nomKey) seenNombre.add(nomKey);
           return true;
         });
         setCargos(uniqueCargos);
       } else {
-        // Si no hay cargos en Firestore, conservar iniciales o cargados
-        setCargos(prev => prev.length > 0 ? prev : (shouldOmitMocks ? [] : initialCargos));
+        // Si no hay cargos en Firestore, conservar iniciales o cargados deduplicados
+        setCargos(prev => {
+          const list = prev.length > 0 ? prev : (shouldOmitMocks ? [] : initialCargos);
+          const seenId = new Set<string>();
+          const seenNombre = new Set<string>();
+          return list.filter(c => {
+            if (!c || !c.id || seenId.has(c.id)) return false;
+            const nomKey = c.nombre?.trim().toLowerCase();
+            if (nomKey && seenNombre.has(nomKey)) return false;
+            seenId.add(c.id);
+            if (nomKey) seenNombre.add(nomKey);
+            return true;
+          });
+        });
       }
 
       if (procData && procData.length > 0) {

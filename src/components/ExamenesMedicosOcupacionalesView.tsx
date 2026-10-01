@@ -176,7 +176,7 @@ export const ExamenesMedicosOcupacionalesView: React.FC<ExamenesMedicosOcupacion
 
           if (diasParaVencer < 0) {
             estadoVigencia = 'Vencido';
-          } else if (diasParaVencer <= 60) {
+          } else if (diasParaVencer <= 30) {
             estadoVigencia = 'ProximoVencer';
           } else {
             estadoVigencia = 'Vigente';
@@ -573,13 +573,13 @@ export const ExamenesMedicosOcupacionalesView: React.FC<ExamenesMedicosOcupacion
         <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-300 shadow-xs">
           <div className="text-[10px] uppercase font-bold text-amber-900 tracking-wider">Próximos a Vencer</div>
           <div className="text-xl font-bold font-serif text-amber-700 mt-1">{metricas.proximosVencer}</div>
-          <div className="text-[10px] text-amber-800 mt-0.5">Menor a 60 días</div>
+          <div className="text-[10px] text-amber-800 mt-0.5">&le; 30 días calendario</div>
         </div>
 
         <div className="p-3.5 bg-rose-50 rounded-xl border border-rose-300 shadow-xs">
           <div className="text-[10px] uppercase font-bold text-rose-900 tracking-wider">Vencidos / Requeridos</div>
           <div className="text-xl font-bold font-serif text-rose-700 mt-1">{metricas.vencidos}</div>
-          <div className="text-[10px] text-rose-800 mt-0.5">Requieren renovación</div>
+          <div className="text-[10px] text-rose-800 mt-0.5">Atención prioritaria</div>
         </div>
 
         <div className="p-3.5 bg-blue-50 rounded-xl border border-blue-300 shadow-xs">
@@ -594,6 +594,53 @@ export const ExamenesMedicosOcupacionalesView: React.FC<ExamenesMedicosOcupacion
           <div className="text-[10px] text-slate-600 mt-0.5">Al desvincularse</div>
         </div>
       </div>
+
+      {/* Banner de Alertas Proactivas de Medicina Ocupacional */}
+      {(metricas.vencidos > 0 || metricas.proximosVencer > 0) && (
+        <div className="p-4 bg-gradient-to-r from-rose-50 via-amber-50 to-orange-50 rounded-2xl border-2 border-rose-300 shadow-xs space-y-3 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs animate-pulse">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-[#18235C] flex items-center gap-2">
+                  <span>Alertas Proactivas de Exámenes Médicos Ocupacionales</span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-rose-600 text-white">
+                    {metricas.vencidos + metricas.proximosVencer} alertas
+                  </span>
+                </h4>
+                <p className="text-xs text-[#282829] mt-0.5">
+                  Se detectaron <strong>{metricas.vencidos}</strong> exámenes vencidos y <strong>{metricas.proximosVencer}</strong> exámenes con vencimiento en menos de 30 días. Los colaboradores afectados están destacados con iconos de advertencia en la lista.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {metricas.vencidos > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFiltroEstadoVigencia('Vencido')}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Ver Vencidos ({metricas.vencidos})</span>
+                </button>
+              )}
+              {metricas.proximosVencer > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFiltroEstadoVigencia('ProximoVencer')}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Ver &lt; 30 días ({metricas.proximosVencer})</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sección Especial: Colaboradores en Preingreso Pendientes de Examen de Ingreso */}
       {candidatosPreingreso.length > 0 && (
@@ -732,7 +779,7 @@ export const ExamenesMedicosOcupacionalesView: React.FC<ExamenesMedicosOcupacion
             >
               <option value="TODOS">Todos los estados de vigencia</option>
               <option value="Vigente">Vigente (Al día)</option>
-              <option value="ProximoVencer">Próximo a Vencer (&le; 60 días)</option>
+              <option value="ProximoVencer">Próximo a Vencer (&le; 30 días)</option>
               <option value="Vencido">Vencido (Atención urgente)</option>
               <option value="Programado">Programado</option>
             </select>
@@ -751,6 +798,61 @@ export const ExamenesMedicosOcupacionalesView: React.FC<ExamenesMedicosOcupacion
               <option value="NoApto">No Apto</option>
             </select>
           </div>
+        </div>
+
+        {/* Chips de filtro rápido para alertas */}
+        <div className="flex items-center gap-2 pt-2 border-t border-[#8FA7D6]/30 flex-wrap text-xs">
+          <span className="font-bold text-[11px] text-[#18235C] flex items-center gap-1">
+            <Filter className="w-3.5 h-3.5" />
+            Filtros Rápidos:
+          </span>
+          <button
+            type="button"
+            onClick={() => setFiltroEstadoVigencia('TODOS')}
+            className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer text-[11px] ${
+              filtroEstadoVigencia === 'TODOS'
+                ? 'bg-[#18235C] text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Todos ({metricas.total})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFiltroEstadoVigencia('Vencido')}
+            className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer text-[11px] flex items-center gap-1 ${
+              filtroEstadoVigencia === 'Vencido'
+                ? 'bg-rose-600 text-white shadow-2xs'
+                : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+            }`}
+          >
+            <AlertTriangle className="w-3 h-3 text-rose-600" />
+            <span>🚨 Vencidos ({metricas.vencidos})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFiltroEstadoVigencia('ProximoVencer')}
+            className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer text-[11px] flex items-center gap-1 ${
+              filtroEstadoVigencia === 'ProximoVencer'
+                ? 'bg-amber-500 text-white shadow-2xs'
+                : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            <Clock className="w-3 h-3 text-amber-600" />
+            <span>⚠️ Próximos a Vencer (&le; 30 días) ({metricas.proximosVencer})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFiltroEstadoVigencia('Vigente')}
+            className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer text-[11px] flex items-center gap-1 ${
+              filtroEstadoVigencia === 'Vigente'
+                ? 'bg-emerald-700 text-white shadow-2xs'
+                : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+            }`}
+          >
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+            <span>Vigentes ({metricas.vigentes})</span>
+          </button>
         </div>
       </div>
 
@@ -817,10 +919,61 @@ export const ExamenesMedicosOcupacionalesView: React.FC<ExamenesMedicosOcupacion
                   if (examen.tipoExamen === 'Posincapacidad') tipoBadge = 'bg-teal-100 text-teal-900 border-teal-300';
 
                   return (
-                    <tr key={examen.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                    <tr
+                      key={examen.id || idx}
+                      className={`transition-colors ${
+                        estadoVigencia === 'Vencido'
+                          ? 'bg-rose-50/40 hover:bg-rose-50/70'
+                          : estadoVigencia === 'ProximoVencer'
+                          ? 'bg-amber-50/30 hover:bg-amber-50/60'
+                          : 'hover:bg-slate-50/80'
+                      }`}
+                    >
                       <td className="p-3">
-                        <div className="font-bold text-[#18235C]">{empleado.nombre}</div>
-                        <div className="text-[11px] font-mono text-[#282829]">CC {empleado.documento}</div>
+                        <div className="flex items-center gap-2.5">
+                          {estadoVigencia === 'Vencido' ? (
+                            <div
+                              className="relative shrink-0"
+                              title={`⚠️ ALERTA CRÍTICA: Examen médico ocupacional vencido hace ${diasParaVencer !== null ? Math.abs(diasParaVencer) : ''} días. Requiere agendamiento prioritario.`}
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-rose-100 border border-rose-300 flex items-center justify-center text-rose-600 shadow-2xs">
+                                <AlertTriangle className="w-4 h-4 text-rose-600 animate-pulse" />
+                              </div>
+                            </div>
+                          ) : estadoVigencia === 'ProximoVencer' ? (
+                            <div
+                              className="relative shrink-0"
+                              title={`⚠️ ALERTA PREVENTIVA: Examen médico próximo a vencer en ${diasParaVencer} días (menos de 30 días).`}
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 shadow-2xs">
+                                <Clock className="w-4 h-4 text-amber-600" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            </div>
+                          )}
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-[#18235C]">{empleado.nombre}</span>
+                              {estadoVigencia === 'Vencido' && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-600 text-white uppercase tracking-wider flex items-center gap-0.5 shadow-2xs">
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  Vencido
+                                </span>
+                              )}
+                              {estadoVigencia === 'ProximoVencer' && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-amber-500 text-white uppercase tracking-wider flex items-center gap-0.5 shadow-2xs">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  &lt; 30 días
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] font-mono text-[#282829]">CC {empleado.documento}</div>
+                          </div>
+                        </div>
                       </td>
 
                       <td className="p-3">
