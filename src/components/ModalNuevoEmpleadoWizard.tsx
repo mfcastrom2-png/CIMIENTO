@@ -73,6 +73,12 @@ import {
 import { uid } from '../data/initialData';
 import { DriveLinkField } from './common/DriveLinkField';
 import { formatDriveDirectUrl, formatDriveViewUrl, isGoogleDriveUrl } from '../utils/driveUtils';
+import {
+  validarCedulaDocumentoDian,
+  validarCorreoElectronicoDian,
+  validarSalarioDianCst,
+  validarFormularioEmpleadoDian
+} from '../utils/validadorDianEmpleado';
 
 interface ModalNuevoEmpleadoWizardProps {
   cargos: Cargo[];
@@ -295,6 +301,33 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
   const [tipoCuenta, setTipoCuenta] = useState<'Ahorros' | 'Corriente'>(empleadoAEditar?.compensacion?.tipoCuenta || 'Ahorros');
   const [numeroCuenta, setNumeroCuenta] = useState(empleadoAEditar?.compensacion?.numeroCuenta || '');
   const [historialVigencias, setHistorialVigencias] = useState(empleadoAEditar?.compensacion?.historialVigencias || []);
+
+  // Validación en tiempo real de estándares DIAN & CST
+  const validacionDian = useMemo(() => {
+    return validarFormularioEmpleadoDian(
+      {
+        documento: numeroDocumento,
+        tipoDocumento,
+        correoCorporativo,
+        correoPersonal,
+        salarioBasico,
+        tipoContrato,
+        empleadoIdActual: empleadoAEditar?.id
+      },
+      empleados,
+      smmlvVigente
+    );
+  }, [
+    numeroDocumento,
+    tipoDocumento,
+    correoCorporativo,
+    correoPersonal,
+    salarioBasico,
+    tipoContrato,
+    empleadoAEditar,
+    empleados,
+    smmlvVigente
+  ]);
 
   // --- PESTAÑA 6: SEGURIDAD SOCIAL ---
   const [eps, setEps] = useState(empleadoAEditar?.seguridadSocial?.eps || EPS_COLOMBIA[0]);
@@ -578,12 +611,8 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
       if (!primerApellido.trim()) {
         return { valido: false, error: 'Paso 1 (Identificación): Debe ingresar el Primer Apellido del colaborador.' };
       }
-      const doc = (numeroDocumento || '').trim().replace(/\D/g, '');
-      if (!doc) {
-        return { valido: false, error: 'Paso 1 (Identificación): Debe ingresar el Número de Documento de Identidad.' };
-      }
-      if (validacionUnicidad.docDuplicado) {
-        return { valido: false, error: `Paso 1 (Identificación): El documento ${numeroDocumento} ya está asignado a ${validacionUnicidad.empleadoDocDuplicado?.nombre}.` };
+      if (!validacionDian.documento.esValido) {
+        return { valido: false, error: `Paso 1 (Identificación - Estándar DIAN): ${validacionDian.documento.mensaje}` };
       }
       if (!fechaNacimiento) {
         return { valido: false, error: 'Paso 1 (Identificación): Debe seleccionar la Fecha de Nacimiento.' };
@@ -603,6 +632,12 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
       }
       if (!celular.trim() && !telefonoFijo.trim()) {
         return { valido: false, error: 'Paso 2 (Contacto & Residencia): Debe ingresar al menos un número de teléfono o celular.' };
+      }
+      if (correoCorporativo.trim() && !validacionDian.correoCorporativo.esValido) {
+        return { valido: false, error: `Paso 2 (Contacto - DIAN): ${validacionDian.correoCorporativo.mensaje}` };
+      }
+      if (correoPersonal.trim() && !validacionDian.correoPersonal.esValido) {
+        return { valido: false, error: `Paso 2 (Contacto - DIAN): ${validacionDian.correoPersonal.mensaje}` };
       }
       if (!contactoEmergenciaNombre.trim()) {
         return { valido: false, error: 'Paso 2 (Contacto & Residencia): El Nombre del Contacto de Emergencia es obligatorio para el SG-SST.' };
@@ -660,6 +695,9 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
     if (paso === 5) {
       if (!salarioBasico || salarioBasico <= 0) {
         return { valido: false, error: 'Paso 5 (Compensación): El Salario Básico Mensual debe ser mayor a cero.' };
+      }
+      if (!validacionDian.salario.esValido) {
+        return { valido: false, error: `Paso 5 (Compensación - Estándar CST/DIAN): ${validacionDian.salario.mensaje}` };
       }
       if (!tipoSalario) {
         return { valido: false, error: 'Paso 5 (Compensación): Debe definir el Tipo de Salario.' };
@@ -1242,15 +1280,25 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     value={numeroDocumento}
                     onChange={e => setNumeroDocumento(e.target.value)}
                     className={`w-full px-3 py-2 rounded-lg font-mono font-bold ${
-                      validacionUnicidad.docDuplicado
+                      !validacionDian.documento.esValido
                         ? 'border-2 border-rose-500 bg-rose-50 text-rose-900'
-                        : 'border border-[#8FA7D6] bg-slate-50 text-[#18235C]'
+                        : 'border border-emerald-500 bg-emerald-50/50 text-emerald-950'
                     }`}
                   />
-                  {validacionUnicidad.docDuplicado && (
-                    <span className="text-[10px] text-rose-600 font-bold block mt-0.5">
-                      ⚠️ Este documento ya está registrado ({validacionUnicidad.empleadoDocDuplicado?.nombre})
-                    </span>
+                  {numeroDocumento && (
+                    <div className="mt-1">
+                      {validacionDian.documento.esValido ? (
+                        <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>{validacionDian.documento.mensaje}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-rose-600 font-bold flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                          <span>{validacionDian.documento.mensaje}</span>
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -1524,8 +1572,27 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     placeholder="personal@gmail.com"
                     value={correoPersonal}
                     onChange={e => setCorreoPersonal(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg"
+                    className={`w-full px-3 py-2 rounded-lg font-medium ${
+                      correoPersonal && !validacionDian.correoPersonal.esValido
+                        ? 'border-2 border-rose-500 bg-rose-50 text-rose-900'
+                        : 'border border-[#8FA7D6] bg-slate-50 text-[#18235C]'
+                    }`}
                   />
+                  {correoPersonal && (
+                    <div className="mt-1">
+                      {validacionDian.correoPersonal.esValido ? (
+                        <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>{validacionDian.correoPersonal.mensaje}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-rose-600 font-semibold flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                          <span>{validacionDian.correoPersonal.mensaje}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="md:col-span-3 p-3.5 bg-slate-50 rounded-xl border border-[#8FA7D6] space-y-2">
@@ -1545,8 +1612,27 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     placeholder="nombre.apellido@bgroup.com.co"
                     value={correoCorporativo}
                     onChange={e => setCorreoCorporativo(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#8FA7D6] rounded-lg font-semibold text-[#18235C]"
+                    className={`w-full px-3 py-2 rounded-lg font-semibold ${
+                      correoCorporativo && !validacionDian.correoCorporativo.esValido
+                        ? 'border-2 border-rose-500 bg-rose-50 text-rose-900'
+                        : 'border border-[#8FA7D6] bg-white text-[#18235C]'
+                    }`}
                   />
+                  {correoCorporativo && (
+                    <div>
+                      {validacionDian.correoCorporativo.esValido ? (
+                        <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>{validacionDian.correoCorporativo.mensaje}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-rose-600 font-bold flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                          <span>{validacionDian.correoCorporativo.mensaje}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Contacto de Emergencia */}
@@ -2044,13 +2130,30 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                       if (val <= topeAuxilioTransporte) setAuxilioTransporte(true);
                       else setAuxilioTransporte(false);
                     }}
-                    className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-mono font-extrabold text-sm text-[#18235C]"
+                    className={`w-full px-3 py-2 rounded-lg font-mono font-extrabold text-sm ${
+                      !validacionDian.salario.esValido
+                        ? 'border-2 border-rose-500 bg-rose-50 text-rose-900'
+                        : 'border border-[#8FA7D6] bg-slate-50 text-[#18235C]'
+                    }`}
                   />
-                  <div className="flex items-center justify-between text-[10px] text-[#282829] mt-0.5">
-                    <span>${salarioBasico.toLocaleString('es-CO')} COP</span>
-                    <span className="font-semibold text-emerald-800">
-                      SMMLV Nómina: ${smmlvVigente.toLocaleString('es-CO')}
-                    </span>
+                  <div className="flex flex-col gap-0.5 text-[10px] mt-1">
+                    {validacionDian.salario.esValido ? (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>{validacionDian.salario.mensaje}</span>
+                      </span>
+                    ) : (
+                      <span className="text-rose-600 font-bold flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                        <span>{validacionDian.salario.mensaje}</span>
+                      </span>
+                    )}
+                    <div className="flex items-center justify-between text-[#282829]/70 pt-0.5">
+                      <span>${salarioBasico.toLocaleString('es-CO')} COP</span>
+                      <span className="font-semibold text-emerald-800">
+                        SMMLV 2026: ${smmlvVigente.toLocaleString('es-CO')}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

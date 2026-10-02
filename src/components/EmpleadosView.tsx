@@ -37,7 +37,8 @@ import {
   Clock,
   UserCheck,
   UserX,
-  AlertTriangle
+  AlertTriangle,
+  Database
 } from 'lucide-react';
 import { ModalNuevoEmpleadoWizard } from './ModalNuevoEmpleadoWizard';
 import { ModalGestionEstadoEmpleado } from './ModalGestionEstadoEmpleado';
@@ -81,6 +82,7 @@ interface EmpleadosViewProps {
   onDeleteEmpleado?: (id: string) => Promise<void> | void;
   isSuperAdmin?: boolean;
   currentUser?: UsuarioSistema | null;
+  onNavigate?: (view: string) => void;
 }
 
 export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
@@ -108,7 +110,8 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
   onUpdateEmpleado,
   onDeleteEmpleado,
   isSuperAdmin = false,
-  currentUser
+  currentUser,
+  onNavigate
 }) => {
   // Estado de navegación y modales
   const [selectedEmpleadoId, setSelectedEmpleadoId] = useState<string | null>(null);
@@ -477,6 +480,18 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
             <Download className="w-3.5 h-3.5 text-[#18235C]" />
             <span>Exportar (CSV / Excel)</span>
           </button>
+
+          {canManageEmployees && onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('saldos-iniciales')}
+              className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+              title="Cargar de forma masiva saldos iniciales de nómina y empleados"
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Cargar Saldos Iniciales</span>
+            </button>
+          )}
 
           {canManageEmployees && (
             <button

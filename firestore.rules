@@ -262,6 +262,11 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // 9.2 Saldos Iniciales de Nómina y Empleados (Corte Contable / Migración)
+    match /saldos_iniciales/{docId} {
+      allow read, write: if isAdmin();
+    }
+
     // 10. Capacitaciones y Exámenes (Plan Anual y registro de asistencia/examen)
     match /capacitaciones/{capId} {
       allow read: if signedIn();

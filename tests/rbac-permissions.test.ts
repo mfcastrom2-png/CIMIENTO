@@ -8,8 +8,8 @@ import { RolSistema, UsuarioSistema } from '../src/types';
 
 describe('Suite de Pruebas: Matriz de Roles y Asignación de Permisos RBAC', () => {
 
-  it('Debe tener registrados los 21 módulos del sistema con categorías válidas', () => {
-    expect(MODULOS_SISTEMA.length).toBe(21);
+  it('Debe tener registrados los 22 módulos del sistema con categorías válidas', () => {
+    expect(MODULOS_SISTEMA.length).toBe(22);
     
     const categoriasEsperadas = ['General', 'Organización', 'Talento Humano', 'SG-SST', 'Finanzas', 'Sistema'];
     MODULOS_SISTEMA.forEach(m => {
@@ -36,6 +36,7 @@ describe('Suite de Pruebas: Matriz de Roles y Asignación de Permisos RBAC', () 
     expect(ids).toContain('votaciones-sst');
     expect(ids).toContain('nomina');
     expect(ids).toContain('parametros-nomina');
+    expect(ids).toContain('saldos-iniciales');
     expect(ids).toContain('documentos');
     expect(ids).toContain('usuarios');
     expect(ids).toContain('buzon-correo');
@@ -43,9 +44,9 @@ describe('Suite de Pruebas: Matriz de Roles y Asignación de Permisos RBAC', () 
   });
 
   describe('Matriz Oficial de Permisos por Rol', () => {
-    it('Superadministrador debe tener acceso irrestricto a los 21 módulos', () => {
+    it('Superadministrador debe tener acceso irrestricto a todos los módulos del sistema', () => {
       const perms = obtenerPermisosPorDefecto('superadmin');
-      expect(perms.length).toBe(21);
+      expect(perms.length).toBe(MODULOS_SISTEMA.length);
       MODULOS_SISTEMA.forEach(m => {
         expect(perms).toContain(m.id);
       });

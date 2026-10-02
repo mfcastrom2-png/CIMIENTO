@@ -37,6 +37,7 @@ export const MODULOS_SISTEMA: ModuloSistemaDef[] = [
   // Finanzas & Nómina
   { id: 'nomina', nombre: 'Nómina & Liquidación CST', descripcion: 'Liquidaciones periódicas, novedades, aportes de ley y desprendibles', categoria: 'Finanzas' },
   { id: 'parametros-nomina', nombre: 'Parámetros de Nómina', descripcion: 'Configuración oficial de SMMLV, auxilio, UVT, recargos y tarifas ARL', categoria: 'Finanzas' },
+  { id: 'saldos-iniciales', nombre: 'Carga Masiva de Saldos Iniciales', descripcion: 'Migración y corte de saldos iniciales de nómina, prestaciones, vacaciones y préstamos', categoria: 'Finanzas' },
   // Documentos & Gobernanza del Sistema
   { id: 'documentos', nombre: 'Documentos y Salidas', descripcion: 'Generación de certificados laborales, actas y reportes institucionales', categoria: 'Sistema' },
   { id: 'usuarios', nombre: 'Gestión de Usuarios & RBAC', descripcion: 'Administración de accesos, roles, asignación de permisos y 2FA', categoria: 'Sistema' },
@@ -53,7 +54,7 @@ export const PERMISOS_POR_DEFECTO_POR_ROL: Record<RolSistema, string[]> = {
     'dashboard', 'empresa', 'estructura', 'cargos', 'empleados', 'evaluaciones',
     'solicitudes', 'vacaciones', 'capacitaciones', 'sst', 'matriz-gtc45',
     'indicadores-sst', 'sst-examenes', 'epps', 'votaciones-sst', 'nomina',
-    'parametros-nomina', 'documentos', 'usuarios', 'buzon-correo', 'auditoria'
+    'parametros-nomina', 'saldos-iniciales', 'documentos', 'usuarios', 'buzon-correo', 'auditoria'
   ],
   lider_area: [
     'dashboard', 'empleados', 'evaluaciones', 'solicitudes', 'vacaciones',

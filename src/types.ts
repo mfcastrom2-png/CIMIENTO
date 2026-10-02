@@ -1124,6 +1124,51 @@ export interface CertificadoVotoEmpleado {
 // Conforme al Art. 186 y siguientes del Código Sustantivo del Trabajo
 // ==========================================
 
+/**
+ * Saldo Inicial Integral de Nómina y Empleado
+ * Permite cargar cortes contables y prestaciones acumuladas previas a la entrada en vigencia del sistema
+ */
+export interface SaldoInicialEmpleadoNomina {
+  id: string; // ej. "saldo-1020892411"
+  empleadoId?: string; // ID interno si existe en el censo
+  documento: string; // Cédula de ciudadanía o extranjería (clave unívoca de cruce)
+  nombreCompleto: string;
+  cargoNombre?: string;
+  fechaIngreso?: string;
+  fechaCorteSaldos: string; // ej. "2025-12-31" o "2026-02-28"
+
+  // 1. Prestaciones Sociales y Pasivos Laborales Acumulados
+  vacacionesDiasPendientes: number; // Días de vacaciones acumulados pendientes de disfrutar (Art. 186 CST)
+  vacacionesValorAcumuladoCOP: number; // Provisión o valor acumulado de vacaciones pendientes
+  cesantiasSaldoAcumuladoCOP: number; // Saldo de cesantías acumuladas pendientes de liquidar o consignar
+  interesesCesantiasAcumuladoCOP: number; // Saldo de intereses a cesantías acumulados pendientes
+  primaServiciosBaseSemestreCOP: number; // Base o valor acumulado de prima de servicios del semestre en curso
+  diasTrabajadosSemestrePrima: number; // Días computables para prima del semestre
+
+  // 2. Acumulados Tributarios y Certificado de Ingresos (Art. 378 / 383 ET - Formulario 220)
+  ingresosLaboralesAcumuladosAnoCOP: number; // Ingresos brutos acumulados año en curso
+  saludAportesAcumuladosAnoCOP: number; // Aportes obligatorios a salud acumulados del empleado
+  pensionAportesAcumuladosAnoCOP: number; // Aportes obligatorios a pensión acumulados del empleado
+  fspAportesAcumuladosAnoCOP: number; // Fondo de Solidaridad Pensional acumulado
+  retencionFuenteAcumuladaAnoCOP: number; // Retención en la fuente practicada acumulada
+  cesantiasPagadasAnoCOP: number; // Cesantías e intereses efectivamente pagados en el año gravable
+
+  // 3. Préstamos, Libranzas y Deducciones Recurrentes Activas
+  prestamoEmpresaSaldoCOP: number; // Saldo pendiente total de deuda
+  prestamoEmpresaCuotaMensualCOP: number; // Valor a descontar periódicamente en nómina
+  libranzaSaldoCOP: number; // Saldo pendiente de libranza bancaria o comercial
+  libranzaCuotaMensualCOP: number; // Cuota periódica libranza
+  embargoJudicialSaldoCOP: number; // Saldo o cuota de embargo (ej. alimentos)
+  otrasDeduccionesFijasMensualCOP: number; // Aportes a fondos de empleados, cooperativas, etc.
+
+  // 4. Metadatos de Auditoría y Estado
+  observaciones?: string;
+  creadoPor?: string;
+  fechaRegistro: string;
+  aplicadoEnNomina?: boolean;
+  aplicadoEnVacaciones?: boolean;
+}
+
 export interface ControlVacacionesEmpleado {
   empleadoId: string;
   empleadoNombre: string;

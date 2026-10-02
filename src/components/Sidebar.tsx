@@ -26,7 +26,8 @@ import {
   Building2,
   Mail,
   Layers,
-  Target
+  Target,
+  Database
 } from 'lucide-react';
 import { Role, UsuarioSistema, RolSistema, ConfiguracionEmpresa } from '../types';
 
@@ -634,6 +635,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       currentView === 'vacaciones' ? 'bg-[#18235C] text-[#8FA7D6]' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
                     }`}>
                       Art. 186 CST
+                    </span>
+                  </button>
+                )}
+
+                {(tienePermiso('saldos-iniciales') || tienePermiso('nomina') || rol === 'admin_gh' || rol === 'superadmin') && (
+                  <button
+                    id="nav-saldos-iniciales"
+                    onClick={() => onNavigate('saldos-iniciales')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'saldos-iniciales' || currentView === 'saldos'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Database className={`w-4 h-4 ${currentView === 'saldos-iniciales' || currentView === 'saldos' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                      <span>Saldos Iniciales</span>
+                    </div>
+                    <span className="text-[10px] bg-[#101740] text-[#00FF00] px-1.5 py-0.5 rounded font-bold">
+                      Carga Masiva
                     </span>
                   </button>
                 )}

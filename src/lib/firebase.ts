@@ -51,7 +51,8 @@ import {
   AccionAuditoria,
   AnuncioSlide,
   Capacitacion,
-  ConfiguracionEmpresa
+  ConfiguracionEmpresa,
+  SaldoInicialEmpleadoNomina
 } from '../types';
 import { obtenerPermisosPorDefecto } from '../data/usuariosYVotacionesData';
 
@@ -1164,6 +1165,76 @@ export const eliminarCapacitacionFB = async (capId: string): Promise<void> => {
     await deleteDoc(docRef);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `${path}/${capId}`);
+  }
+};
+
+/**
+ * Operaciones para Saldos Iniciales de Nómina y Empleados (Corte Contable / Migración)
+ */
+export const guardarSaldosInicialesLoteFB = async (
+  saldos: SaldoInicialEmpleadoNomina[]
+): Promise<{ success: boolean; count: number; error?: string }> => {
+  if (!saldos || saldos.length === 0) return { success: true, count: 0 };
+  const path = 'saldos_iniciales';
+  try {
+    const batch = writeBatch(db);
+    saldos.forEach(saldo => {
+      const docRef = doc(db, path, saldo.id);
+      batch.set(docRef, limpiarParaFirestore(saldo), { merge: true });
+    });
+    await batch.commit();
+
+    // Auditoría inmutable de la carga masiva
+    await registrarEventoAuditoria(
+      'CARGA_MASIVA_SALDOS',
+      'saldos_iniciales',
+      `Carga e integración masiva de saldos iniciales para ${saldos.length} colaborador(es).`,
+      null,
+      `lote-${Date.now()}`,
+      { cantidad: saldos.length }
+    );
+
+    return { success: true, count: saldos.length };
+  } catch (error: any) {
+    console.error('Error al guardar saldos iniciales en lote:', error);
+    return {
+      success: false,
+      count: 0,
+      error: error?.message || 'Error en transacción atómica de saldos iniciales'
+    };
+  }
+};
+
+export const guardarSaldoInicialFB = async (
+  saldo: SaldoInicialEmpleadoNomina
+): Promise<void> => {
+  const path = 'saldos_iniciales';
+  try {
+    const docRef = doc(db, path, saldo.id);
+    await setDoc(docRef, limpiarParaFirestore(saldo), { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${path}/${saldo.id}`);
+  }
+};
+
+export const obtenerSaldosInicialesFB = async (): Promise<SaldoInicialEmpleadoNomina[]> => {
+  const path = 'saldos_iniciales';
+  try {
+    const snap = await getDocs(collection(db, path));
+    return snap.docs.map(d => ({ ...(d.data() as SaldoInicialEmpleadoNomina), id: d.id }));
+  } catch (error) {
+    console.warn('Error al consultar saldos_iniciales en Firestore, usando fallback local:', error);
+    return [];
+  }
+};
+
+export const eliminarSaldoInicialFB = async (id: string): Promise<void> => {
+  const path = 'saldos_iniciales';
+  try {
+    const docRef = doc(db, path, id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${path}/${id}`);
   }
 };
 

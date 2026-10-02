@@ -35,6 +35,10 @@ import {
   generarAsuntoBienvenida
 } from '../utils/notificacionesCorreo';
 import {
+  validarCedulaDocumentoDian,
+  validarCorreoElectronicoDian
+} from '../utils/validadorDianEmpleado';
+import {
   AlertCircle,
   Check,
   CheckCircle2,
@@ -335,9 +339,18 @@ export function UsuariosView({
     const emailLimpio = (nuevoUsuario.email || '').trim().toLowerCase();
     const docLimpio = (nuevoUsuario.documento || '').trim();
 
-    if (!emailLimpio.includes('@') || !emailLimpio.includes('.')) {
-      setErrorFormulario('El correo electrónico ingresado no tiene un formato válido.');
+    const valEmail = validarCorreoElectronicoDian(emailLimpio, 'correo del usuario', true);
+    if (!valEmail.esValido) {
+      setErrorFormulario(`Validación DIAN / Email: ${valEmail.mensaje}`);
       return;
+    }
+
+    if (docLimpio && docLimpio !== '—') {
+      const valDoc = validarCedulaDocumentoDian(docLimpio, 'CC');
+      if (!valDoc.esValido) {
+        setErrorFormulario(`Validación DIAN / Cédula: ${valDoc.mensaje}`);
+        return;
+      }
     }
 
     // 2. Verificación de duplicados en el estado local actual

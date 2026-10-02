@@ -78,6 +78,7 @@ interface NominaViewProps {
   userRole: Role;
   currentEmpleadoId?: string;
   empresa?: ConfiguracionEmpresa;
+  onNavigate?: (view: string) => void;
 }
 
 export function NominaView({
@@ -85,7 +86,8 @@ export function NominaView({
   cargos,
   userRole,
   currentEmpleadoId,
-  empresa = initialEmpresa
+  empresa = initialEmpresa,
+  onNavigate
 }: NominaViewProps) {
   const [activeTab, setActiveTab] = useState<'periodo' | 'provisiones' | 'novedades' | 'vacaciones' | 'desprendible' | 'liquidacion' | 'parametros'>('periodo');
 
@@ -858,6 +860,18 @@ export function NominaView({
           </div>
 
           <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('saldos-iniciales')}
+                className="px-3 py-1.5 text-xs font-bold bg-white hover:bg-slate-50 text-[#18235C] border border-[#8FA7D6] rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Carga masiva de saldos iniciales de nómina y colaboradores"
+              >
+                <Database className="w-3.5 h-3.5 text-[#18235C]" />
+                <span>Saldos Iniciales</span>
+              </button>
+            )}
+
             <button
               onClick={() => ejecutarGuardadoNominaLoteAtómico()}
               disabled={sincronizandoLote}
@@ -1060,6 +1074,19 @@ export function NominaView({
             <Percent className="w-3.5 h-3.5" />
             Parámetros Legales 2026
           </button>
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('saldos-iniciales')}
+              className="pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 border-transparent text-emerald-700 hover:text-emerald-900"
+              title="Cargar de forma masiva saldos iniciales de nómina y empleados"
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-600" />
+              Saldos Iniciales
+              <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold">
+                Carga Masiva
+              </span>
+            </button>
+          )}
         </div>
       </div>
 

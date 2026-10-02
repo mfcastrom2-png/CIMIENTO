@@ -36,6 +36,7 @@ import { LoginView } from './components/LoginView';
 import { GestionDatosModal } from './components/GestionDatosModal';
 import { EmpresaConfigView } from './components/EmpresaConfigView';
 import { ConfiguracionBuzonCorreoView } from './components/ConfiguracionBuzonCorreoView';
+import { SaldosInicialesView } from './components/SaldosInicialesView';
 
 import {
   Bell,
@@ -429,6 +430,7 @@ function AppLayout() {
                     onCargarMasNube={cargarMasEmpleadosNube}
                     cargandoNube={cargandoNube}
                     onRefrescarNube={recargarDatosBajoDemanda}
+                    onNavigate={(view) => navigate('/' + view)}
                   />
                 }
               />
@@ -628,9 +630,37 @@ function AppLayout() {
                     userRole={userRole}
                     currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     empresa={empresa}
+                    onNavigate={(view) => navigate('/' + view)}
                   />
                 }
               />
+              <Route
+                path="/saldos-iniciales"
+                element={
+                  !isSuperAdmin && currentUser?.rol !== 'admin_gh' && !currentUser?.permisos?.includes('saldos-iniciales') && !currentUser?.permisos?.includes('nomina') ? (
+                    <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-xl shadow-xs border border-rose-200 text-center">
+                      <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <ShieldAlert className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-lg font-bold text-slate-800">Acceso No Autorizado a Saldos Iniciales</h2>
+                      <p className="text-sm text-slate-600 mt-2">
+                        La carga masiva de saldos iniciales de nómina y prestaciones está reservada para la Dirección de Gestión Humana y Administradores.
+                      </p>
+                    </div>
+                  ) : (
+                    <SaldosInicialesView
+                      empleados={empleados}
+                      cargos={cargos}
+                      userRole={userRole}
+                      currentUser={currentUser}
+                      empresa={empresa}
+                      isSuperAdmin={isSuperAdmin}
+                      onNavigate={(view) => navigate('/' + view)}
+                    />
+                  )
+                }
+              />
+              <Route path="/saldos" element={<Navigate to="/saldos-iniciales" replace />} />
               <Route
                 path="/parametros-nomina"
                 element={
