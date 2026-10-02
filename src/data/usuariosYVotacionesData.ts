@@ -3,23 +3,76 @@ import {
   LogAuditoriaUsuario,
   ProcesoVotacionSST,
   SolicitudVacacionDetalle,
-  UsuarioSistema
+  UsuarioSistema,
+  RolSistema
 } from '../types';
 
-export const MODULOS_SISTEMA = [
-  { id: 'dashboard', nombre: 'Dashboard', descripcion: 'Métricas generales, KPIs y accesos rápidos' },
-  { id: 'estructura', nombre: 'Estructura Organizacional', descripcion: 'Organigrama, áreas y dependencias jerárquicas' },
-  { id: 'cargos', nombre: 'Manual de Cargos', descripcion: 'Fichas técnicas, perfiles, requisitos y competencias' },
-  { id: 'empleados', nombre: 'Personas & Personal', descripcion: 'Hojas de vida, contratos, datos sociodemográficos' },
-  { id: 'evaluaciones', nombre: 'Evaluaciones de Desempeño', descripcion: 'Modelo de 100 pts, resultados, competencias y planes de desarrollo' },
-  { id: 'solicitudes', nombre: 'Solicitudes y Permisos', descripcion: 'Trámite y aprobación de permisos, licencias y certificados' },
-  { id: 'capacitaciones', nombre: 'Capacitaciones y Exámenes', descripcion: 'Plan anual, asistencia y evaluación técnica con certificados' },
-  { id: 'sst', nombre: 'SG-SST (Res. 0312/19 & Votaciones)', descripcion: '21 estándares, GTC 45, comités y elecciones de COPASST / Convivencia' },
-  { id: 'epps', nombre: 'Almacén & Inventario de EPPs', descripcion: 'Control de dotaciones, stock mínimo, entregas y actas Res. 2400' },
-  { id: 'nomina', nombre: 'Nómina & Novedades CST', descripcion: 'Liquidación salarial, novedades, parafiscales y vacaciones' },
-  { id: 'usuarios', nombre: 'Gestión de Usuarios', descripcion: 'Administración de cuentas, roles, permisos y auditoría de accesos' },
-  { id: 'documentos', nombre: 'Documentos y Salidas', descripcion: 'Generación y descarga de constancias, minutas y reportes oficiales' }
+export interface ModuloSistemaDef {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  categoria: 'General' | 'Organización' | 'Talento Humano' | 'SG-SST' | 'Finanzas' | 'Sistema';
+}
+
+export const MODULOS_SISTEMA: ModuloSistemaDef[] = [
+  // General
+  { id: 'dashboard', nombre: 'Dashboard Principal', descripcion: 'Métricas generales, KPIs institucionales y accesos directos', categoria: 'General' },
+  // Organización
+  { id: 'empresa', nombre: 'Datos de la Empresa', descripcion: 'Razón social, NIT, identidad visual institucional y sedes', categoria: 'Organización' },
+  { id: 'estructura', nombre: 'Estructura Organizacional', descripcion: 'Organigrama, procesos estratégicos, misionales y de apoyo', categoria: 'Organización' },
+  { id: 'cargos', nombre: 'Manual de Cargos', descripcion: 'Fichas técnicas de perfil, profesiogramas, funciones y competencias', categoria: 'Organización' },
+  // Talento Humano & Desempeño
+  { id: 'empleados', nombre: 'Gestión de Empleados', descripcion: 'Expediente digital 360°, contratos, hojas de vida y novedades', categoria: 'Talento Humano' },
+  { id: 'evaluaciones', nombre: 'Evaluaciones de Desempeño', descripcion: 'Modelo de 100 pts, resultados, competencias y planes de desarrollo', categoria: 'Talento Humano' },
+  { id: 'solicitudes', nombre: 'Solicitudes y Permisos', descripcion: 'Trámite, aprobación y visto bueno de permisos, licencias e incapacidades', categoria: 'Talento Humano' },
+  { id: 'vacaciones', nombre: 'Control de Vacaciones', descripcion: 'Seguimiento de días causados, disfrutados y calendario Ley Emiliani', categoria: 'Talento Humano' },
+  { id: 'capacitaciones', nombre: 'Plan de Capacitaciones', descripcion: 'Plan anual formativo, control de asistencia, exámenes técnicos y certificados', categoria: 'Talento Humano' },
+  // Seguridad y Salud en el Trabajo (SG-SST)
+  { id: 'sst', nombre: 'SG-SST Res. 0312/2019', descripcion: 'Autoevaluación de estándares mínimos y planes de mejoramiento PHVA', categoria: 'SG-SST' },
+  { id: 'matriz-gtc45', nombre: 'Matriz de Riesgos GTC 45', descripcion: 'Identificación de peligros, valoración de riesgos y jerarquía de controles', categoria: 'SG-SST' },
+  { id: 'indicadores-sst', nombre: 'Indicadores SG-SST', descripcion: 'Medición de estructura, proceso y resultado con fórmulas dinámicas y tendencias', categoria: 'SG-SST' },
+  { id: 'sst-examenes', nombre: 'Exámenes Médicos Ocupacionales', descripcion: 'Registro confidencial de conceptos de aptitud laboral y reserva médica', categoria: 'SG-SST' },
+  { id: 'epps', nombre: 'Almacén & Inventario de EPPs', descripcion: 'Dotaciones, control de stock mínimo, entregas y actas digitales de conformidad', categoria: 'SG-SST' },
+  { id: 'votaciones-sst', nombre: 'Votaciones & Comités (COPASST/CCL)', descripcion: 'Elecciones paritarias, censo electoral, emisión de voto y escrutinio', categoria: 'SG-SST' },
+  // Finanzas & Nómina
+  { id: 'nomina', nombre: 'Nómina & Liquidación CST', descripcion: 'Liquidaciones periódicas, novedades, aportes de ley y desprendibles', categoria: 'Finanzas' },
+  { id: 'parametros-nomina', nombre: 'Parámetros de Nómina', descripcion: 'Configuración oficial de SMMLV, auxilio, UVT, recargos y tarifas ARL', categoria: 'Finanzas' },
+  // Documentos & Gobernanza del Sistema
+  { id: 'documentos', nombre: 'Documentos y Salidas', descripcion: 'Generación de certificados laborales, actas y reportes institucionales', categoria: 'Sistema' },
+  { id: 'usuarios', nombre: 'Gestión de Usuarios & RBAC', descripcion: 'Administración de accesos, roles, asignación de permisos y 2FA', categoria: 'Sistema' },
+  { id: 'buzon-correo', nombre: 'Buzón de Notificaciones', descripcion: 'Configuración de servidor SMTP y bitácora de correos despachados', categoria: 'Sistema' },
+  { id: 'auditoria', nombre: 'Auditoría del Sistema', descripcion: 'Trazabilidad inmutable de eventos, cambios de nómina y seguridad', categoria: 'Sistema' }
 ];
+
+/**
+ * Matriz Oficial de Permisos Predeterminados por Rol del Sistema
+ */
+export const PERMISOS_POR_DEFECTO_POR_ROL: Record<RolSistema, string[]> = {
+  superadmin: MODULOS_SISTEMA.map(m => m.id),
+  admin_gh: [
+    'dashboard', 'empresa', 'estructura', 'cargos', 'empleados', 'evaluaciones',
+    'solicitudes', 'vacaciones', 'capacitaciones', 'sst', 'matriz-gtc45',
+    'indicadores-sst', 'sst-examenes', 'epps', 'votaciones-sst', 'nomina',
+    'parametros-nomina', 'documentos', 'usuarios', 'buzon-correo', 'auditoria'
+  ],
+  lider_area: [
+    'dashboard', 'empleados', 'evaluaciones', 'solicitudes', 'vacaciones',
+    'capacitaciones', 'epps', 'votaciones-sst', 'documentos'
+  ],
+  responsable_sst: [
+    'dashboard', 'cargos', 'empleados', 'solicitudes', 'capacitaciones', 'sst',
+    'matriz-gtc45', 'indicadores-sst', 'sst-examenes', 'epps',
+    'votaciones-sst', 'documentos'
+  ],
+  empleado: [
+    'dashboard', 'solicitudes', 'vacaciones', 'capacitaciones', 'evaluaciones',
+    'epps', 'votaciones-sst', 'nomina', 'documentos'
+  ]
+};
+
+export function obtenerPermisosPorDefecto(rol: RolSistema): string[] {
+  return PERMISOS_POR_DEFECTO_POR_ROL[rol] || PERMISOS_POR_DEFECTO_POR_ROL.empleado;
+}
 
 export const INITIAL_USUARIOS_SISTEMA: UsuarioSistema[] = [
   {
@@ -33,10 +86,7 @@ export const INITIAL_USUARIOS_SISTEMA: UsuarioSistema[] = [
     ultimoAcceso: '2026-09-15 12:40',
     fechaCreacion: '2026-01-01',
     dobleFactorHabilitado: true,
-    permisos: [
-      'dashboard', 'estructura', 'cargos', 'empleados', 'evaluaciones',
-      'solicitudes', 'capacitaciones', 'sst', 'epps', 'nomina', 'usuarios', 'documentos'
-    ]
+    permisos: obtenerPermisosPorDefecto('superadmin')
   },
   {
     id: 'usr-carlos-restrepo',
@@ -50,7 +100,7 @@ export const INITIAL_USUARIOS_SISTEMA: UsuarioSistema[] = [
     fechaCreacion: '2026-01-15',
     dobleFactorHabilitado: false,
     empleadoId: 'e-carlos-restrepo',
-    permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
+    permisos: obtenerPermisosPorDefecto('empleado')
   }
 ];
 

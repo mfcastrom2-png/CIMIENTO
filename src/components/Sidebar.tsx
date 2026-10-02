@@ -149,108 +149,149 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* SI ES EMPLEADO: SERVICIOS DIRECTOS DEL TRABAJADOR */}
         {esEmpleado && (
           <>
-            <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
-              Mis Servicios & Pagos
-            </div>
+            {(tienePermiso('nomina') || tienePermiso('epps') || tienePermiso('solicitudes') || tienePermiso('vacaciones')) && (
+              <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
+                Mis Servicios & Pagos
+              </div>
+            )}
 
-            <button
-              id="nav-nomina-empleado"
-              onClick={() => onNavigate('nomina')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                currentView === 'nomina'
-                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-              }`}
-            >
-              <FileDown className={`w-4 h-4 ${currentView === 'nomina' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-              <span>Mi Desprendible de Pago</span>
-            </button>
+            {tienePermiso('nomina') && (
+              <button
+                id="nav-nomina-empleado"
+                onClick={() => onNavigate('nomina')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  currentView === 'nomina'
+                    ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                    : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                }`}
+              >
+                <FileDown className={`w-4 h-4 ${currentView === 'nomina' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                <span>Mi Desprendible de Pago</span>
+              </button>
+            )}
 
-            <button
-              id="nav-epp-empleado"
-              onClick={() => onNavigate('epps')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                currentView === 'epps'
-                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-              }`}
-            >
-              <HardHat className={`w-4 h-4 ${currentView === 'epps' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-              <span>Solicitar EPPs & Dotación</span>
-            </button>
+            {tienePermiso('epps') && (
+              <button
+                id="nav-epp-empleado"
+                onClick={() => onNavigate('epps')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  currentView === 'epps'
+                    ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                    : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                }`}
+              >
+                <HardHat className={`w-4 h-4 ${currentView === 'epps' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                <span>Solicitar EPPs & Dotación</span>
+              </button>
+            )}
 
-            <button
-              id="nav-solicitudes-empleado"
-              onClick={() => onNavigate('solicitudes')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                currentView === 'solicitudes'
-                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-              }`}
-            >
-              <CalendarCheck className={`w-4 h-4 ${currentView === 'solicitudes' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-              <span>Permisos & Solicitudes</span>
-            </button>
+            {tienePermiso('solicitudes') && (
+              <button
+                id="nav-solicitudes-empleado"
+                onClick={() => onNavigate('solicitudes')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  currentView === 'solicitudes'
+                    ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                    : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                }`}
+              >
+                <CalendarCheck className={`w-4 h-4 ${currentView === 'solicitudes' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                <span>Permisos & Solicitudes</span>
+              </button>
+            )}
 
-            <button
-              id="nav-vacaciones-empleado"
-              onClick={() => onNavigate('vacaciones')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                currentView === 'vacaciones'
-                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-              }`}
-            >
-              <Palmtree className={`w-4 h-4 ${currentView === 'vacaciones' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-              <span>Mis Vacaciones</span>
-            </button>
+            {tienePermiso('vacaciones') && (
+              <button
+                id="nav-vacaciones-empleado"
+                onClick={() => onNavigate('vacaciones')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  currentView === 'vacaciones'
+                    ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                    : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                }`}
+              >
+                <Palmtree className={`w-4 h-4 ${currentView === 'vacaciones' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                <span>Mis Vacaciones</span>
+              </button>
+            )}
 
-            <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
-              Desempeño & Formación
-            </div>
+            {(tienePermiso('evaluaciones') || tienePermiso('capacitaciones')) && (
+              <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
+                Desempeño & Formación
+              </div>
+            )}
 
-            <button
-              id="nav-evaluaciones-empleado"
-              onClick={() => onNavigate('evaluaciones')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                currentView === 'evaluaciones'
-                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-              }`}
-            >
-              <Award className={`w-4 h-4 ${currentView === 'evaluaciones' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-              <span>Evaluación de Desempeño</span>
-            </button>
+            {tienePermiso('evaluaciones') && (
+              <button
+                id="nav-evaluaciones-empleado"
+                onClick={() => onNavigate('evaluaciones')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  currentView === 'evaluaciones'
+                    ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                    : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                }`}
+              >
+                <Award className={`w-4 h-4 ${currentView === 'evaluaciones' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                <span>Evaluación de Desempeño</span>
+              </button>
+            )}
 
-            <button
-              id="nav-capacitaciones-empleado"
-              onClick={() => onNavigate('capacitaciones')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                currentView === 'capacitaciones'
-                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-              }`}
-            >
-              <GraduationCap className={`w-4 h-4 ${currentView === 'capacitaciones' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-              <span>Mis Capacitaciones</span>
-            </button>
+            {tienePermiso('capacitaciones') && (
+              <button
+                id="nav-capacitaciones-empleado"
+                onClick={() => onNavigate('capacitaciones')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  currentView === 'capacitaciones'
+                    ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                    : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                }`}
+              >
+                <GraduationCap className={`w-4 h-4 ${currentView === 'capacitaciones' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                <span>Mis Capacitaciones</span>
+              </button>
+            )}
 
-            <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
-              Participación & SST
-            </div>
+            {tienePermiso('votaciones-sst') && (
+              <>
+                <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
+                  Participación & SST
+                </div>
 
-            <button
-              id="nav-votaciones-sst-empleado"
-              onClick={() => onNavigate('votaciones-sst')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                currentView === 'votaciones-sst'
-                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-              }`}
-            >
-              <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-              <span>Votaciones</span>
-            </button>
+                <button
+                  id="nav-votaciones-sst-empleado"
+                  onClick={() => onNavigate('votaciones-sst')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                    currentView === 'votaciones-sst'
+                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                  }`}
+                >
+                  <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                  <span>Votaciones</span>
+                </button>
+              </>
+            )}
+
+            {tienePermiso('documentos') && (
+              <>
+                <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
+                  Documentos & Certificados
+                </div>
+
+                <button
+                  id="nav-documentos-empleado"
+                  onClick={() => onNavigate('documentos')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                    currentView === 'documentos'
+                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                  }`}
+                >
+                  <FileText className={`w-4 h-4 ${currentView === 'documentos' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                  <span>Mis Certificados Laborales</span>
+                </button>
+              </>
+            )}
           </>
         )}
 
@@ -258,12 +299,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {!esEmpleado && (
           <>
             {/* SECCIÓN ORGANIZACIÓN */}
-            {(tienePermiso('estructura') || tienePermiso('cargos') || rol === 'superadmin' || rol === 'admin_gh') && (
+            {(tienePermiso('empresa') || tienePermiso('estructura') || tienePermiso('cargos') || rol === 'superadmin' || rol === 'admin_gh') && (
               <>
                 <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
                   Organización
                 </div>
-                {(rol === 'superadmin' || rol === 'admin_gh') && (
+                {(tienePermiso('empresa') || rol === 'superadmin' || rol === 'admin_gh') && (
                   <button
                     id="nav-empresa"
                     onClick={() => onNavigate('empresa')}
@@ -367,130 +408,142 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
 
             {/* SECCIÓN SEGURIDAD & SST */}
-            {(tienePermiso('sst') || tienePermiso('sst-examenes') || tienePermiso('examenes') || tienePermiso('epps') || esSST || rol === 'superadmin' || rol === 'admin_gh') && (
+            {(tienePermiso('sst') || tienePermiso('matriz-gtc45') || tienePermiso('indicadores-sst') || tienePermiso('sst-examenes') || tienePermiso('examenes') || tienePermiso('epps') || tienePermiso('votaciones-sst') || esSST || rol === 'superadmin' || rol === 'admin_gh') && (
               <>
                 <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
                   Seguridad & SG-SST
                 </div>
-                <button
-                  id="nav-sst"
-                  onClick={() => onNavigate('sst')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'sst'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <HardHat className={`w-4 h-4 ${currentView === 'sst' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                    <span>SG-SST Res. 0312</span>
-                  </div>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    currentView === 'sst' ? 'bg-[#18235C] text-[#8FA7D6]' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
-                  }`}>
-                    21 Estándares
-                  </span>
-                </button>
+                {(tienePermiso('sst') || esSST || rol === 'superadmin' || rol === 'admin_gh') && (
+                  <button
+                    id="nav-sst"
+                    onClick={() => onNavigate('sst')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'sst'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <HardHat className={`w-4 h-4 ${currentView === 'sst' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                      <span>SG-SST Res. 0312</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      currentView === 'sst' ? 'bg-[#18235C] text-[#8FA7D6]' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
+                    }`}>
+                      21 Estándares
+                    </span>
+                  </button>
+                )}
 
-                <button
-                  id="nav-matriz-gtc45"
-                  onClick={() => onNavigate('matriz-gtc45')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'matriz-gtc45' || currentView === 'matriz-riesgos'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Layers className={`w-4 h-4 ${currentView === 'matriz-gtc45' || currentView === 'matriz-riesgos' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                    <span>Matriz de Riesgos</span>
-                  </div>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    currentView === 'matriz-gtc45' || currentView === 'matriz-riesgos' ? 'bg-[#18235C] text-white' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
-                  }`}>
-                    GTC 45
-                  </span>
-                </button>
+                {(tienePermiso('matriz-gtc45') || tienePermiso('sst') || esSST || rol === 'superadmin' || rol === 'admin_gh') && (
+                  <button
+                    id="nav-matriz-gtc45"
+                    onClick={() => onNavigate('matriz-gtc45')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'matriz-gtc45' || currentView === 'matriz-riesgos'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Layers className={`w-4 h-4 ${currentView === 'matriz-gtc45' || currentView === 'matriz-riesgos' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                      <span>Matriz de Riesgos</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      currentView === 'matriz-gtc45' || currentView === 'matriz-riesgos' ? 'bg-[#18235C] text-white' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
+                    }`}>
+                      GTC 45
+                    </span>
+                  </button>
+                )}
 
-                <button
-                  id="nav-indicadores-sst"
-                  onClick={() => onNavigate('indicadores-sst')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'indicadores-sst' || currentView === 'sst-indicadores' || currentView === 'indicadores'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Target className={`w-4 h-4 ${currentView === 'indicadores-sst' || currentView === 'sst-indicadores' || currentView === 'indicadores' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-                    <span>Indicadores SG-SST</span>
-                  </div>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    currentView === 'indicadores-sst' || currentView === 'sst-indicadores' || currentView === 'indicadores' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
-                  }`}>
-                    PHVA / 0312
-                  </span>
-                </button>
+                {(tienePermiso('indicadores-sst') || tienePermiso('sst') || esSST || rol === 'superadmin' || rol === 'admin_gh') && (
+                  <button
+                    id="nav-indicadores-sst"
+                    onClick={() => onNavigate('indicadores-sst')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'indicadores-sst' || currentView === 'sst-indicadores' || currentView === 'indicadores'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Target className={`w-4 h-4 ${currentView === 'indicadores-sst' || currentView === 'sst-indicadores' || currentView === 'indicadores' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                      <span>Indicadores SG-SST</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      currentView === 'indicadores-sst' || currentView === 'sst-indicadores' || currentView === 'indicadores' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
+                    }`}>
+                      PHVA / 0312
+                    </span>
+                  </button>
+                )}
 
-                <button
-                  id="nav-sst-examenes"
-                  onClick={() => onNavigate('sst-examenes')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'sst-examenes' || currentView === 'examenes-medicos' || currentView === 'examenes'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Stethoscope className={`w-4 h-4 ${currentView === 'sst-examenes' || currentView === 'examenes-medicos' || currentView === 'examenes' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-                    <span>Exámenes Médicos</span>
-                  </div>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    currentView === 'sst-examenes' || currentView === 'examenes-medicos' || currentView === 'examenes' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
-                  }`}>
-                    SST
-                  </span>
-                </button>
+                {(tienePermiso('sst-examenes') || tienePermiso('examenes') || tienePermiso('sst') || esSST || rol === 'superadmin' || rol === 'admin_gh') && (
+                  <button
+                    id="nav-sst-examenes"
+                    onClick={() => onNavigate('sst-examenes')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'sst-examenes' || currentView === 'examenes-medicos' || currentView === 'examenes'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Stethoscope className={`w-4 h-4 ${currentView === 'sst-examenes' || currentView === 'examenes-medicos' || currentView === 'examenes' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                      <span>Exámenes Médicos</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      currentView === 'sst-examenes' || currentView === 'examenes-medicos' || currentView === 'examenes' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
+                    }`}>
+                      SST
+                    </span>
+                  </button>
+                )}
 
-                <button
-                  id="nav-epps"
-                  onClick={() => onNavigate('epps')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'epps'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Warehouse className={`w-4 h-4 ${currentView === 'epps' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                    <span>Inventario de EPPs</span>
-                  </div>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    currentView === 'epps' ? 'bg-[#18235C] text-white' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
-                  }`}>
-                    Almacén
-                  </span>
-                </button>
+                {(tienePermiso('epps') || esSST || rol === 'superadmin' || rol === 'admin_gh') && (
+                  <button
+                    id="nav-epps"
+                    onClick={() => onNavigate('epps')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'epps'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Warehouse className={`w-4 h-4 ${currentView === 'epps' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                      <span>Inventario de EPPs</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      currentView === 'epps' ? 'bg-[#18235C] text-white' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
+                    }`}>
+                      Almacén
+                    </span>
+                  </button>
+                )}
 
-                <button
-                  id="nav-votaciones-sst"
-                  onClick={() => onNavigate('votaciones-sst')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'votaciones-sst'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
-                    <span>Votaciones & Comités</span>
-                  </div>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    currentView === 'votaciones-sst' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
-                  }`}>
-                    COPASST
-                  </span>
-                </button>
+                {(tienePermiso('votaciones-sst') || tienePermiso('sst') || esSST || rol === 'superadmin' || rol === 'admin_gh') && (
+                  <button
+                    id="nav-votaciones-sst"
+                    onClick={() => onNavigate('votaciones-sst')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'votaciones-sst'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                      <span>Votaciones & Comités</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      currentView === 'votaciones-sst' ? 'bg-[#18235C] text-white' : 'bg-[#00FF00]/20 text-[#00FF00]'
+                    }`}>
+                      COPASST
+                    </span>
+                  </button>
+                )}
 
                 {tienePermiso('capacitaciones') && (
                   <button
@@ -517,67 +570,73 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
 
             {/* SECCIÓN FINANZAS & COMPENSACIÓN */}
-            {(tienePermiso('nomina') || rol === 'admin_gh' || rol === 'superadmin') && (
+            {(tienePermiso('nomina') || tienePermiso('parametros-nomina') || tienePermiso('vacaciones') || rol === 'admin_gh' || rol === 'superadmin') && (
               <>
                 <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
                   Finanzas & Compensación
                 </div>
-                <button
-                  id="nav-nomina"
-                  onClick={() => onNavigate('nomina')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'nomina'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Receipt className={`w-4 h-4 ${currentView === 'nomina' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                    <span>Nómina y Prestaciones</span>
-                  </div>
-                  <span className="text-[10px] bg-[#101740] text-[#00FF00] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                    <Lock className="w-2.5 h-2.5 text-[#00FF00]" />
-                    Admin
-                  </span>
-                </button>
+                {(tienePermiso('nomina') || rol === 'admin_gh' || rol === 'superadmin') && (
+                  <button
+                    id="nav-nomina"
+                    onClick={() => onNavigate('nomina')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'nomina'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Receipt className={`w-4 h-4 ${currentView === 'nomina' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                      <span>Nómina y Prestaciones</span>
+                    </div>
+                    <span className="text-[10px] bg-[#101740] text-[#00FF00] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                      <Lock className="w-2.5 h-2.5 text-[#00FF00]" />
+                      Admin
+                    </span>
+                  </button>
+                )}
 
-                <button
-                  id="nav-parametros-nomina"
-                  onClick={() => onNavigate('parametros-nomina')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'parametros-nomina'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Scale className={`w-4 h-4 ${currentView === 'parametros-nomina' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                    <span>Parámetros de Nómina</span>
-                  </div>
-                  <span className="text-[10px] bg-[#101740] text-[#00FF00] px-1.5 py-0.5 rounded font-bold">
-                    SMMLV
-                  </span>
-                </button>
+                {(tienePermiso('parametros-nomina') || rol === 'admin_gh' || rol === 'superadmin') && (
+                  <button
+                    id="nav-parametros-nomina"
+                    onClick={() => onNavigate('parametros-nomina')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'parametros-nomina'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Scale className={`w-4 h-4 ${currentView === 'parametros-nomina' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                      <span>Parámetros de Nómina</span>
+                    </div>
+                    <span className="text-[10px] bg-[#101740] text-[#00FF00] px-1.5 py-0.5 rounded font-bold">
+                      SMMLV
+                    </span>
+                  </button>
+                )}
 
-                <button
-                  id="nav-vacaciones"
-                  onClick={() => onNavigate('vacaciones')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'vacaciones'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Palmtree className={`w-4 h-4 ${currentView === 'vacaciones' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                    <span>Control de Vacaciones</span>
-                  </div>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    currentView === 'vacaciones' ? 'bg-[#18235C] text-[#8FA7D6]' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
-                  }`}>
-                    Art. 186 CST
-                  </span>
-                </button>
+                {(tienePermiso('vacaciones') || tienePermiso('nomina') || rol === 'admin_gh' || rol === 'superadmin') && (
+                  <button
+                    id="nav-vacaciones"
+                    onClick={() => onNavigate('vacaciones')}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                      currentView === 'vacaciones'
+                        ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                        : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Palmtree className={`w-4 h-4 ${currentView === 'vacaciones' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                      <span>Control de Vacaciones</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      currentView === 'vacaciones' ? 'bg-[#18235C] text-[#8FA7D6]' : 'bg-[#8FA7D6]/20 text-[#8FA7D6]'
+                    }`}>
+                      Art. 186 CST
+                    </span>
+                  </button>
+                )}
               </>
             )}
 
@@ -621,7 +680,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
 
-            {(rol === 'superadmin' || rol === 'admin_gh') && (
+            {(tienePermiso('buzon-correo') || rol === 'superadmin' || rol === 'admin_gh') && (
               <button
                 id="nav-buzon-correo"
                 onClick={() => onNavigate('buzon-correo')}

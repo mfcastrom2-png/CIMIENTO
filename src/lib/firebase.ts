@@ -53,6 +53,7 @@ import {
   Capacitacion,
   ConfiguracionEmpresa
 } from '../types';
+import { obtenerPermisosPorDefecto } from '../data/usuariosYVotacionesData';
 
 // 1. Inicialización de Firebase con soporte de Long Polling para proxies y contenedores
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -167,18 +168,19 @@ export const registrarConEmail = async (
   const credential = await createUserWithEmailAndPassword(auth, email.trim(), pass);
   await updateProfile(credential.user, { displayName: nombre });
 
-  // Crear perfil inicial seguro en la colección `usuarios` (Siempre rol: 'empleado' por defecto)
+  const rolValido = (rol as RolSistema) || 'empleado';
+  // Crear perfil inicial seguro en la colección `usuarios` con los permisos correspondientes a su rol
   const userProfile: UsuarioSistema = {
     id: credential.user.uid,
     nombre,
     email: email.trim().toLowerCase(),
     documento: documento || '—',
-    rol: 'empleado',
+    rol: rolValido,
     estado: 'activo',
     ultimoAcceso: new Date().toISOString(),
     fechaCreacion: new Date().toISOString(),
     dobleFactorHabilitado: false,
-    permisos: ['dashboard', 'solicitudes']
+    permisos: obtenerPermisosPorDefecto(rolValido)
   };
 
   await setDoc(doc(db, 'usuarios', credential.user.uid), userProfile);
@@ -202,7 +204,7 @@ export const loginConGoogle = async () => {
     ultimoAcceso: new Date().toISOString(),
     fechaCreacion: new Date().toISOString(),
     dobleFactorHabilitado: false,
-    permisos: ['dashboard', 'solicitudes']
+    permisos: obtenerPermisosPorDefecto('empleado')
   }};
 };
 
@@ -215,7 +217,17 @@ export const obtenerPerfilUsuario = async (uid: string, emailOpcional?: string):
     const userDocRef = doc(db, 'usuarios', uid);
     const userDoc = await getDoc(userDocRef);
     if (userDoc.exists()) {
-      const data = userDoc.data() as UsuarioSistema;
+      const rawData = userDoc.data() as UsuarioSistema;
+      const rolNormalizado = (rawData.rol as RolSistema) || 'empleado';
+      const permisosNormalizados = (Array.isArray(rawData.permisos) && rawData.permisos.length > 0)
+        ? rawData.permisos
+        : obtenerPermisosPorDefecto(rolNormalizado);
+      const data: UsuarioSistema = {
+        ...rawData,
+        rol: rolNormalizado,
+        permisos: permisosNormalizados
+      };
+
       // Auto-enlace con expediente de empleado si aún no tiene empleadoId asignado
       if (!data.empleadoId && data.email) {
         try {
@@ -281,7 +293,7 @@ export const obtenerPerfilUsuario = async (uid: string, emailOpcional?: string):
         ultimoAcceso: new Date().toISOString(),
         fechaCreacion: new Date().toISOString().split('T')[0],
         dobleFactorHabilitado: false,
-        permisos: ['dashboard', 'solicitudes']
+        permisos: obtenerPermisosPorDefecto('empleado')
       };
       await setDoc(userDocRef, perfilColaboradorDefault);
       return perfilColaboradorDefault;

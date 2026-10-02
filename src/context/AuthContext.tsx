@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { UsuarioSistema, Role } from '../types';
+import { UsuarioSistema, Role, RolSistema } from '../types';
 import { auth, db, cerrarSesion, obtenerPerfilUsuario } from '../lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { obtenerPermisosPorDefecto } from '../data/usuariosYVotacionesData';
 
 interface AuthContextType {
   currentUser: UsuarioSistema | null;
@@ -76,8 +77,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        setCurrentUser(profile);
-        setUserRoleState(profile.rol === 'empleado' ? 'empleado' : 'admin');
+        const rolNormalizado = (profile.rol as RolSistema) || 'empleado';
+        const profileNormalizado: UsuarioSistema = {
+          ...profile,
+          rol: rolNormalizado,
+          permisos: (Array.isArray(profile.permisos) && profile.permisos.length > 0)
+            ? profile.permisos
+            : obtenerPermisosPorDefecto(rolNormalizado)
+        };
+
+        setCurrentUser(profileNormalizado);
+        setUserRoleState(profileNormalizado.rol === 'empleado' ? 'empleado' : 'admin');
 
         // Suscripción en tiempo real: Inactivación o eliminación expulsa de inmediato (SEC-B05)
         unsubscribeDoc = onSnapshot(doc(db, 'usuarios', user.uid), async (docSnap) => {
@@ -94,8 +104,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUserRoleState('empleado');
             return;
           }
-          setCurrentUser(data);
-          setUserRoleState(data.rol === 'empleado' ? 'empleado' : 'admin');
+          const rolDoc = (data.rol as RolSistema) || 'empleado';
+          const dataNormalizada: UsuarioSistema = {
+            ...data,
+            rol: rolDoc,
+            permisos: (Array.isArray(data.permisos) && data.permisos.length > 0)
+              ? data.permisos
+              : obtenerPermisosPorDefecto(rolDoc)
+          };
+          setCurrentUser(dataNormalizada);
+          setUserRoleState(dataNormalizada.rol === 'empleado' ? 'empleado' : 'admin');
         }, (err) => {
           if (import.meta.env.DEV) {
             console.debug('Listener de usuario cerrado:', err);
@@ -127,8 +145,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginSuccess = (usuario: UsuarioSistema) => {
-    setCurrentUser(usuario);
-    setUserRoleState(usuario.rol === 'empleado' ? 'empleado' : 'admin');
+    const rolNormalizado = (usuario.rol as RolSistema) || 'empleado';
+    const usuarioNormalizado: UsuarioSistema = {
+      ...usuario,
+      rol: rolNormalizado,
+      permisos: (Array.isArray(usuario.permisos) && usuario.permisos.length > 0)
+        ? usuario.permisos
+        : obtenerPermisosPorDefecto(rolNormalizado)
+    };
+    setCurrentUser(usuarioNormalizado);
+    setUserRoleState(usuarioNormalizado.rol === 'empleado' ? 'empleado' : 'admin');
   };
 
   return (

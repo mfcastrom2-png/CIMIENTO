@@ -14,7 +14,7 @@ Se completó satisfactoriamente el ciclo integral de validación y aseguramiento
 1. **Reconocimiento & Análisis Estático:** Verificación de scripts, linters, compilación (`tsc --noEmit`), empaquetado de producción (`vite build`) e inventario completo de colecciones en Firestore.
 2. **Matriz de Pruebas Security-First:** Diseño y ejecución de 62 casos de prueba (52 automatizados con Vitest + 10 verificaciones de seguridad y usabilidad E2E).
 3. **Pruebas de Aislamiento Multi-Tenant & Reglas de Firestore:** Evaluación contra el emulador de Firebase validando aislamiento por `empresaId`, prevención de brechas `'' == ''`, inmutabilidad de roles, inmutabilidad de registros de auditoría y denegación por defecto.
-4. **Verificación de Lógica de Negocio:** Cálculos de nómina colombiana (SMMLV 2026 $1.560.000, Aux. Transporte $220.000, jornada Ley 2101 de 210h/mes, horas extras, FSP, exoneración Art. 114-1 E.T., liquidaciones definitivas CST), motor de evaluación de desempeño de 100 puntos y control de festivos Ley Emiliani.
+4. **Verificación de Lógica de Negocio:** Cálculos de nómina colombiana (SMMLV 2026 $1.750.905, Aux. Transporte $249.095, jornada Ley 2101 de 210h/mes, horas extras, FSP, exoneración Art. 114-1 E.T., liquidaciones definitivas CST), motor de evaluación de desempeño de 100 puntos y control de festivos Ley Emiliani.
 
 ---
 

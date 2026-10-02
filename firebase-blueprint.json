@@ -77,7 +77,7 @@
         "datosAnteriores": { "type": "object", "description": "Snapshot opcional previo al cambio" },
         "datosNuevos": { "type": "object", "description": "Snapshot opcional con los nuevos valores" },
         "usuario": { "type": "object", "description": "Detalles del usuario que ejecutó la acción: uid, email, nombre, rol" },
-        "empresaId": { "type": "string", "description": "Identificador de la empresa para segregación multi-tenant" }
+        "empresaId": { "type": "string", "description": "Identificador institucional referencial (Arquitectura Empresa Única)" }
       }
     },
     "AnuncioSlide": {

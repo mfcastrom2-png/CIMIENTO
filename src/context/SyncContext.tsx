@@ -22,7 +22,7 @@ import {
   initialEmpresa
 } from '../data/initialData';
 import { INITIAL_INVENTARIO_EPP, INITIAL_SOLICITUDES_ENTREGA_EPP } from '../data/eppData';
-import { INITIAL_USUARIOS_SISTEMA } from '../data/usuariosYVotacionesData';
+import { INITIAL_USUARIOS_SISTEMA, obtenerPermisosPorDefecto } from '../data/usuariosYVotacionesData';
 import {
   db,
   suscribirColeccion,
@@ -299,9 +299,16 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setInventarioEpp(eppData);
       setSolicitudesEpp(solEppData);
       if (usrData && usrData.length > 0) {
-        setUsuariosList(usrData);
+        const usrNormalizados = usrData.map(u => ({
+          ...u,
+          rol: u.rol || 'empleado',
+          permisos: (Array.isArray(u.permisos) && u.permisos.length > 0)
+            ? u.permisos
+            : obtenerPermisosPorDefecto(u.rol || 'empleado')
+        }));
+        setUsuariosList(usrNormalizados);
         try {
-          localStorage.setItem('bgroup_usuarios_cache', JSON.stringify(usrData));
+          localStorage.setItem('bgroup_usuarios_cache', JSON.stringify(usrNormalizados));
         } catch {}
       }
 
@@ -447,7 +454,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ultimoAcceso: 'Nunca',
         fechaCreacion: new Date().toISOString().slice(0, 10),
         dobleFactorHabilitado: false,
-        permisos: ['empleados', 'solicitudes', 'capacitaciones'],
+        permisos: obtenerPermisosPorDefecto('empleado'),
         empleadoId: empleado.id
       };
 

@@ -3,6 +3,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /**
+     * =========================================================================
+     * MODELO DE SEGURIDAD: EMPRESA ÚNICA (SINGLE-TENANT)
+     * =========================================================================
+     * Esta base de datos Firestore está dedicada exclusivamente a una única
+     * empresa institucional. Por diseño:
+     * 1. Las colecciones residen en la raíz (/empleados, /cargos, /nominas, etc.)
+     *    sin partición ni filtros por 'empresaId'.
+     * 2. El control de acceso se fundamenta en RBAC (Roles de Sistema) y Habeas
+     *    Data (titularidad individual del colaborador sobre sus propios datos
+     *    personales, médicos y salariales).
+     * 3. Los campos 'empresaId' presentes en el modelo son puramente referenciales.
+     * =========================================================================
+     */
+
     // Funciones auxiliares de autenticación y roles para empresa única
     function signedIn() {
       return request.auth != null;
@@ -291,6 +306,52 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if signedIn();
       allow update, delete: if false;
+    }
+
+    // 14. Módulo de Seguridad y Salud en el Trabajo (SG-SST) — Indicadores, Mediciones y Acciones
+    match /indicadores_sst/{indicadorId} {
+      allow read: if signedIn();
+      allow write: if isSSTorAdmin();
+    }
+
+    match /mediciones_indicadores_sst/{medicionId} {
+      allow read: if signedIn();
+      allow write: if isSSTorAdmin();
+    }
+
+    match /acciones_mejora_sst/{accionId} {
+      allow read: if signedIn();
+      allow write: if isSSTorAdmin();
+    }
+
+    // 15. Matriz de Identificación de Peligros y Valoración de Riesgos (GTC 45)
+    match /matriz_riesgos_gtc45/{peligroId} {
+      allow read: if signedIn();
+      allow write: if isSSTorAdmin();
+    }
+
+    // 16. Evaluaciones de Estándares Mínimos SST (Resolución 0312 de 2019)
+    match /evaluaciones_estandares_sst/{evalId} {
+      allow read: if signedIn();
+      allow write: if isSSTorAdmin();
+    }
+
+    // 17. Exámenes Médicos Ocupacionales (Datos Sensibles de Salud — Res. 2346/2007 & Ley 1581/2012)
+    // Lectura restringida a SST/Admin y al colaborador titular de su concepto de aptitud
+    match /examenes_medicos_ocupacionales/{examenId} {
+      allow read: if isSSTorAdmin()
+        || (
+          signedIn()
+          && (
+            (isEmailVerified() && resource.data.empleadoEmail == request.auth.token.email)
+            || (
+              exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+              && 'empleadoId' in currentUser().data
+              && resource.data.empleadoId == currentUser().data.empleadoId
+            )
+          )
+        );
+      allow write: if isSSTorAdmin();
     }
 
     // Default deny catch-all

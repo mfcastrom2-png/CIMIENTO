@@ -10,6 +10,33 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+// Encabezados básicos de endurecimiento de seguridad HTTP (OWASP Secure Headers)
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Control de tasa de peticiones en memoria para prevenir abusos / Spam Relay
+const emailRateLimiter = new Map<string, { count: number; resetAt: number }>();
+const MAX_EMAILS_PER_WINDOW = 30; // máx 30 envíos
+const WINDOW_MS = 60 * 1000; // ventana de 1 minuto
+
+function rateLimitCheck(ip: string): boolean {
+  const now = Date.now();
+  const record = emailRateLimiter.get(ip);
+  if (!record || now > record.resetAt) {
+    emailRateLimiter.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return true;
+  }
+  if (record.count >= MAX_EMAILS_PER_WINDOW) {
+    return false;
+  }
+  record.count++;
+  return true;
+}
+
 app.use(express.json({ limit: '10mb' }));
 
 /**
@@ -21,6 +48,7 @@ function crearTransporterSMTP(config: {
   seguridadSmtp: string;
   usuarioSmtp: string;
   passwordSmtp: string;
+  permitirInseguroTls?: boolean;
 }) {
   const isSecure = config.puertoSmtp === 465 || config.seguridadSmtp === 'SSL';
   
@@ -33,7 +61,8 @@ function crearTransporterSMTP(config: {
       pass: config.passwordSmtp.trim()
     } : undefined,
     tls: {
-      rejectUnauthorized: false
+      // Por defecto en producción rechaza certificados inválidos o autofirmados para prevenir ataques Man-In-The-Middle
+      rejectUnauthorized: config.permitirInseguroTls === true ? false : (process.env.NODE_ENV !== 'production' ? false : true)
     },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
@@ -45,6 +74,14 @@ function crearTransporterSMTP(config: {
  * ENDPOINT: Probar conexión SMTP en vivo y enviar correo real de prueba
  */
 app.post('/api/probar-conexion-smtp', async (req, res) => {
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+  if (!rateLimitCheck(clientIp)) {
+    return res.status(429).json({
+      success: false,
+      message: 'Demasiadas solicitudes de envío. Por favor espere un momento antes de reintentar.'
+    });
+  }
+
   const { config, emailDestino } = req.body;
 
   if (!config || !config.servidorSmtp || !config.emailRemitente) {
@@ -144,6 +181,14 @@ app.post('/api/probar-conexion-smtp', async (req, res) => {
  * ENDPOINT: Enviar cualquier correo institucional real
  */
 app.post('/api/enviar-correo-institucional', async (req, res) => {
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+  if (!rateLimitCheck(clientIp)) {
+    return res.status(429).json({
+      success: false,
+      message: 'Límite de tasa de despacho excedido. Por favor espere antes de enviar más correos.'
+    });
+  }
+
   const { config, destinatario, destinatarioNombre, asunto, cuerpoTexto, cuerpoHtml } = req.body;
 
   if (!config || !config.servidorSmtp || !config.emailRemitente) {

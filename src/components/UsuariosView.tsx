@@ -14,7 +14,9 @@ import {
 import {
   INITIAL_LOGS_AUDITORIA,
   INITIAL_USUARIOS_SISTEMA,
-  MODULOS_SISTEMA
+  MODULOS_SISTEMA,
+  PERMISOS_POR_DEFECTO_POR_ROL,
+  obtenerPermisosPorDefecto
 } from '../data/usuariosYVotacionesData';
 import {
   db,
@@ -155,7 +157,7 @@ export function UsuariosView({
             fechaCreacion: emp.laboral?.fechaIngreso || new Date().toISOString().split('T')[0],
             dobleFactorHabilitado: false,
             empleadoId: emp.id,
-            permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
+            permisos: obtenerPermisosPorDefecto('empleado')
           });
         }
       }
@@ -222,7 +224,7 @@ export function UsuariosView({
             fechaCreacion: emp.laboral?.fechaIngreso || new Date().toISOString().split('T')[0],
             dobleFactorHabilitado: false,
             empleadoId: emp.id,
-            permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'vacaciones', 'votaciones-sst', 'epps']
+            permisos: obtenerPermisosPorDefecto('empleado')
           });
         }
       }
@@ -265,7 +267,7 @@ export function UsuariosView({
     cargoNombre: '',
     estado: 'activo',
     dobleFactorHabilitado: false,
-    permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'sst', 'documentos']
+    permisos: obtenerPermisosPorDefecto('empleado')
   });
   const [passwordTemporal, setPasswordTemporal] = useState<string>('BGroup2026*');
   const [enviarNotificacionEmail, setEnviarNotificacionEmail] = useState<boolean>(true);
@@ -404,9 +406,9 @@ export function UsuariosView({
         dobleFactorHabilitado: Boolean(nuevoUsuario.dobleFactorHabilitado),
         password: claveAsignada,
         empleadoId: nuevoUsuario.empleadoId,
-        permisos: nuevoUsuario.permisos && nuevoUsuario.permisos.length > 0
+        permisos: (nuevoUsuario.permisos && nuevoUsuario.permisos.length > 0)
           ? nuevoUsuario.permisos
-          : ['dashboard', 'solicitudes', 'capacitaciones']
+          : obtenerPermisosPorDefecto((nuevoUsuario.rol as RolSistema) || 'empleado')
       };
 
       // 5. Guardar en Firestore de forma atómica
@@ -470,7 +472,7 @@ export function UsuariosView({
         cargoNombre: '',
         estado: 'activo',
         dobleFactorHabilitado: false,
-        permisos: ['dashboard', 'solicitudes', 'capacitaciones', 'sst', 'documentos']
+        permisos: obtenerPermisosPorDefecto('empleado')
       });
 
       mostrarNotificacion(`Usuario ${nuevo.nombre} creado con éxito.`);
@@ -487,13 +489,24 @@ export function UsuariosView({
     e.preventDefault();
     if (!usuarioEditando) return;
 
+    const rolNormalizado = (usuarioEditando.rol as RolSistema) || 'empleado';
+    const permisosFinales = (Array.isArray(usuarioEditando.permisos) && usuarioEditando.permisos.length > 0)
+      ? usuarioEditando.permisos
+      : obtenerPermisosPorDefecto(rolNormalizado);
+
+    const usuarioParaGuardar: UsuarioSistema = {
+      ...usuarioEditando,
+      rol: rolNormalizado,
+      permisos: permisosFinales
+    };
+
     try {
-      await guardarUsuarioFB(usuarioEditando);
+      await guardarUsuarioFB(usuarioParaGuardar);
     } catch (err) {
       console.warn('Error al actualizar usuario en Firestore:', err);
     }
 
-    const actualizadosEdit = usuarios.map(u => (u.id === usuarioEditando.id ? usuarioEditando : u));
+    const actualizadosEdit = usuarios.map(u => (u.id === usuarioParaGuardar.id ? usuarioParaGuardar : u));
     setUsuarios(actualizadosEdit);
     onActualizarUsuarios?.(actualizadosEdit);
 
@@ -501,7 +514,7 @@ export function UsuariosView({
       id: `log-${Date.now()}`,
       usuarioId: currentUser?.id || 'usr-admin',
       usuarioNombre: currentUser?.nombre || 'Administrador GH',
-      accion: `Actualización de perfil y permisos del usuario ${usuarioEditando.nombre}`,
+      accion: `Actualización de perfil (rol ${usuarioParaGuardar.rol}) y ${permisosFinales.length} permisos para ${usuarioParaGuardar.nombre}`,
       modulo: 'Gestión de Usuarios',
       ip: '190.158.42.12',
       fechaHora: new Date().toLocaleString('es-CO'),
@@ -511,7 +524,7 @@ export function UsuariosView({
 
     setModalEditarOpen(false);
     setUsuarioEditando(null);
-    mostrarNotificacion(`Cambios guardados para ${usuarioEditando.nombre}.`);
+    mostrarNotificacion(`Cambios guardados con éxito para ${usuarioParaGuardar.nombre}.`);
   };
 
   // Alternar estado activo/inactivo/bloqueado
@@ -706,17 +719,8 @@ export function UsuariosView({
         }
 
         // Normalizar accesos y permisos modulares según rol institucional
-        let permisosRequeridos = ['dashboard'];
-        const rol = u.rol || 'empleado';
-        if (rol === 'superadmin' || rol === 'admin_gh') {
-          permisosRequeridos = MODULOS_SISTEMA.map(m => m.id);
-        } else if (rol === 'lider_area') {
-          permisosRequeridos = ['dashboard', 'empleados', 'evaluaciones', 'solicitudes', 'capacitaciones', 'documentos'];
-        } else if (rol === 'responsable_sst') {
-          permisosRequeridos = ['dashboard', 'cargos', 'capacitaciones', 'sst', 'epps', 'documentos'];
-        } else {
-          permisosRequeridos = ['dashboard', 'solicitudes', 'capacitaciones', 'sst', 'documentos'];
-        }
+        const rol = (u.rol as RolSistema) || 'empleado';
+        const permisosRequeridos = obtenerPermisosPorDefecto(rol);
 
         const actualStr = (u.permisos || []).slice().sort().join(',');
         const nuevoStr = permisosRequeridos.slice().sort().join(',');
@@ -760,6 +764,71 @@ export function UsuariosView({
       mostrarNotificacion(`Error en depuración: ${err?.message || err}`);
     } finally {
       setDepurandoAccesos(false);
+    }
+  };
+
+  // Sincronizar permisos específicos de un usuario con los recomendados para su rol institucional
+  const handleSincronizarPermisosUsuario = async (usuario: UsuarioSistema) => {
+    const permisosSugeridos = obtenerPermisosPorDefecto(usuario.rol);
+    const usuarioActualizado: UsuarioSistema = { ...usuario, permisos: permisosSugeridos };
+
+    const actualizados = usuarios.map(u => (u.id === usuario.id ? usuarioActualizado : u));
+    setUsuarios(actualizados);
+    onActualizarUsuarios?.(actualizados);
+
+    try {
+      await guardarUsuarioFB(usuarioActualizado);
+    } catch (err) {
+      console.warn('Error al guardar permisos sincronizados en Firestore:', err);
+    }
+
+    const nuevoLog: LogAuditoriaUsuario = {
+      id: `log-${Date.now()}`,
+      usuarioId: currentUser?.id || 'usr-admin',
+      usuarioNombre: currentUser?.nombre || 'Administrador GH',
+      accion: `Sincronización de permisos según rol (${usuario.rol}) para el usuario ${usuario.nombre}`,
+      modulo: 'Gestión de Usuarios / RBAC',
+      ip: '190.158.42.12',
+      fechaHora: new Date().toLocaleString('es-CO'),
+      tipo: 'MODIFICACION'
+    };
+    setLogs(prev => [nuevoLog, ...prev]);
+    mostrarNotificacion(`Permisos de ${usuario.nombre} sincronizados con su rol (${usuario.rol}).`);
+  };
+
+  // Sincronizar permisos de TODOS los usuarios con la matriz oficial RBAC
+  const handleSincronizarTodosLosPermisos = async () => {
+    let modificados = 0;
+    const actualizados = usuarios.map(u => {
+      const sugeridos = obtenerPermisosPorDefecto(u.rol);
+      const actualSorted = (u.permisos || []).slice().sort().join(',');
+      const nuevoSorted = sugeridos.slice().sort().join(',');
+      if (actualSorted !== nuevoSorted) {
+        modificados++;
+        const uNuevo = { ...u, permisos: sugeridos };
+        guardarUsuarioFB(uNuevo).catch(() => {});
+        return uNuevo;
+      }
+      return u;
+    });
+
+    if (modificados > 0) {
+      setUsuarios(actualizados);
+      onActualizarUsuarios?.(actualizados);
+      const nuevoLog: LogAuditoriaUsuario = {
+        id: `log-${Date.now()}`,
+        usuarioId: currentUser?.id || 'usr-admin',
+        usuarioNombre: currentUser?.nombre || 'Administrador GH',
+        accion: `Sincronización masiva de permisos según matriz RBAC para ${modificados} usuarios`,
+        modulo: 'Gestión de Usuarios / RBAC',
+        ip: '190.158.42.12',
+        fechaHora: new Date().toLocaleString('es-CO'),
+        tipo: 'MODIFICACION'
+      };
+      setLogs(prev => [nuevoLog, ...prev]);
+      mostrarNotificacion(`Se sincronizaron los permisos de ${modificados} usuario(s) según la matriz oficial.`);
+    } else {
+      mostrarNotificacion('Todos los usuarios ya tienen sus permisos perfectamente alineados con la matriz.');
     }
   };
 
@@ -1103,7 +1172,15 @@ export function UsuariosView({
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => {
-                              setUsuarioEditando(u);
+                              const rolNormalizado = (u.rol as RolSistema) || 'empleado';
+                              const permisosNormalizados = (Array.isArray(u.permisos) && u.permisos.length > 0)
+                                ? u.permisos
+                                : obtenerPermisosPorDefecto(rolNormalizado);
+                              setUsuarioEditando({
+                                ...u,
+                                rol: rolNormalizado,
+                                permisos: permisosNormalizados
+                              });
                               setModalEditarOpen(true);
                             }}
                             className="p-1.5 text-[#18235C] hover:bg-[#8FA7D6]/20 rounded-md border border-transparent hover:border-[#8FA7D6] transition-colors"
@@ -1166,15 +1243,24 @@ export function UsuariosView({
       {activeTab === 'rolesMatriz' && (
         <div className="space-y-4">
           <div className="bg-[#FFFFFF] p-5 rounded-2xl border border-[#8FA7D6] shadow-sm">
-            <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
               <div>
                 <h3 className="text-base font-black text-[#18235C]">
-                  Matriz de Control de Acceso Basado en Roles (RBAC)
+                  Matriz Oficial de Control de Acceso Basado en Roles (RBAC)
                 </h3>
                 <p className="text-xs text-[#282829] mt-0.5">
-                  Visualice y audite la distribución de privilegios por módulo para garantizar la segregación de funciones, la reserva de información salarial y la confidencialidad en votaciones.
+                  Visualice y audite la distribución oficial de privilegios por módulo para garantizar la segregación de funciones, la reserva salarial y el principio de menor privilegio.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={handleSincronizarTodosLosPermisos}
+                className="px-3.5 py-2 bg-[#18235C] text-white hover:bg-[#101740] rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 shrink-0 cursor-pointer"
+                title="Alinear los permisos de todos los usuarios registrados según su rol oficial"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-[#00FF00]" />
+                <span>Sincronizar Permisos de Todos los Usuarios</span>
+              </button>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-[#8FA7D6] shadow-2xs">
@@ -1182,6 +1268,7 @@ export function UsuariosView({
                 <thead>
                   <tr className="bg-[#18235C] text-white text-[11px] font-bold">
                     <th className="p-3">Módulo del Sistema</th>
+                    <th className="p-3">Categoría</th>
                     <th className="p-3 text-center">Superadmin</th>
                     <th className="p-3 text-center">Admin GH</th>
                     <th className="p-3 text-center">Líder Área</th>
@@ -1197,25 +1284,43 @@ export function UsuariosView({
                         <div className="text-[10px] text-[#282829]/80">{m.descripcion}</div>
                       </td>
 
+                      <td className="p-3 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#8FA7D6]/20 text-[#18235C] border border-[#8FA7D6]/40">
+                          {m.categoria}
+                        </span>
+                      </td>
+
                       {/* Superadmin */}
                       <td className="p-3 text-center">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-800">
-                          <Check className="w-3.5 h-3.5 text-emerald-700" />
-                        </span>
+                        {PERMISOS_POR_DEFECTO_POR_ROL.superadmin.includes(m.id) ? (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-800" title="Acceso Total">
+                            <Check className="w-3.5 h-3.5 text-emerald-700" />
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-50 text-rose-400">
+                            <X className="w-3.5 h-3.5" />
+                          </span>
+                        )}
                       </td>
 
                       {/* Admin GH */}
                       <td className="p-3 text-center">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-800">
-                          <Check className="w-3.5 h-3.5 text-emerald-700" />
-                        </span>
+                        {PERMISOS_POR_DEFECTO_POR_ROL.admin_gh.includes(m.id) ? (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-800" title="Gestión Total GH">
+                            <Check className="w-3.5 h-3.5 text-emerald-700" />
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-50 text-rose-400">
+                            <X className="w-3.5 h-3.5" />
+                          </span>
+                        )}
                       </td>
 
                       {/* Líder de Área */}
                       <td className="p-3 text-center">
-                        {['dashboard', 'empleados', 'evaluaciones', 'solicitudes', 'capacitaciones', 'documentos'].includes(m.id) ? (
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-800">
-                            <Check className="w-3.5 h-3.5 text-emerald-700" />
+                        {PERMISOS_POR_DEFECTO_POR_ROL.lider_area.includes(m.id) ? (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-800" title="Gestión de Equipo">
+                            <Check className="w-3.5 h-3.5 text-blue-700" />
                           </span>
                         ) : (
                           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-50 text-rose-400">
@@ -1226,9 +1331,9 @@ export function UsuariosView({
 
                       {/* Responsable SST */}
                       <td className="p-3 text-center">
-                        {['dashboard', 'cargos', 'capacitaciones', 'sst', 'documentos'].includes(m.id) ? (
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-800">
-                            <Check className="w-3.5 h-3.5 text-emerald-700" />
+                        {PERMISOS_POR_DEFECTO_POR_ROL.responsable_sst.includes(m.id) ? (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-800" title="Gestión SG-SST">
+                            <Check className="w-3.5 h-3.5 text-amber-700" />
                           </span>
                         ) : (
                           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-50 text-rose-400">
@@ -1239,8 +1344,8 @@ export function UsuariosView({
 
                       {/* Empleado */}
                       <td className="p-3 text-center">
-                        {['dashboard', 'solicitudes', 'capacitaciones', 'sst', 'documentos'].includes(m.id) ? (
-                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#8FA7D6]/20 text-[#18235C]" title="Acceso a nivel de colaborador (Votar en SST, consultar su ficha, hacer solicitudes)">
+                        {PERMISOS_POR_DEFECTO_POR_ROL.empleado.includes(m.id) ? (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#8FA7D6]/20 text-[#18235C]" title="Autoservicio del Colaborador">
                             <Check className="w-3.5 h-3.5 text-[#18235C]" />
                           </span>
                         ) : (
@@ -1462,17 +1567,8 @@ export function UsuariosView({
                     value={nuevoUsuario.rol || 'empleado'}
                     onChange={e => {
                       const rol = e.target.value as RolSistema;
-                      let perms = ['dashboard'];
-                      if (rol === 'superadmin' || rol === 'admin_gh') {
-                        perms = MODULOS_SISTEMA.map(m => m.id);
-                      } else if (rol === 'lider_area') {
-                        perms = ['dashboard', 'empleados', 'evaluaciones', 'solicitudes', 'capacitaciones', 'documentos'];
-                      } else if (rol === 'responsable_sst') {
-                        perms = ['dashboard', 'cargos', 'capacitaciones', 'sst', 'documentos'];
-                      } else {
-                        perms = ['dashboard', 'solicitudes', 'capacitaciones', 'sst', 'documentos'];
-                      }
-                      setNuevoUsuario({ ...nuevoUsuario, rol, permisos: perms });
+                      const perms = obtenerPermisosPorDefecto(rol);
+                      setNuevoUsuario(prev => ({ ...prev, rol, permisos: perms }));
                     }}
                     className="w-full bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg px-2.5 py-1.5 text-xs text-[#282829] font-medium"
                   >
@@ -1504,9 +1600,39 @@ export function UsuariosView({
 
               {/* Selección modular de permisos */}
               <div>
-                <label className="block font-bold text-[#18235C] mb-2">
-                  Permisos de Acceso a Módulos:
-                </label>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                  <label className="block font-bold text-[#18235C]">
+                    Permisos de Acceso a Módulos ({(nuevoUsuario.permisos || []).length} de {MODULOS_SISTEMA.length} asignados):
+                  </label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rolActual = (nuevoUsuario.rol as RolSistema) || 'empleado';
+                        const permsRol = obtenerPermisosPorDefecto(rolActual);
+                        setNuevoUsuario(prev => ({ ...prev, permisos: permsRol }));
+                      }}
+                      className="text-[10px] font-bold text-[#18235C] bg-[#8FA7D6]/20 hover:bg-[#8FA7D6]/40 px-2 py-0.5 rounded border border-[#8FA7D6]/50 transition-colors"
+                      title="Restablece los permisos según la matriz oficial para este rol"
+                    >
+                      Matriz recomendada ({(nuevoUsuario.rol as string) || 'empleado'})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNuevoUsuario(prev => ({ ...prev, permisos: MODULOS_SISTEMA.map(m => m.id) }))}
+                      className="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200"
+                    >
+                      Todos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNuevoUsuario(prev => ({ ...prev, permisos: ['dashboard'] }))}
+                      className="text-[10px] text-rose-700 bg-rose-50 hover:bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200"
+                    >
+                      Solo Dashboard
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-2 bg-[#FFFFFF] p-3 rounded-xl border border-[#8FA7D6] max-h-40 overflow-y-auto">
                   {MODULOS_SISTEMA.map(m => {
                     const checked = (nuevoUsuario.permisos || []).includes(m.id);
@@ -1697,7 +1823,15 @@ export function UsuariosView({
                   <label className="block font-bold text-[#18235C] mb-1">Rol en Plataforma</label>
                   <select
                     value={usuarioEditando.rol}
-                    onChange={e => setUsuarioEditando({ ...usuarioEditando, rol: e.target.value as RolSistema })}
+                    onChange={e => {
+                      const nuevoRol = e.target.value as RolSistema;
+                      const nuevosPermisos = obtenerPermisosPorDefecto(nuevoRol);
+                      setUsuarioEditando({
+                        ...usuarioEditando,
+                        rol: nuevoRol,
+                        permisos: nuevosPermisos
+                      });
+                    }}
                     className="w-full bg-[#FFFFFF] border border-[#8FA7D6] rounded-lg px-2.5 py-1.5 text-xs text-[#282829] font-medium"
                   >
                     <option value="empleado">Colaborador / Empleado</option>
@@ -1725,21 +1859,51 @@ export function UsuariosView({
               </div>
 
               <div>
-                <label className="block font-bold text-[#18235C] mb-2">
-                  Permisos de Acceso Modulares:
-                </label>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                  <label className="block font-bold text-[#18235C]">
+                    Permisos de Acceso Modulares ({(usuarioEditando.permisos || []).length} de {MODULOS_SISTEMA.length} asignados):
+                  </label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const permsRol = obtenerPermisosPorDefecto(usuarioEditando.rol);
+                        setUsuarioEditando(prev => prev ? ({ ...prev, permisos: permsRol }) : null);
+                      }}
+                      className="text-[10px] font-bold text-[#18235C] bg-[#8FA7D6]/20 hover:bg-[#8FA7D6]/40 px-2 py-0.5 rounded border border-[#8FA7D6]/50 transition-colors"
+                      title="Restablece los permisos según la matriz oficial para este rol"
+                    >
+                      Matriz recomendada ({usuarioEditando.rol})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUsuarioEditando(prev => prev ? ({ ...prev, permisos: MODULOS_SISTEMA.map(m => m.id) }) : null)}
+                      className="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200"
+                    >
+                      Todos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUsuarioEditando(prev => prev ? ({ ...prev, permisos: ['dashboard'] }) : null)}
+                      className="text-[10px] text-rose-700 bg-rose-50 hover:bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200"
+                    >
+                      Solo Dashboard
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-2 bg-[#FFFFFF] p-3 rounded-xl border border-[#8FA7D6] max-h-40 overflow-y-auto">
                   {MODULOS_SISTEMA.map(m => {
-                    const checked = usuarioEditando.permisos.includes(m.id);
+                    const checked = (usuarioEditando.permisos || []).includes(m.id);
                     return (
                       <label key={m.id} className="flex items-center gap-2 text-[11px] cursor-pointer">
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => {
+                            const actual = usuarioEditando.permisos || [];
                             const updated = checked
-                              ? usuarioEditando.permisos.filter(p => p !== m.id)
-                              : [...usuarioEditando.permisos, m.id];
+                              ? actual.filter(p => p !== m.id)
+                              : [...actual, m.id];
                             setUsuarioEditando({ ...usuarioEditando, permisos: updated });
                           }}
                           className="rounded text-[#18235C] focus:ring-0"

@@ -1,3 +1,19 @@
+/**
+ * ============================================================================
+ * ARQUITECTURA OFICIAL DEL SISTEMA: EMPRESA ÚNICA (SINGLE-TENANT)
+ * ============================================================================
+ * Cada despliegue de esta aplicación e instancia de base de datos Firestore
+ * corresponde a una única empresa corporativa institucional (ej. CIMIENTO S.A.S.).
+ *
+ * En este modelo de Empresa Única:
+ * - Toda la base de datos y colecciones operan para la entidad institucional única.
+ * - La seguridad y reglas de acceso se rigen por Roles (RBAC: superadmin, admin_gh,
+ *   responsable_sst, lider_area, empleado) y titularidad individual de datos
+ *   (Habeas Data / Ley 1581 de 2012), sin requerir partición por tenant.
+ * - Cualquier campo 'empresaId' opcional es de naturaleza referencial.
+ * ============================================================================
+ */
+
 export type Role = 'admin' | 'empleado';
 
 export type Modalidad = 'Presencial' | 'Remoto' | 'Híbrido';
@@ -397,7 +413,7 @@ export interface EventoHistorialLaboral {
 
 export interface Empleado {
   id: string;
-  empresaId?: string; // Multi-Tenancy
+  empresaId?: string; // Referencial (Arquitectura Empresa Única)
   codigo?: string;
   codigoInterno?: string;
   nombre: string;
@@ -434,7 +450,7 @@ export interface Empleado {
 
 export interface Solicitud {
   id: string;
-  empresaId?: string; // Multi-Tenancy
+  empresaId?: string; // Referencial (Arquitectura Empresa Única)
   empresaNombre?: string;
   sedeTrabajo?: string;
   empleadoId: string;
@@ -1025,7 +1041,7 @@ export interface UsuarioSistema {
   documento: string;
   email: string;
   rol: RolSistema;
-  empresaId?: string; // Aislamiento Multi-Tenant (ej. 'empresa-bgroup-001')
+  empresaId?: string; // Referencial (Arquitectura Empresa Única)
   empleadoId?: string; // Vinculación con registro de empleado
   cargoNombre?: string;
   estado: EstadoUsuario;

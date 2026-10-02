@@ -38,7 +38,7 @@
 | **SEC-010** | Catch-All Rules | **APROBADO** | Regla final deniega cualquier ruta no especificada en el archivo `.rules`. |
 | **EV-001** | Ponderación Evaluación | **APROBADO** | La suma de componentes es exactamente 100% (50% + 25% + 15% + 10%). |
 | **EV-002** | Detección Sesgos | **APROBADO** | Alerta por Efecto Halo e Indulgencia generada al detectar puntajes perfectos. |
-| **NOM-001** | Nómina 1 SMMLV | **APROBADO** | Cálculo exacto de salud ($62.400), pensión ($62.400) y aux. transporte ($220.000). |
+| **NOM-001** | Nómina 1 SMMLV | **APROBADO** | Cálculo exacto de salud ($70.036), pensión ($70.036), aux. transporte ($249.095) y neto a pagar ($1.859.928) para SMMLV 2026 ($1.750.905). |
 | **NOM-002** | Topes Ley Nómina | **APROBADO** | FSP del 1% aplicado correctamente a salarios >= 4 SMMLV. |
 | **NOM-003** | Liquidación CST | **APROBADO** | Indemnización por despido injusto calculada conforme Art. 64 del CST. |
 | **VAC-001** | Ley Emiliani | **APROBADO** | Exclusión precisa de festivos oficiales colombianos 2026/2027 y fines de semana. |

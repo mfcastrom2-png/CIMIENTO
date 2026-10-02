@@ -47,7 +47,7 @@
   2. Evaluar `anosCompletos = diasTotalesLaborados / 360`.
   3. Resultado da `364 / 360 = 1.011` años completos.
 - **Resultado Esperado:** Un año laboral comercial completo de 12 meses debe equivaler a 360 días de trabajo según la norma laboral colombiana.
-- **Resultado Obtenido:** Da 1.0111 años, incrementando ligeramente el valor indemnizatorio ($1.571.556 COP en vez de $1.560.000 COP).
+- **Resultado Obtenido:** Da 1.0111 años, incrementando ligeramente el valor indemnizatorio ($1.770.340 COP en vez de $1.750.905 COP).
 - **Evidencia:**
   ```typescript
   // src/services/payrollEngine.ts:317
