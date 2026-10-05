@@ -39,7 +39,8 @@ import {
   CheckCircle2,
   Clock,
   Award,
-  HardDrive
+  HardDrive,
+  Database
 } from 'lucide-react';
 import { uid, initialEmpresa } from '../data/initialData';
 import { DriveLinkField } from './common/DriveLinkField';
@@ -173,7 +174,8 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
     { id: 'estructura', label: '4. Cargo & Estructura', icon: Layers },
     { id: 'compensacion', label: '5. Compensación', icon: DollarSign },
     { id: 'seguridadSocial', label: '6. Seguridad Social', icon: ShieldCheck },
-    { id: 'academica', label: '7. Formación Académica', icon: GraduationCap },
+    { id: 'saldosIniciales', label: '7. Saldos Iniciales / Empalme', icon: Database },
+    { id: 'academica', label: '8. Formación Académica', icon: GraduationCap },
     { id: 'experiencia', label: '8. Experiencia Laboral', icon: History },
     { id: 'sst', label: '9. Información SST', icon: HardHat },
     { id: 'documentos', label: `10. Documentos (${(empleado.documentos || []).length})`, icon: FileText },
@@ -635,6 +637,171 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                 <span className="text-slate-800 font-semibold">{empleado.seguridadSocial?.tipoAfiliacion || 'Cotizante Dependiente'}</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB 7: SALDOS INICIALES Y EMPALME CONTABLE */}
+        {activeTab === 'saldosIniciales' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <h3 className="font-bold text-base text-[#18235C]">
+                Expediente Digital – Pestaña 7: Saldos Iniciales, Acumulados y Empalme
+              </h3>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#18235C] text-white">
+                Finanzas & Nómina
+              </span>
+            </div>
+
+            {empleado.saldoInicial ? (
+              <div className="space-y-4 text-xs">
+                {/* Resumen del Corte */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-[#18235C] block">Fecha de Corte de Saldos Cargada:</span>
+                    <span className="font-mono text-slate-700">{empleado.saldoInicial.fechaCorteSaldos || 'No especificada'}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#18235C] block">Registrado Por:</span>
+                    <span className="text-slate-700">{empleado.saldoInicial.creadoPor || 'Administrador GH'}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-[#18235C] block">Fecha de Registro:</span>
+                    <span className="font-mono text-slate-700">
+                      {empleado.saldoInicial.fechaRegistro ? new Date(empleado.saldoInicial.fechaRegistro).toLocaleDateString('es-CO') : '—'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 1. Pasivos Prestacionales */}
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                  <h4 className="font-bold text-xs text-[#18235C] uppercase tracking-wider flex items-center gap-1.5">
+                    <Database className="w-4 h-4 text-[#18235C]" />
+                    <span>1. Prestaciones Sociales y Pasivos Laborales Acumulados</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Vacaciones Pendientes:</span>
+                      <span className="text-[#18235C] font-extrabold text-sm">{empleado.saldoInicial.vacacionesDiasPendientes} días</span>
+                      <span className="text-slate-500 text-[10px] block mt-0.5">
+                        ${(empleado.saldoInicial.vacacionesValorAcumuladoCOP || 0).toLocaleString('es-CO')} COP
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Cesantías Acumuladas:</span>
+                      <span className="text-[#18235C] font-extrabold text-sm">
+                        ${(empleado.saldoInicial.cesantiasSaldoAcumuladoCOP || 0).toLocaleString('es-CO')} COP
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Intereses a Cesantías:</span>
+                      <span className="text-[#18235C] font-extrabold text-sm">
+                        ${(empleado.saldoInicial.interesesCesantiasAcumuladoCOP || 0).toLocaleString('es-CO')} COP
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Prima de Servicios Acumulada:</span>
+                      <span className="text-[#18235C] font-extrabold text-sm">
+                        ${(empleado.saldoInicial.primaServiciosBaseSemestreCOP || 0).toLocaleString('es-CO')} COP
+                      </span>
+                      <span className="text-slate-500 text-[10px] block mt-0.5">
+                        {empleado.saldoInicial.diasTrabajadosSemestrePrima || 0} días computables
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Acumulados Tributarios DIAN */}
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                  <h4 className="font-bold text-xs text-[#18235C] uppercase tracking-wider flex items-center gap-1.5">
+                    <DollarSign className="w-4 h-4 text-[#18235C]" />
+                    <span>2. Acumulados Tributarios y Retención en la Fuente (Art. 383 E.T.)</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Ingresos Brutos Año:</span>
+                      <span className="text-slate-900 font-bold">
+                        ${(empleado.saldoInicial.ingresosLaboralesAcumuladosAnoCOP || 0).toLocaleString('es-CO')} COP
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Aportes Salud Año:</span>
+                      <span className="text-slate-900 font-bold">
+                        ${(empleado.saldoInicial.saludAportesAcumuladosAnoCOP || 0).toLocaleString('es-CO')} COP
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Aportes Pensión Año:</span>
+                      <span className="text-slate-900 font-bold">
+                        ${(empleado.saldoInicial.pensionAportesAcumuladosAnoCOP || 0).toLocaleString('es-CO')} COP
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Retención Practicada Año:</span>
+                      <span className="text-emerald-700 font-bold">
+                        ${(empleado.saldoInicial.retencionFuenteAcumuladaAnoCOP || 0).toLocaleString('es-CO')} COP
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Deducciones Recurrentes */}
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                  <h4 className="font-bold text-xs text-[#18235C] uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-[#18235C]" />
+                    <span>3. Carteras de Préstamos, Libranzas y Embargos Activos</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Préstamo Empresa:</span>
+                      <span className="text-slate-900 font-bold">
+                        Saldo: ${(empleado.saldoInicial.prestamoEmpresaSaldoCOP || 0).toLocaleString('es-CO')}
+                      </span>
+                      <span className="text-slate-500 text-[10px] block mt-0.5">
+                        Cuota: ${(empleado.saldoInicial.prestamoEmpresaCuotaMensualCOP || 0).toLocaleString('es-CO')}/mes
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Libranzas Bancarias:</span>
+                      <span className="text-slate-900 font-bold">
+                        Saldo: ${(empleado.saldoInicial.libranzaSaldoCOP || 0).toLocaleString('es-CO')}
+                      </span>
+                      <span className="text-slate-500 text-[10px] block mt-0.5">
+                        Cuota: ${(empleado.saldoInicial.libranzaCuotaMensualCOP || 0).toLocaleString('es-CO')}/mes
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Embargos Judiciales:</span>
+                      <span className="text-amber-800 font-bold">
+                        Saldo: ${(empleado.saldoInicial.embargoJudicialSaldoCOP || 0).toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Otras Deducciones Fijas:</span>
+                      <span className="text-slate-900 font-bold">
+                        ${(empleado.saldoInicial.otrasDeduccionesFijasMensualCOP || 0).toLocaleString('es-CO')}/mes
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {empleado.saldoInicial.observaciones && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">
+                    <span className="font-bold block mb-0.5">Observaciones de Empalme:</span>
+                    <span>{empleado.saldoInicial.observaciones}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <Database className="w-10 h-10 text-slate-400 mx-auto" />
+                <p className="text-slate-600 font-bold text-sm">
+                  Este colaborador no tiene un registro de Saldo Inicial / Empalme Contable asignado.
+                </p>
+                <p className="text-slate-500 text-xs max-w-md mx-auto">
+                  Puedes cargar o importar su saldo inicial desde la opción de "Carga Masiva de Saldos Iniciales" en Finanzas & GH para incluir sus días de vacaciones acumulados y deducciones.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

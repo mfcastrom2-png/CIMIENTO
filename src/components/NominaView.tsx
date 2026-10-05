@@ -22,7 +22,11 @@ import {
   obtenerParametrosConfigurados,
   parseSalarioNumerico,
   restablecerParametrosLegales,
-  simularLiquidacionDefinitiva
+  simularLiquidacionDefinitiva,
+  estaEmpleadoDisponibleEnPeriodo,
+  calcularDiasDefectoPeriodoEmpleado,
+  filtrarEmpleadosDisponiblesEnPeriodo,
+  obtenerFechaIngresoEmpleado
 } from '../services/payrollEngine';
 import { obtenerParametrosNominaFB } from '../lib/firebase';
 import { descargarElementoComoPdf, imprimirDocumento } from '../utils/printUtils';
@@ -229,8 +233,20 @@ export function NominaView({
   // Empleado seleccionado para editar novedades en modal o panel
   const [empleadoEditandoNovedad, setEmpleadoEditandoNovedad] = useState<string | null>(null);
 
+  // Empleados disponibles para liquidar nómina en el período activo según su fecha de ingreso y vigencia laboral
+  const empleadosDisponibles = useMemo(() => {
+    return filtrarEmpleadosDisponiblesEnPeriodo(empleados, periodoActivo);
+  }, [empleados, periodoActivo]);
+
   // Empleado seleccionado para ver desprendible
   const [empleadoDesprendibleId, setEmpleadoDesprendibleId] = useState<string>(empleados[0]?.id || 'e1');
+
+  // Sincronizar el empleado del desprendible si el actual no está disponible en este período
+  useEffect(() => {
+    if (empleadosDisponibles.length > 0 && !empleadosDisponibles.some(e => e.id === empleadoDesprendibleId)) {
+      setEmpleadoDesprendibleId(empleadosDisponibles[0].id);
+    }
+  }, [empleadosDisponibles, empleadoDesprendibleId]);
 
   // Paginación y búsqueda para planilla de nómina (lotes de 25 colaboradores)
   const [filtroLiquidaciones, setFiltroLiquidaciones] = useState('');
@@ -304,14 +320,15 @@ export function NominaView({
   const [sincronizandoLote, setSincronizandoLote] = useState(false);
   const [mensajeSincronizacion, setMensajeSincronizacion] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
 
-  // 1. Liquidaciones automáticas calculadas de todos los empleados
+  // 1. Liquidaciones automáticas calculadas de los empleados disponibles en el período (según fecha de ingreso)
   const liquidaciones = useMemo(() => {
-    return empleados.map(emp => {
+    return empleadosDisponibles.map(emp => {
       const cargo = cargos.find(c => c.id === emp.cargoId);
       const cargoNombre = cargo ? cargo.nombre : 'Sin cargo asignado';
       const cargoCodigo = cargo ? cargo.ficha.identificacion.codigo : '';
+      const diasPorDefecto = calcularDiasDefectoPeriodoEmpleado(emp, periodoActivo);
       const novedades = novedadesMap[emp.id] || {
-        diasTrabajados: 30,
+        diasTrabajados: diasPorDefecto,
         horasExtrasDiurnas: 0,
         horasExtrasNocturnas: 0,
         horasFestivasDiurnas: 0,
@@ -327,7 +344,7 @@ export function NominaView({
 
       return calcularLiquidacionEmpleado(emp, cargoNombre, cargoCodigo, novedades, parametrosLegales);
     });
-  }, [empleados, cargos, novedadesMap, parametrosLegales]);
+  }, [empleadosDisponibles, cargos, novedadesMap, parametrosLegales, periodoActivo]);
 
   // Persistencia atómica de nómina mediante writeBatch en Firestore
   const ejecutarGuardadoNominaLoteAtómico = async (estadoPeriodo?: 'Borrador' | 'Liquidada' | 'Pagada') => {
@@ -379,15 +396,22 @@ export function NominaView({
   // VISTA ESPECIALIZADA PARA EL ROL EMPLEADO: Consulta y descarga exclusiva de su propio desprendible
   if (userRole === 'empleado') {
     const miEmpleadoId = currentEmpleadoId || 'e6';
-    const miLiquidacion = liquidaciones.find(l => l.empleadoId === miEmpleadoId) || liquidaciones[0];
+    const miEmpleadoObj = empleados.find(e => e.id === miEmpleadoId);
+    const estaDisponibleEnPeriodo = miEmpleadoObj ? estaEmpleadoDisponibleEnPeriodo(miEmpleadoObj, periodoActivo) : true;
+    const miLiquidacion = liquidaciones.find(l => l.empleadoId === miEmpleadoId);
 
     if (!miLiquidacion) {
+      const fechaIngresoEmp = miEmpleadoObj ? obtenerFechaIngresoEmpleado(miEmpleadoObj) : undefined;
       return (
         <div className="bg-white rounded-2xl border border-[#8FA7D6] p-10 text-center max-w-lg mx-auto space-y-3 shadow-xs">
           <Receipt className="w-12 h-12 text-[#8FA7D6] mx-auto opacity-70" />
-          <h3 className="font-bold text-base text-[#18235C]">No hay liquidación de nómina activa</h3>
+          <h3 className="font-bold text-base text-[#18235C]">
+            {!estaDisponibleEnPeriodo ? 'Período anterior a su fecha de ingreso' : 'No hay liquidación de nómina activa'}
+          </h3>
           <p className="text-xs text-[#282829]/70 leading-relaxed">
-            La base de datos de nómina se encuentra en estado limpio para producción. En cuanto el área de Gestión Humana configure los colaboradores y cierre el período, aquí aparecerán sus colillas de pago oficiales.
+            {!estaDisponibleEnPeriodo
+              ? `Su fecha oficial de vinculación laboral es ${fechaIngresoEmp}. Sus desprendibles de nómina se encuentran disponibles a partir del período correspondiente a su ingreso.`
+              : 'La base de datos de nómina se encuentra en estado limpio para producción. En cuanto el área de Gestión Humana configure los colaboradores y cierre el período, aquí aparecerán sus colillas de pago oficiales.'}
           </p>
         </div>
       );
@@ -942,7 +966,7 @@ export function NominaView({
               {formatMonedaCOP(totales.totalNetoPagar)}
             </div>
             <div className="text-[10px] text-[#282829]/70 mt-0.5 font-medium">
-              {liquidaciones.length} colaboradores activos en nómina
+              {liquidaciones.length} colaboradores habilitados en este período ({empleados.length} en base total)
             </div>
           </div>
 
@@ -1102,7 +1126,7 @@ export function NominaView({
                     Mes comercial (30 días)
                   </span>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#18235C] text-white">
-                    Mostrando {liquidacionesPaginadas.length} de {liquidacionesFiltradas.length}
+                    Mostrando {liquidacionesPaginadas.length} de {liquidacionesFiltradas.length} disponibles según fecha de ingreso
                   </span>
                 </h3>
                 <p className="text-xs text-[#282829] mt-0.5">
@@ -1160,14 +1184,32 @@ export function NominaView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#8FA7D6]/30">
-                  {liquidacionesPaginadas.map(liq => (
+                  {liquidacionesPaginadas.map(liq => {
+                    const empObj = empleados.find(e => e.id === liq.empleadoId);
+                    const fechaIngresoStr = empObj ? obtenerFechaIngresoEmpleado(empObj) : '';
+                    const esMesIngreso = fechaIngresoStr.startsWith(`${periodoActivo.ano}-${String(periodoActivo.mes).padStart(2, '0')}`);
+
+                    return (
                     <tr key={liq.empleadoId} className="hover:bg-[#8FA7D6]/10 transition-colors">
                       <td className="py-3 px-3">
-                        <div className="font-bold text-[#18235C]">{liq.empleadoNombre}</div>
-                        <div className="text-[10px] text-[#282829] flex items-center gap-1.5">
+                        <div className="font-bold text-[#18235C] flex items-center gap-1.5 flex-wrap">
+                          <span>{liq.empleadoNombre}</span>
+                          {esMesIngreso && (
+                            <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[9px] font-bold">
+                              Ingreso: {fechaIngresoStr} ({liq.novedades.diasTrabajados}d)
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-[#282829] flex items-center gap-1.5 flex-wrap">
                           <span>CC: {liq.empleadoDocumento}</span>
                           <span>•</span>
                           <span className="text-[#18235C] font-semibold">{liq.cargoNombre}</span>
+                          {fechaIngresoStr && !esMesIngreso && (
+                            <>
+                              <span>•</span>
+                              <span className="text-[#282829]/70">Ingreso: {fechaIngresoStr}</span>
+                            </>
+                          )}
                         </div>
                       </td>
 
@@ -1252,7 +1294,8 @@ export function NominaView({
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {liquidacionesFiltradas.length === 0 && liquidaciones.length > 0 && (
                     <tr>
                       <td colSpan={11} className="py-8 px-4 text-center text-[#282829]/70">
@@ -1520,7 +1563,7 @@ export function NominaView({
       {activeTab === 'provisiones' && (
         <ReservasProvisionesView
           periodoActivo={periodoActivo}
-          empleados={empleados}
+          empleados={empleadosDisponibles}
           cargos={cargos}
           liquidaciones={liquidaciones}
           parametros={parametrosLegales}
@@ -1530,7 +1573,7 @@ export function NominaView({
       {/* SUBMENÚ: GESTIÓN DE NOVEDADES DE NÓMINA */}
       {activeTab === 'novedades' && (
         <GestionNovedadesView
-          empleados={empleados}
+          empleados={empleadosDisponibles}
           cargos={cargos}
           periodoActivo={periodoActivo}
           periodos={periodos}
@@ -1546,7 +1589,7 @@ export function NominaView({
       {/* CUADRO DE CONTROL DE SOLICITUDES DE VACACIONES */}
       {activeTab === 'vacaciones' && (
         <ControlVacacionesView
-          empleados={empleados}
+          empleados={empleadosDisponibles}
           cargos={cargos}
           userRole={userRole}
           currentEmpleadoId={currentEmpleadoId}
@@ -1566,7 +1609,7 @@ export function NominaView({
                 onChange={e => setEmpleadoDesprendibleId(e.target.value)}
                 className="px-3 py-2 bg-[#FFFFFF] border border-[#8FA7D6] rounded-xl text-xs text-[#282829] font-medium focus:outline-none focus:ring-2 focus:ring-[#18235C]"
               >
-                {empleados.map(emp => (
+                {empleadosDisponibles.map(emp => (
                   <option key={emp.id} value={emp.id}>
                     {emp.nombre} — CC: {emp.documento}
                   </option>

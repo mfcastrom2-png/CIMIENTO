@@ -19,6 +19,9 @@ import {
   eliminarSaldoInicialLocal,
   limpiarTodosSaldosInicialesLocal,
   generarNovedadesDesdeSaldosIniciales,
+  sincronizarOSincronizarYCrearEmpleadosDesdeSaldos,
+  calcularProvisionMensualVacaciones,
+  calcularPasivosLaboralesCompletos,
   ResultadoParseoSaldos,
   ENCABEZADOS_CSV_SALDOS
 } from '../services/saldosInicialesService';
@@ -172,6 +175,8 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
     let vinculados = 0;
     let pasivosCOP = 0;
     let diasVac = 0;
+    let totalProvisionMensualVacCOP = 0;
+    let totalProvisionMensualPrestacionesCOP = 0;
     let carteraCOP = 0;
     let ingresosAnoCOP = 0;
 
@@ -179,10 +184,10 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
       if (s.empleadoId || mapaEmpleadosPorDoc.has(s.documento.replace(/[^0-9a-zA-Z]/g, '').toLowerCase())) {
         vinculados++;
       }
-      pasivosCOP += (s.vacacionesValorAcumuladoCOP || 0) +
-                    (s.cesantiasSaldoAcumuladoCOP || 0) +
-                    (s.interesesCesantiasAcumuladoCOP || 0) +
-                    (s.primaServiciosBaseSemestreCOP || 0);
+      const desglose = calcularPasivosLaboralesCompletos(s);
+      pasivosCOP += desglose.totalPasivosAcumuladosCOP;
+      totalProvisionMensualVacCOP += desglose.provisionMensualVacaciones;
+      totalProvisionMensualPrestacionesCOP += desglose.totalProvisionMensualCOP;
       diasVac += s.vacacionesDiasPendientes || 0;
       carteraCOP += (s.prestamoEmpresaSaldoCOP || 0) +
                     (s.libranzaSaldoCOP || 0) +
@@ -195,6 +200,8 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
       vinculados,
       noVinculados: total - vinculados,
       pasivosCOP,
+      totalProvisionMensualVacCOP,
+      totalProvisionMensualPrestacionesCOP,
       diasVac,
       carteraCOP,
       ingresosAnoCOP
@@ -387,12 +394,23 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
         }
       }
 
-      // 4. Guardar en Firestore si está marcado
+      // 4. Sincronizar e Impactar Censo de Empleados si está marcado
+      if (impactarExpedientes && typeof window !== 'undefined') {
+        try {
+          const resSync = sincronizarOSincronizarYCrearEmpleadosDesdeSaldos(itemsParaGuardar, empleados, cargos);
+          localStorage.setItem('bgroup_empleados', JSON.stringify(resSync.empleadosActualizados));
+          window.dispatchEvent(new Event('bgroup_empleados_updated'));
+        } catch (e) {
+          console.error('Error sincronizando censo de empleados:', e);
+        }
+      }
+
+      // 5. Guardar en Firestore si está marcado
       if (guardarEnFirestore) {
         await guardarSaldosInicialesLoteFB(itemsParaGuardar);
       }
 
-      // 5. Registrar evento de auditoría
+      // 6. Registrar evento de auditoría
       await registrarEventoAuditoria(
         'CARGA_MASIVA_SALDOS',
         'saldos_iniciales',
@@ -407,7 +425,7 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
         }
       );
 
-      setMensajeExito(`¡Operación exitosa! Se procesaron y consolidaron los saldos iniciales de ${itemsParaGuardar.length} colaborador(es). Se actualizaron pasivos y novedades.`);
+      setMensajeExito(`¡Operación exitosa! Se procesaron y consolidaron los saldos iniciales de ${itemsParaGuardar.length} colaborador(es). Se crearon/actualizaron las fichas en el Módulo de Empleados, pasivos y novedades de nómina.`);
       setTextoPegado('');
       setNombreArchivo(null);
       setResultadoParseo(null);
@@ -417,6 +435,25 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
       setMensajeError(err?.message || 'Ocurrió un error al persistir los saldos iniciales.');
     } finally {
       setGuardandoLote(false);
+    }
+  };
+
+  // Sincronizar todos los saldos registrados con el censo del módulo de empleados
+  const handleSincronizarCensoDirecto = () => {
+    if (saldosGuardados.length === 0) {
+      setMensajeError('No hay saldos registrados para sincronizar.');
+      return;
+    }
+    try {
+      const resSync = sincronizarOSincronizarYCrearEmpleadosDesdeSaldos(saldosGuardados, empleados, cargos);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('bgroup_empleados', JSON.stringify(resSync.empleadosActualizados));
+        window.dispatchEvent(new Event('bgroup_empleados_updated'));
+      }
+      setMensajeExito(`¡Sincronización con Módulo de Empleados exitosa! ${resSync.creadosContador} colaborador(es) nuevos creados en el Censo y ${resSync.actualizadosContador} actualizados.`);
+    } catch (err) {
+      console.error('Error al sincronizar censo:', err);
+      setMensajeError('Ocurrió un error al sincronizar con el censo de empleados.');
     }
   };
 
@@ -582,6 +619,16 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
 
           <button
             type="button"
+            onClick={handleSincronizarCensoDirecto}
+            className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            title="Sincronizar todos los saldos iniciales con el Módulo de Empleados (crea/actualiza fichas automáticamente)"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-blue-700" />
+            <span>Sincronizar Censo Empleados</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setModalNuevoManualOpen(true)}
             className="px-3.5 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
@@ -613,7 +660,7 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
       )}
 
       {/* KPI Cards de Pasivos y Cartera */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white p-3.5 rounded-xl border border-[#8FA7D6] shadow-2xs">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
             <span className="font-semibold">Colaboradores</span>
@@ -638,8 +685,19 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
 
         <div className="bg-white p-3.5 rounded-xl border border-[#8FA7D6] shadow-2xs">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-            <span className="font-semibold">Vacaciones Pendientes</span>
+            <span className="font-semibold">Provisión Vacaciones</span>
             <Palmtree className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="text-lg font-black text-amber-700">
+            ${metricas.totalProvisionMensualVacCOP.toLocaleString('es-CO')}
+          </div>
+          <span className="text-[10px] text-slate-500 font-medium">4.17% mensual s/básico CST</span>
+        </div>
+
+        <div className="bg-white p-3.5 rounded-xl border border-[#8FA7D6] shadow-2xs">
+          <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+            <span className="font-semibold">Vacaciones Pendientes</span>
+            <Calendar className="w-4 h-4 text-amber-600" />
           </div>
           <div className="text-2xl font-black text-amber-700">
             {metricas.diasVac.toFixed(1)} <span className="text-xs font-semibold text-slate-500">días</span>
@@ -658,15 +716,15 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
           <span className="text-[10px] text-slate-400">Préstamos + Libranzas</span>
         </div>
 
-        <div className="col-span-2 sm:col-span-4 lg:col-span-1 bg-white p-3.5 rounded-xl border border-[#8FA7D6] shadow-2xs">
+        <div className="bg-white p-3.5 rounded-xl border border-[#8FA7D6] shadow-2xs">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-            <span className="font-semibold">Acumulados Fiscales</span>
+            <span className="font-semibold">Carga Mensual Prestaciones</span>
             <Receipt className="w-4 h-4 text-[#18235C]" />
           </div>
           <div className="text-lg font-black text-[#18235C]">
-            ${metricas.ingresosAnoCOP.toLocaleString('es-CO')}
+            ${metricas.totalProvisionMensualPrestacionesCOP.toLocaleString('es-CO')}
           </div>
-          <span className="text-[10px] text-slate-400">Ingresos brutos acumulados</span>
+          <span className="text-[10px] text-slate-400">21.83% mensual (Ley CST)</span>
         </div>
       </div>
 
@@ -983,11 +1041,11 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
                     <tr>
                       <th className="py-2.5 px-3">Colaborador / Documento</th>
                       <th className="py-2.5 px-3">Cruce Censo</th>
-                      <th className="py-2.5 px-3 text-right">Vacaciones (Días / $)</th>
+                      <th className="py-2.5 px-3 text-right">Vacaciones (Días / Pasivo)</th>
+                      <th className="py-2.5 px-3 text-right">Provisión Vac (4.17%)</th>
                       <th className="py-2.5 px-3 text-right">Cesantías + Int ($)</th>
                       <th className="py-2.5 px-3 text-right">Prima Serv ($)</th>
-                      <th className="py-2.5 px-3 text-right">Cuota Prést/Libr ($)</th>
-                      <th className="py-2.5 px-3 text-right">Acum. Ingresos ($)</th>
+                      <th className="py-2.5 px-3 text-right">Total Pasivos COP</th>
                       <th className="py-2.5 px-3 text-center">Corte</th>
                     </tr>
                   </thead>
@@ -1001,8 +1059,8 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
                     ) : (
                       itemsVistaPreviaFiltrados.map((item, idx) => {
                         const empVinculado = item.empleadoId ? empleados.find(e => e.id === item.empleadoId) : mapaEmpleadosPorDoc.get(item.documento.replace(/[^0-9a-zA-Z]/g, '').toLowerCase());
+                        const desglose = calcularPasivosLaboralesCompletos(item);
                         const cesTotal = item.cesantiasSaldoAcumuladoCOP + item.interesesCesantiasAcumuladoCOP;
-                        const cuotaTotal = item.prestamoEmpresaCuotaMensualCOP + item.libranzaCuotaMensualCOP + item.embargoJudicialSaldoCOP;
 
                         return (
                           <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
@@ -1028,21 +1086,20 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
                               <div className="text-[10px] text-slate-500">${item.vacacionesValorAcumuladoCOP.toLocaleString('es-CO')}</div>
                             </td>
                             <td className="py-2 px-3 text-right">
+                              <span className="font-bold text-emerald-700">
+                                ${(item.provisionMensualVacacionesCOP || desglose.provisionMensualVacaciones).toLocaleString('es-CO')}
+                              </span>
+                              <div className="text-[10px] text-slate-400">4.17% s/básico</div>
+                            </td>
+                            <td className="py-2 px-3 text-right">
                               <span className="font-bold text-slate-800">${cesTotal.toLocaleString('es-CO')}</span>
                               <div className="text-[10px] text-slate-500">Int: ${item.interesesCesantiasAcumuladoCOP.toLocaleString('es-CO')}</div>
                             </td>
                             <td className="py-2 px-3 text-right font-bold text-slate-800">
-                              ${item.primaServiciosBaseSemestreCOP.toLocaleString('es-CO')}
+                              ${(item.primaServiciosValorAcumuladoCOP || desglose.pasivoPrimaAcumulado).toLocaleString('es-CO')}
                             </td>
-                            <td className="py-2 px-3 text-right">
-                              {cuotaTotal > 0 ? (
-                                <span className="font-bold text-indigo-700">${cuotaTotal.toLocaleString('es-CO')}/mes</span>
-                              ) : (
-                                <span className="text-slate-400">—</span>
-                              )}
-                            </td>
-                            <td className="py-2 px-3 text-right text-slate-700">
-                              ${item.ingresosLaboralesAcumuladosAnoCOP.toLocaleString('es-CO')}
+                            <td className="py-2 px-3 text-right font-bold text-indigo-900">
+                              ${desglose.totalPasivosAcumuladosCOP.toLocaleString('es-CO')}
                             </td>
                             <td className="py-2 px-3 text-center text-slate-500 font-sans text-[10px]">
                               {item.fechaCorteSaldos}
@@ -1140,9 +1197,10 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
                   <th className="py-2.5 px-3">Colaborador / Cédula</th>
                   <th className="py-2.5 px-3">Cargo / Fecha Ingreso</th>
                   <th className="py-2.5 px-3 text-right">Vacaciones Pendientes</th>
+                  <th className="py-2.5 px-3 text-right">Provisión Vac (4.17%)</th>
                   <th className="py-2.5 px-3 text-right">Cesantías + Int ($)</th>
                   <th className="py-2.5 px-3 text-right">Prima Serv ($)</th>
-                  <th className="py-2.5 px-3 text-right">Cuota Préstamos</th>
+                  <th className="py-2.5 px-3 text-right">Total Pasivos COP</th>
                   <th className="py-2.5 px-3 text-center">Fecha Corte</th>
                   <th className="py-2.5 px-3 text-center">Acciones</th>
                 </tr>
@@ -1150,7 +1208,7 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
               <tbody className="divide-y divide-slate-200 text-xs">
                 {saldosRegistradosFiltrados.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
                       <Database className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                       <p className="font-bold text-slate-700">No hay saldos iniciales registrados</p>
                       <p className="text-xs text-slate-400 mt-1">
@@ -1161,8 +1219,8 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
                 ) : (
                   saldosRegistradosFiltrados.map((item) => {
                     const empVinculado = item.empleadoId ? empleados.find(e => e.id === item.empleadoId) : mapaEmpleadosPorDoc.get(item.documento.replace(/[^0-9a-zA-Z]/g, '').toLowerCase());
+                    const desglose = calcularPasivosLaboralesCompletos(item);
                     const cesTotal = item.cesantiasSaldoAcumuladoCOP + item.interesesCesantiasAcumuladoCOP;
-                    const cuotaTotal = item.prestamoEmpresaCuotaMensualCOP + item.libranzaCuotaMensualCOP + item.embargoJudicialSaldoCOP + item.otrasDeduccionesFijasMensualCOP;
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-50 transition-colors">
@@ -1197,25 +1255,37 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
                         </td>
 
                         <td className="py-2.5 px-3 text-right font-mono">
+                          <span className="font-bold text-emerald-700">
+                            ${(item.provisionMensualVacacionesCOP || desglose.provisionMensualVacaciones).toLocaleString('es-CO')}
+                          </span>
+                          <div className="text-[10px] text-slate-400 font-sans">
+                            4.17% mensual
+                          </div>
+                        </td>
+
+                        <td className="py-2.5 px-3 text-right font-mono">
                           <span className="font-bold text-slate-800">${cesTotal.toLocaleString('es-CO')}</span>
                           <div className="text-[10px] text-slate-500">
                             Int: ${item.interesesCesantiasAcumuladoCOP.toLocaleString('es-CO')}
                           </div>
                         </td>
 
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800">
-                          ${item.primaServiciosBaseSemestreCOP.toLocaleString('es-CO')}
+                        <td className="py-2.5 px-3 text-right font-mono">
+                          <span className="font-bold text-slate-800">
+                            ${(item.primaServiciosValorAcumuladoCOP || desglose.pasivoPrimaAcumulado).toLocaleString('es-CO')}
+                          </span>
+                          <div className="text-[10px] text-slate-500">
+                            {item.diasTrabajadosSemestrePrima || 180}d ({item.semestrePrimaActual || '1er Sem'})
+                          </div>
                         </td>
 
                         <td className="py-2.5 px-3 text-right font-mono">
-                          {cuotaTotal > 0 ? (
-                            <div>
-                              <span className="font-bold text-indigo-700">${cuotaTotal.toLocaleString('es-CO')}</span>
-                              <div className="text-[10px] text-slate-400">mensual</div>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 font-sans">—</span>
-                          )}
+                          <span className="font-bold text-indigo-900">
+                            ${desglose.totalPasivosAcumuladosCOP.toLocaleString('es-CO')}
+                          </span>
+                          <div className="text-[10px] text-slate-500">
+                            Prov: ${desglose.totalProvisionMensualCOP.toLocaleString('es-CO')}/m
+                          </div>
                         </td>
 
                         <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-600">
@@ -1270,12 +1340,18 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
           <div className="bg-white rounded-xl border border-[#8FA7D6] shadow-2xs p-5 space-y-3">
             <div className="flex items-center gap-2 text-[#18235C]">
               <Palmtree className="w-5 h-5 text-amber-600" />
-              <h3 className="font-extrabold text-sm">Vacaciones Acumuladas (Art. 186 CST)</h3>
+              <h3 className="font-extrabold text-sm">Provisión Mensual y Pasivo de Vacaciones (Art. 186 y 192 CST - 4.17%)</h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Los trabajadores tienen derecho a 15 días hábiles continuos de vacaciones remuneradas por cada año de servicios prestados.
-              Al realizar la carga de saldos iniciales, el campo <code className="font-mono text-slate-800 bg-slate-100 px-1 rounded">vacacionesDiasPendientes</code> registra
-              los días acumulados a la fecha de corte que el empleado tiene pendientes por disfrutar. El sistema recalcula la provisión contable con base en el último salario ordinario devengado.
+              Los colaboradores tienen derecho a <strong>15 días hábiles continuos de descanso remunerado</strong> por cada año de servicios laborados.
+            </p>
+            <div className="bg-amber-50/70 p-3 rounded-lg border border-amber-200 text-xs text-amber-950 space-y-1 font-mono">
+              <div className="font-bold font-sans text-amber-900">Fórmula Legal Mensual de Causación:</div>
+              <div>Provisión Mensual = Salario Básico × (15 días / 360 días) = Salario Básico × 4.1667% ≈ <strong>4.17%</strong></div>
+              <div>Causación de Días por Mes Comercial (30d) = <strong>1.25 días hábiles</strong> (15 días / 12 meses)</div>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              <strong>Regla Clave:</strong> De conformidad con el Art. 192 del CST, el <em>Auxilio de Transporte NO forma parte</em> de la base salarial de vacaciones. Para trabajadores con <strong>Salario Integral</strong>, la provisión de vacaciones aplica sobre el salario básico pactado, al ser un descanso remunerado de ley.
             </p>
           </div>
 
@@ -1285,31 +1361,42 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
               <h3 className="font-extrabold text-sm">Cesantías e Intereses (Art. 249 CST / Ley 52 de 1975)</h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Las cesantías corresponden a un mes de salario por cada año laborado, causadas proporcionalmente. Los intereses corresponden al 12% anual sobre el saldo de cesantías causado.
-              En este módulo, el campo <code className="font-mono text-slate-800 bg-slate-100 px-1 rounded">cesantiasSaldoAcumuladoCOP</code> refleja el pasivo pendiente por consignar o liquidar,
-              permitiendo un empalme contable exacto sin duplicar causaciones.
+              Las cesantías corresponden a un mes de salario por cada año laborado (<strong>8.33% mensual</strong>), causadas proporcionalmente. Los intereses corresponden al <strong>12% anual</strong> (1.0% mensual) sobre el saldo de cesantías causado.
+            </p>
+            <div className="bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 text-xs text-emerald-950 space-y-1 font-mono">
+              <div>Cesantías Mensuales = Base Computable (Salario + Aux. Transp + Recargos) × <strong>8.33%</strong></div>
+              <div>Intereses Mensuales = Cesantías Mensuales × <strong>1.0%</strong> (12% anual)</div>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              En este módulo, el campo <code className="font-mono text-slate-800 bg-slate-100 px-1 rounded">cesantiasSaldoAcumuladoCOP</code> refleja el pasivo pendiente por consignar a fondos (14 de Feb) o liquidar, permitiendo un empalme contable exacto sin duplicar causaciones.
             </p>
           </div>
 
           <div className="bg-white rounded-xl border border-[#8FA7D6] shadow-2xs p-5 space-y-3">
             <div className="flex items-center gap-2 text-[#18235C]">
               <Receipt className="w-5 h-5 text-blue-600" />
-              <h3 className="font-extrabold text-sm">Acumulados Tributarios DIAN (Art. 378/383 ET - Formulario 220)</h3>
+              <h3 className="font-extrabold text-sm">Prima de Servicios y Carga Consolidada (Art. 306 CST - 21.83%)</h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Para efectos del cálculo de retención en la fuente por el Procedimiento 1 o Procedimiento 2, así como la expedición anual del Certificado de Ingresos y Retenciones (Formulario 220 DIAN),
-              los campos de ingresos, aportes a salud, pensión, FSP y retenciones practicadas acumulan el historial del año fiscal en curso previo al uso de este software.
+              La prima de servicios equivale a un mes de salario por cada año de servicios (<strong>8.33% mensual</strong>), pagadera en dos cuotas semestrales (Junio y Diciembre).
             </p>
+            <div className="bg-blue-50/70 p-3 rounded-lg border border-blue-200 text-xs text-blue-950 space-y-1 font-mono">
+              <div className="font-bold font-sans text-blue-900">Total Carga Prestacional Mensual CST:</div>
+              <div>Cesantías (8.33%) + Intereses (1.00%) + Prima (8.33%) + Vacaciones (4.17%) = <strong>21.83% mensual</strong></div>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl border border-[#8FA7D6] shadow-2xs p-5 space-y-3">
             <div className="flex items-center gap-2 text-[#18235C]">
               <CreditCard className="w-5 h-5 text-indigo-600" />
-              <h3 className="font-extrabold text-sm">Préstamos y Libranzas (Ley 1527 de 2012)</h3>
+              <h3 className="font-extrabold text-sm">Préstamos, Libranzas y Acumulados DIAN</h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
               Al parametrizar préstamos de la empresa, libranzas con entidades financieras o embargos judiciales, el sistema crea automáticamente las novedades recurrentes de nómina para que sean
               deducidas de forma periódica respetando los topes de inembargabilidad del salario y el salario mínimo legal vigente (SMMLV).
+            </p>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Asimismo, los acumulados tributarios alimentan el cálculo de Retención en la Fuente y el Certificado de Ingresos y Retenciones (Formulario 220 DIAN).
             </p>
           </div>
         </div>
@@ -1341,37 +1428,72 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 block font-bold">Fecha de Corte</span>
-                <span className="font-mono font-bold text-slate-800">{saldoSeleccionadoDetalle.fechaCorteSaldos}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 block font-bold">Vacaciones Pendientes</span>
-                <span className="font-bold text-amber-700">{saldoSeleccionadoDetalle.vacacionesDiasPendientes} días</span>
-                <span className="text-[10px] text-slate-500 block">${saldoSeleccionadoDetalle.vacacionesValorAcumuladoCOP.toLocaleString('es-CO')}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 block font-bold">Cesantías Acumuladas</span>
-                <span className="font-mono font-bold text-slate-800">${saldoSeleccionadoDetalle.cesantiasSaldoAcumuladoCOP.toLocaleString('es-CO')}</span>
-                <span className="text-[10px] text-slate-500 block">Int: ${saldoSeleccionadoDetalle.interesesCesantiasAcumuladoCOP.toLocaleString('es-CO')}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 block font-bold">Prima del Semestre</span>
-                <span className="font-mono font-bold text-slate-800">${saldoSeleccionadoDetalle.primaServiciosBaseSemestreCOP.toLocaleString('es-CO')}</span>
-                <span className="text-[10px] text-slate-500 block">{saldoSeleccionadoDetalle.diasTrabajadosSemestrePrima} días base</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 block font-bold">Préstamo Empresa</span>
-                <span className="font-mono font-bold text-slate-800">${saldoSeleccionadoDetalle.prestamoEmpresaSaldoCOP.toLocaleString('es-CO')}</span>
-                <span className="text-[10px] text-slate-500 block">Cuota: ${saldoSeleccionadoDetalle.prestamoEmpresaCuotaMensualCOP.toLocaleString('es-CO')}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 block font-bold">Libranzas Activas</span>
-                <span className="font-mono font-bold text-slate-800">${saldoSeleccionadoDetalle.libranzaSaldoCOP.toLocaleString('es-CO')}</span>
-                <span className="text-[10px] text-slate-500 block">Cuota: ${saldoSeleccionadoDetalle.libranzaCuotaMensualCOP.toLocaleString('es-CO')}</span>
-              </div>
-            </div>
+            {(() => {
+              const desglose = calcularPasivosLaboralesCompletos(saldoSeleccionadoDetalle);
+              return (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-[10px] text-slate-400 block font-bold">Salario Básico</span>
+                      <span className="font-mono font-bold text-slate-900">${(saldoSeleccionadoDetalle.salarioBasico || desglose.salarioBasico).toLocaleString('es-CO')}</span>
+                      <span className="text-[10px] text-slate-500 block">{saldoSeleccionadoDetalle.tipoSalario || 'Ordinario'}</span>
+                    </div>
+                    <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200">
+                      <span className="text-[10px] text-amber-700 block font-bold">Vacaciones Pendientes</span>
+                      <span className="font-bold text-amber-800">{saldoSeleccionadoDetalle.vacacionesDiasPendientes} días</span>
+                      <span className="text-[10px] text-amber-900 font-mono block">${saldoSeleccionadoDetalle.vacacionesValorAcumuladoCOP.toLocaleString('es-CO')}</span>
+                    </div>
+                    <div className="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-200">
+                      <span className="text-[10px] text-emerald-700 block font-bold">Provisión Mensual Vac.</span>
+                      <span className="font-bold text-emerald-800 font-mono">${desglose.provisionMensualVacaciones.toLocaleString('es-CO')}</span>
+                      <span className="text-[10px] text-emerald-700 font-medium block">4.17% s/básico (Art. 186)</span>
+                    </div>
+                    <div className="bg-indigo-50/70 p-2.5 rounded-lg border border-indigo-200">
+                      <span className="text-[10px] text-indigo-700 block font-bold">Total Pasivo Consolidado</span>
+                      <span className="font-bold text-indigo-900 font-mono">${desglose.totalPasivosAcumuladosCOP.toLocaleString('es-CO')}</span>
+                      <span className="text-[10px] text-indigo-700 block">Carga: ${desglose.totalProvisionMensualCOP.toLocaleString('es-CO')}/mes</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-[10px] text-slate-400 block font-bold">Cesantías Acumuladas</span>
+                      <span className="font-mono font-bold text-slate-800">${saldoSeleccionadoDetalle.cesantiasSaldoAcumuladoCOP.toLocaleString('es-CO')}</span>
+                      <span className="text-[10px] text-slate-500 block">Prov: ${desglose.provisionMensualCesantias.toLocaleString('es-CO')}/mes (8.33%)</span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-[10px] text-slate-400 block font-bold">Intereses Cesantías</span>
+                      <span className="font-mono font-bold text-slate-800">${saldoSeleccionadoDetalle.interesesCesantiasAcumuladoCOP.toLocaleString('es-CO')}</span>
+                      <span className="text-[10px] text-slate-500 block">Prov: ${desglose.provisionMensualIntereses.toLocaleString('es-CO')}/mes (1.0%)</span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-[10px] text-slate-400 block font-bold">Prima Semestre Actual (CST)</span>
+                      <span className="font-mono font-bold text-indigo-900">
+                        ${(saldoSeleccionadoDetalle.primaServiciosValorAcumuladoCOP || desglose.pasivoPrimaAcumulado).toLocaleString('es-CO')}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">
+                        Base: ${(saldoSeleccionadoDetalle.primaServiciosBaseSemestreCOP || 0).toLocaleString('es-CO')} ({saldoSeleccionadoDetalle.diasTrabajadosSemestrePrima || 180}d)
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-[10px] text-slate-400 block font-bold">Préstamo Empresa</span>
+                      <span className="font-mono font-bold text-slate-800">${saldoSeleccionadoDetalle.prestamoEmpresaSaldoCOP.toLocaleString('es-CO')}</span>
+                      <span className="text-[10px] text-slate-500 block">Cuota: ${saldoSeleccionadoDetalle.prestamoEmpresaCuotaMensualCOP.toLocaleString('es-CO')}</span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-[10px] text-slate-400 block font-bold">Libranzas Activas</span>
+                      <span className="font-mono font-bold text-slate-800">${saldoSeleccionadoDetalle.libranzaSaldoCOP.toLocaleString('es-CO')}</span>
+                      <span className="text-[10px] text-slate-500 block">Cuota: ${saldoSeleccionadoDetalle.libranzaCuotaMensualCOP.toLocaleString('es-CO')}</span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                      <span className="text-[10px] text-slate-400 block font-bold">Fecha de Corte Oficial</span>
+                      <span className="font-mono font-bold text-slate-800">{saldoSeleccionadoDetalle.fechaCorteSaldos}</span>
+                      <span className="text-[10px] text-slate-500 block">Ingreso: {saldoSeleccionadoDetalle.fechaIngreso || 'No registrada'}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Bloque Tributario */}
             <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200 space-y-1.5 text-xs">
@@ -1475,50 +1597,62 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
             </div>
 
             {/* Cuadro de Pasivos y Saldos */}
-            <div className="border border-slate-300 rounded-lg overflow-hidden text-xs">
-              <table className="w-full text-left">
-                <thead className="bg-[#18235C] text-white text-[11px]">
-                  <tr>
-                    <th className="py-2 px-3">Concepto Laboral / Pasivo</th>
-                    <th className="py-2 px-3">Unidad / Base</th>
-                    <th className="py-2 px-3 text-right">Valor Consolidado ($ COP)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
-                  <tr>
-                    <td className="py-2 px-3 font-sans font-medium text-slate-800">Vacaciones Pendientes (Art. 186 CST)</td>
-                    <td className="py-2 px-3">{saldoParaCertificado.vacacionesDiasPendientes} días hábiles</td>
-                    <td className="py-2 px-3 text-right font-bold text-slate-900">${saldoParaCertificado.vacacionesValorAcumuladoCOP.toLocaleString('es-CO')}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3 font-sans font-medium text-slate-800">Cesantías Causadas Pendientes (Art. 249 CST)</td>
-                    <td className="py-2 px-3">Corte a fecha</td>
-                    <td className="py-2 px-3 text-right font-bold text-slate-900">${saldoParaCertificado.cesantiasSaldoAcumuladoCOP.toLocaleString('es-CO')}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3 font-sans font-medium text-slate-800">Intereses sobre Cesantías (Ley 52/1975)</td>
-                    <td className="py-2 px-3">12% anual</td>
-                    <td className="py-2 px-3 text-right font-bold text-slate-900">${saldoParaCertificado.interesesCesantiasAcumuladoCOP.toLocaleString('es-CO')}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3 font-sans font-medium text-slate-800">Prima de Servicios Semestral (Art. 306 CST)</td>
-                    <td className="py-2 px-3">{saldoParaCertificado.diasTrabajadosSemestrePrima} días causados</td>
-                    <td className="py-2 px-3 text-right font-bold text-slate-900">${saldoParaCertificado.primaServiciosBaseSemestreCOP.toLocaleString('es-CO')}</td>
-                  </tr>
-                  <tr className="bg-slate-100 font-bold font-sans">
-                    <td className="py-2 px-3 text-slate-900" colSpan={2}>TOTAL PASIVOS LABORALES EN CORTE</td>
-                    <td className="py-2 px-3 text-right font-mono text-emerald-800 font-black">
-                      ${(
-                        saldoParaCertificado.vacacionesValorAcumuladoCOP +
-                        saldoParaCertificado.cesantiasSaldoAcumuladoCOP +
-                        saldoParaCertificado.interesesCesantiasAcumuladoCOP +
-                        saldoParaCertificado.primaServiciosBaseSemestreCOP
-                      ).toLocaleString('es-CO')}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const desglose = calcularPasivosLaboralesCompletos(saldoParaCertificado);
+              return (
+                <div className="border border-slate-300 rounded-lg overflow-hidden text-xs">
+                  <table className="w-full text-left">
+                    <thead className="bg-[#18235C] text-white text-[11px]">
+                      <tr>
+                        <th className="py-2 px-3">Concepto Laboral / Pasivo</th>
+                        <th className="py-2 px-3">Unidad / Base Computable</th>
+                        <th className="py-2 px-3 text-right">Provisión Mensual ($)</th>
+                        <th className="py-2 px-3 text-right">Pasivo Consolidado ($ COP)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
+                      <tr>
+                        <td className="py-2 px-3 font-sans font-medium text-slate-800">Vacaciones Remuneradas (Art. 186/192 CST)</td>
+                        <td className="py-2 px-3">{saldoParaCertificado.vacacionesDiasPendientes} días pendientes</td>
+                        <td className="py-2 px-3 text-right text-emerald-700 font-bold">${desglose.provisionMensualVacaciones.toLocaleString('es-CO')} <span className="font-sans text-[10px] text-slate-500">(4.17%)</span></td>
+                        <td className="py-2 px-3 text-right font-bold text-slate-900">${saldoParaCertificado.vacacionesValorAcumuladoCOP.toLocaleString('es-CO')}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 px-3 font-sans font-medium text-slate-800">Cesantías Causadas Pendientes (Art. 249 CST)</td>
+                        <td className="py-2 px-3">Base: ${desglose.baseSalarioCesantias.toLocaleString('es-CO')}</td>
+                        <td className="py-2 px-3 text-right text-slate-700">${desglose.provisionMensualCesantias.toLocaleString('es-CO')} <span className="font-sans text-[10px] text-slate-500">(8.33%)</span></td>
+                        <td className="py-2 px-3 text-right font-bold text-slate-900">${saldoParaCertificado.cesantiasSaldoAcumuladoCOP.toLocaleString('es-CO')}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 px-3 font-sans font-medium text-slate-800">Intereses sobre Cesantías (Ley 52/1975)</td>
+                        <td className="py-2 px-3">12% anual sobre cesantías</td>
+                        <td className="py-2 px-3 text-right text-slate-700">${desglose.provisionMensualIntereses.toLocaleString('es-CO')} <span className="font-sans text-[10px] text-slate-500">(1.0%)</span></td>
+                        <td className="py-2 px-3 text-right font-bold text-slate-900">${saldoParaCertificado.interesesCesantiasAcumuladoCOP.toLocaleString('es-CO')}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 px-3 font-sans font-medium text-slate-800">
+                          Prima de Servicios ({saldoParaCertificado.semestrePrimaActual || 'Semestre Actual'} - Art. 306 CST)
+                        </td>
+                        <td className="py-2 px-3">{saldoParaCertificado.diasTrabajadosSemestrePrima || 180} días computables</td>
+                        <td className="py-2 px-3 text-right text-slate-700">${desglose.provisionMensualPrima.toLocaleString('es-CO')} <span className="font-sans text-[10px] text-slate-500">(8.33%)</span></td>
+                        <td className="py-2 px-3 text-right font-bold text-slate-900">
+                          ${(saldoParaCertificado.primaServiciosValorAcumuladoCOP || desglose.pasivoPrimaAcumulado).toLocaleString('es-CO')}
+                        </td>
+                      </tr>
+                      <tr className="bg-slate-100 font-bold font-sans">
+                        <td className="py-2 px-3 text-slate-900" colSpan={2}>TOTAL PASIVOS Y CARGA PRESTACIONAL</td>
+                        <td className="py-2 px-3 text-right font-mono text-[#18235C] font-black">
+                          ${desglose.totalProvisionMensualCOP.toLocaleString('es-CO')}/mes
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono text-emerald-800 font-black">
+                          ${desglose.totalPasivosAcumuladosCOP.toLocaleString('es-CO')}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
 
             {/* Firmas de Auditoría */}
             <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs">
@@ -1632,6 +1766,9 @@ const ModalNuevoSaldoManual: React.FC<ModalNuevoSaldoManualProps> = ({
   const [cargoNombre, setCargoNombre] = useState('');
   const [fechaIngreso, setFechaIngreso] = useState('2024-01-15');
   const [fechaCorteSaldos, setFechaCorteSaldos] = useState('2026-02-28');
+  const [salarioBasico, setSalarioBasico] = useState<number>(2000000);
+  const [tipoSalario, setTipoSalario] = useState<string>('Ordinario');
+  const [tipoContrato, setTipoContrato] = useState<string>('Término indefinido');
 
   // Prestaciones
   const [vacacionesDias, setVacacionesDias] = useState<number>(0);
@@ -1640,6 +1777,11 @@ const ModalNuevoSaldoManual: React.FC<ModalNuevoSaldoManualProps> = ({
   const [interesesCesantiasCOP, setInteresesCesantiasCOP] = useState<number>(0);
   const [primaCOP, setPrimaCOP] = useState<number>(0);
   const [diasPrima, setDiasPrima] = useState<number>(60);
+
+  // Provisión mensual calculada automáticamente (4.17% del salario básico)
+  const provisionMensualVacacionesCalculada = useMemo(() => {
+    return calcularProvisionMensualVacaciones(salarioBasico, 0, 0.0417, tipoContrato, tipoSalario);
+  }, [salarioBasico, tipoContrato, tipoSalario]);
 
   // Tributario
   const [ingresosAno, setIngresosAno] = useState<number>(0);
@@ -1665,8 +1807,17 @@ const ModalNuevoSaldoManual: React.FC<ModalNuevoSaldoManualProps> = ({
       setCargoNombre(emp.laboral?.cargoNombre || emp.cargoId || '');
       setFechaIngreso(emp.laboral?.fechaIngreso || emp.contrato?.inicio || '2024-01-15');
       const salario = emp.compensacion?.salarioBasico || emp.salarioBase || 2000000;
+      setSalarioBasico(salario);
+      setTipoSalario(emp.compensacion?.tipoSalario || 'Ordinario');
+      setTipoContrato(emp.laboral?.tipoContrato || emp.contrato?.tipo || 'Término indefinido');
       setVacacionesCOP(Math.round((salario / 30) * vacacionesDias));
     }
+  };
+
+  // Recalcular valor acumulado de vacaciones al cambiar días o salario
+  const handleCambioDiasVacaciones = (dias: number) => {
+    setVacacionesDias(dias);
+    setVacacionesCOP(Math.round((salarioBasico / 30) * dias));
   };
 
   const handleGuardar = (e: React.FormEvent) => {
@@ -1675,6 +1826,12 @@ const ModalNuevoSaldoManual: React.FC<ModalNuevoSaldoManualProps> = ({
       alert('Documento y nombre son obligatorios');
       return;
     }
+
+    const provCes = Math.round(salarioBasico * 0.0833);
+    const provInt = Math.round(provCes * 0.12);
+    const provPri = Math.round(salarioBasico * 0.0833);
+    const pasivosLaboralesEmpleado = (Number(vacacionesCOP) || 0) + (Number(cesantiasCOP) || 0) + (Number(interesesCesantiasCOP) || 0) + (Number(primaCOP) || 0);
+    const provMensualTotal = provisionMensualVacacionesCalculada + provCes + provInt + provPri;
 
     const docLimpio = documento.replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
     const nuevo: SaldoInicialEmpleadoNomina = {
@@ -1685,12 +1842,22 @@ const ModalNuevoSaldoManual: React.FC<ModalNuevoSaldoManualProps> = ({
       cargoNombre,
       fechaIngreso,
       fechaCorteSaldos,
+      salarioBasico: Number(salarioBasico) || 0,
+      tipoSalario,
+      tipoContrato,
       vacacionesDiasPendientes: Number(vacacionesDias) || 0,
       vacacionesValorAcumuladoCOP: Number(vacacionesCOP) || 0,
+      provisionMensualVacacionesCOP: provisionMensualVacacionesCalculada,
       cesantiasSaldoAcumuladoCOP: Number(cesantiasCOP) || 0,
+      provisionMensualCesantiasCOP: provCes,
       interesesCesantiasAcumuladoCOP: Number(interesesCesantiasCOP) || 0,
-      primaServiciosBaseSemestreCOP: Number(primaCOP) || 0,
+      provisionMensualInteresesCOP: provInt,
+      primaServiciosBaseSemestreCOP: Number(primaCOP) || salarioBasico,
       diasTrabajadosSemestrePrima: Number(diasPrima) || 60,
+      primaServiciosValorAcumuladoCOP: Number(primaCOP) || 0,
+      provisionMensualPrimaCOP: provPri,
+      totalPasivosLaboralesCOP: pasivosLaboralesEmpleado,
+      totalProvisionMensualPrestacionesCOP: provMensualTotal,
       ingresosLaboralesAcumuladosAnoCOP: Number(ingresosAno) || 0,
       saludAportesAcumuladosAnoCOP: Number(saludAno) || 0,
       pensionAportesAcumuladosAnoCOP: Number(pensionAno) || 0,
@@ -1781,7 +1948,22 @@ const ModalNuevoSaldoManual: React.FC<ModalNuevoSaldoManualProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Salario Básico ($ COP) *</label>
+              <input
+                type="number"
+                required
+                value={salarioBasico}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  setSalarioBasico(val);
+                  setVacacionesCOP(Math.round((val / 30) * vacacionesDias));
+                }}
+                className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold"
+                placeholder="2000000"
+              />
+            </div>
             <div>
               <label className="font-bold text-slate-700 block mb-1">Fecha de Ingreso</label>
               <input
@@ -1802,9 +1984,14 @@ const ModalNuevoSaldoManual: React.FC<ModalNuevoSaldoManualProps> = ({
             </div>
           </div>
 
-          {/* Pasivos Laborales */}
+          {/* Pasivos Laborales y Provisión Mensual de Vacaciones 4.17% */}
           <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-xl space-y-2">
-            <span className="font-bold text-amber-900 block text-xs">Pasivos de Prestaciones Sociales</span>
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-amber-900 block text-xs">Pasivos de Prestaciones Sociales (CST)</span>
+              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                Provisión Mensual Vacaciones (4.17%): ${provisionMensualVacacionesCalculada.toLocaleString('es-CO')}
+              </span>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <div>
                 <label className="text-[10px] text-slate-600 block">Vacaciones Días</label>
@@ -1812,12 +1999,12 @@ const ModalNuevoSaldoManual: React.FC<ModalNuevoSaldoManualProps> = ({
                   type="number"
                   step="0.5"
                   value={vacacionesDias}
-                  onChange={(e) => setVacacionesDias(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => handleCambioDiasVacaciones(parseFloat(e.target.value) || 0)}
                   className="w-full p-1.5 border border-slate-300 rounded text-xs"
                 />
               </div>
               <div>
-                <label className="text-[10px] text-slate-600 block">Vacaciones $ COP</label>
+                <label className="text-[10px] text-slate-600 block">Vacaciones $ COP (Acum.)</label>
                 <input
                   type="number"
                   value={vacacionesCOP}

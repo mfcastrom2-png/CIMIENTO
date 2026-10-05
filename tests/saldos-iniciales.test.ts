@@ -5,7 +5,10 @@ import {
   generarLotePruebaSaldos,
   limpiarNumeroMoneda,
   validarFechaYMD,
-  generarNovedadesDesdeSaldosIniciales
+  generarNovedadesDesdeSaldosIniciales,
+  calcularProvisionMensualVacaciones,
+  calcularPasivosLaboralesCompletos,
+  esContratoSinNomina
 } from '../src/services/saldosInicialesService';
 import { SaldoInicialEmpleadoNomina, Empleado } from '../src/types';
 
@@ -118,5 +121,59 @@ describe('Suite de Pruebas: Módulo de Carga Masiva de Saldos Iniciales en Nómi
     expect(resultado.items.length).toBeGreaterThan(0);
     expect(resultado.items[0].documento).toBe('1019034789');
     expect(resultado.items[0].persona?.primerNombre).toBe('Carlos');
+  });
+
+  it('Debe calcular con precisión la provisión mensual de vacaciones (4.17% sobre salario básico sin auxilio de transporte)', () => {
+    // Caso 1: Salario Ordinario $2.000.000 -> 4.17% = $83.400
+    const prov1 = calcularProvisionMensualVacaciones(2000000);
+    expect(prov1).toBe(83400);
+
+    // Caso 2: Salario con recargos fijos $2.000.000 + $500.000 recargo = $2.500.000 -> 4.17% = $104.250
+    const prov2 = calcularProvisionMensualVacaciones(2000000, 500000);
+    expect(prov2).toBe(104250);
+
+    // Caso 3: Salario Integral $17.500.000 (SÍ genera provisión de vacaciones según Art. 132 CST) -> 4.17% = $729.750
+    const provIntegral = calcularProvisionMensualVacaciones(17500000, 0, 0.0417, 'Término indefinido', 'Integral');
+    expect(provIntegral).toBe(729750);
+
+    // Caso 4: Contrato por Prestación de Servicios / Honorarios -> Provisión 0
+    const provServicios = calcularProvisionMensualVacaciones(3500000, 0, 0.0417, 'Prestación de servicios');
+    expect(provServicios).toBe(0);
+
+    expect(esContratoSinNomina('Contrato Prestación de Servicios')).toBe(true);
+    expect(esContratoSinNomina('Honorarios Profesionales')).toBe(true);
+    expect(esContratoSinNomina('Término Fijo')).toBe(false);
+  });
+
+  it('Debe calcular el desglose integral de pasivos laborales y provisiones mensuales completas', () => {
+    const itemSaldoPrueba: Partial<SaldoInicialEmpleadoNomina> & { salarioBasico: number } = {
+      salarioBasico: 3000000,
+      tipoContrato: 'Término indefinido',
+      tipoSalario: 'Ordinario',
+      vacacionesDiasPendientes: 15,
+      vacacionesValorAcumuladoCOP: 1500000,
+      cesantiasSaldoAcumuladoCOP: 2000000,
+      interesesCesantiasAcumuladoCOP: 240000,
+      primaServiciosBaseSemestreCOP: 1000000,
+      primaServiciosValorAcumuladoCOP: 1000000,
+      diasTrabajadosSemestrePrima: 60
+    };
+
+    const desglose = calcularPasivosLaboralesCompletos(itemSaldoPrueba);
+
+    // 4.17% de 3.000.000 = 125.100
+    expect(desglose.provisionMensualVacaciones).toBe(125100);
+    // 8.33% de 3.000.000 = 249.900
+    expect(desglose.provisionMensualCesantias).toBe(249900);
+    // 12% sobre provisión cesantías = 249.900 * 0.12 = 29.988 (~1%)
+    expect(desglose.provisionMensualIntereses).toBe(29988);
+    // 8.33% de base prima ($1.000.000) = 83.300
+    expect(desglose.provisionMensualPrima).toBe(83300);
+
+    // Total provision mensual = 125.100 + 249.900 + 29.988 + 83.300 = 488.288
+    expect(desglose.totalProvisionMensualCOP).toBe(488288);
+
+    // Total pasivos acumulados = 1.500.000 (vac) + 2.000.000 (ces) + 240.000 (int) + 1.000.000 (prima) = 4.740.000
+    expect(desglose.totalPasivosAcumuladosCOP).toBe(4740000);
   });
 });

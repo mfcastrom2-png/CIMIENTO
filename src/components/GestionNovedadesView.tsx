@@ -1,6 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Cargo, Empleado, NovedadNominaEmpleado } from '../types';
-import { PARAMETROS_COLOMBIA_2026, parseSalarioNumerico } from '../services/payrollEngine';
+import {
+  PARAMETROS_COLOMBIA_2026,
+  parseSalarioNumerico,
+  calcularDiasDefectoPeriodoEmpleado,
+  obtenerFechaIngresoEmpleado
+} from '../services/payrollEngine';
 import {
   AlertCircle,
   Calendar,
@@ -110,8 +115,10 @@ export function GestionNovedadesView({
 
   // Abrir modal de edición
   const handleOpenEdit = (empleadoId: string) => {
+    const emp = empleados.find(e => e.id === empleadoId);
+    const diasDefecto = (emp && periodoActivo) ? calcularDiasDefectoPeriodoEmpleado(emp, periodoActivo) : 30;
     const current = novedadesMap[empleadoId] || {
-      diasTrabajados: 30,
+      diasTrabajados: diasDefecto,
       horasExtrasDiurnas: 0,
       horasExtrasNocturnas: 0,
       horasFestivasDiurnas: 0,

@@ -15,11 +15,19 @@ import {
   calcularLiquidacionEmpleado,
   simularLiquidacionDefinitiva,
   calcularReservasProvisionesEmpleado,
+  calcularPrimaServiciosSemestral,
+  calcularCesantiasEInteresesEmpleado,
+  calcularVacacionesEmpleado,
   calcularConsolidadoReservas,
   parseSalarioNumerico,
   determinarClaseRiesgoARL,
   esContratoSinNominaLaboral,
-  crearPeriodoNomina
+  crearPeriodoNomina,
+  obtenerFechaIngresoEmpleado,
+  obtenerFechaRetiroEmpleado,
+  estaEmpleadoDisponibleEnPeriodo,
+  calcularDiasDefectoPeriodoEmpleado,
+  filtrarEmpleadosDisponiblesEnPeriodo
 } from '../src/services/payrollEngine';
 import {
   FESTIVOS_COLOMBIA_2026_2027,
@@ -27,6 +35,11 @@ import {
   esFinDeSemanaOFestivo,
   calcularFechaFinalPermisoRemunerado
 } from '../src/utils/festivosColombia';
+import {
+  calcularProvisionMensualVacaciones,
+  calcularPasivosLaboralesCompletos,
+  esContratoSinNomina
+} from '../src/services/saldosInicialesService';
 import {
   Empleado,
   NovedadNominaEmpleado,
@@ -575,6 +588,297 @@ describe('Suite de Pruebas: Motor de Nómina y Liquidaciones (payrollEngine)', (
       );
     });
   });
+
+  describe('Cálculo Semestral de Prima de Servicios (Art. 306 CST - Director Administrativo y Empleados Operativos)', () => {
+    it('Debe calcular la prima de servicios del Director Administrativo sin auxilio de transporte (> 2 SMMLV)', () => {
+      const directorAdmin: Empleado = {
+        ...empleadoBase,
+        id: 'e2',
+        nombre: 'Andrés Pinilla (Director Administrativo)',
+        salarioBase: 4800000,
+        contrato: {
+          tipo: 'Término indefinido',
+          salario: '$ 4.800.000',
+          inicio: '2022-01-10',
+          fin: '—'
+        }
+      };
+
+      const liqDirector = calcularLiquidacionEmpleado(
+        directorAdmin,
+        'Director Administrativo',
+        'ADM-001',
+        novedadesVacias,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      // Calcular prima semestral en junio (mes 6) para 180 días laborados
+      const primaDirector = calcularPrimaServiciosSemestral(
+        directorAdmin,
+        liqDirector,
+        6, // Junio
+        2026,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      expect(primaDirector.salarioBasico).toBe(4800000);
+      expect(primaDirector.tieneDerechoAuxilioTransporte).toBe(false);
+      expect(primaDirector.auxilioTransporte).toBe(0);
+      expect(primaDirector.baseSalarioPromedio).toBe(4800000);
+      expect(primaDirector.diasLaboradosSemestre).toBe(180);
+      // Prima semestral = (4.800.000 * 180) / 360 = 2.400.000
+      expect(primaDirector.primaSemestralCausada).toBe(2400000);
+      expect(primaDirector.fechaPagoLimite).toContain('30 de Junio');
+    });
+
+    it('Debe calcular la prima del Director General con Salario $9.500.000 (sin auxilio de transporte)', () => {
+      const directorGeneral: Empleado = {
+        ...empleadoBase,
+        id: 'e1',
+        nombre: 'Marcela Rueda (Gerente General)',
+        salarioBase: 9500000,
+        contrato: {
+          tipo: 'Término indefinido',
+          salario: '$ 9.500.000',
+          inicio: '2019-03-01',
+          fin: '—'
+        }
+      };
+
+      const liqGeneral = calcularLiquidacionEmpleado(
+        directorGeneral,
+        'Gerencia General',
+        'DIR-001',
+        novedadesVacias,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      const primaGeneral = calcularPrimaServiciosSemestral(
+        directorGeneral,
+        liqGeneral,
+        6,
+        2026,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      expect(primaGeneral.tieneDerechoAuxilioTransporte).toBe(false);
+      expect(primaGeneral.baseSalarioPromedio).toBe(9500000);
+      // Prima = (9.500.000 * 180) / 360 = 4.750.000
+      expect(primaGeneral.primaSemestralCausada).toBe(4750000);
+    });
+
+    it('Debe calcular la prima de un colaborador operativo (<= 2 SMMLV) incluyendo Auxilio de Transporte', () => {
+      const tecnicoOperativo: Empleado = {
+        ...empleadoBase,
+        id: 'e6',
+        nombre: 'Carlos Restrepo',
+        salarioBase: 2800000,
+        contrato: {
+          tipo: 'Término indefinido',
+          salario: '$ 2.800.000',
+          inicio: '2024-01-15',
+          fin: '—'
+        }
+      };
+
+      const liqTecnico = calcularLiquidacionEmpleado(
+        tecnicoOperativo,
+        'Técnico de Redes',
+        'TEC-001',
+        novedadesVacias,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      const primaTecnico = calcularPrimaServiciosSemestral(
+        tecnicoOperativo,
+        liqTecnico,
+        6,
+        2026,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      expect(primaTecnico.tieneDerechoAuxilioTransporte).toBe(true);
+      expect(primaTecnico.auxilioTransporte).toBe(249095);
+      // Base = 2.800.000 + 249.095 = 3.049.095
+      expect(primaTecnico.baseSalarioPromedio).toBe(3049095);
+      // Prima = (3.049.095 * 180) / 360 = 1.524.548
+      expect(primaTecnico.primaSemestralCausada).toBe(1524548);
+    });
+
+    it('Debe calcular la prima proporcional para un empleado ingresado a mitad de semestre (60 días)', () => {
+      const empleadoNuevo: Empleado = {
+        ...empleadoBase,
+        id: 'e7',
+        nombre: 'Mateo Cárdenas',
+        salarioBase: 2600000,
+        contrato: {
+          tipo: 'Término fijo',
+          salario: '$ 2.600.000',
+          inicio: '2026-05-01', // Ingresó el 1 de mayo (60 días trabajados en semestre 1 a junio)
+          fin: '2027-04-30'
+        }
+      };
+
+      const liqNuevo = calcularLiquidacionEmpleado(
+        empleadoNuevo,
+        'Técnico de Instalaciones',
+        'TEC-001',
+        novedadesVacias,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      const prima60Dias = calcularPrimaServiciosSemestral(
+        empleadoNuevo,
+        liqNuevo,
+        6, // Junio
+        2026,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      expect(prima60Dias.diasLaboradosSemestre).toBe(60);
+      // Base = 2.600.000 + 249.095 = 2.849.095
+      // Prima = (2.849.095 * 60) / 360 = 474.849
+      expect(prima60Dias.primaSemestralCausada).toBe(Math.round((2849095 * 60) / 360));
+    });
+  });
+
+  describe('Cálculo de Provisión Mensual de Cesantías e Intereses (Art. 249 CST y Ley 50 de 1990)', () => {
+    it('Debe calcular la provisión mensual (8.33%) y acumulada para un colaborador operativo con auxilio de transporte', () => {
+      const tecnico: Empleado = {
+        ...empleadoBase,
+        id: 'e6',
+        nombre: 'Carlos Restrepo',
+        salarioBase: 2800000,
+        contrato: {
+          tipo: 'Término indefinido',
+          salario: '$ 2.800.000',
+          inicio: '2024-01-15',
+          fin: '—'
+        }
+      };
+
+      const liqTecnico = calcularLiquidacionEmpleado(
+        tecnico,
+        'Técnico de Redes',
+        'TEC-001',
+        novedadesVacias,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      const res = calcularCesantiasEInteresesEmpleado(
+        tecnico,
+        liqTecnico,
+        12, // Diciembre (360 días)
+        2026,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      // Auxilio de Transporte aplica por devengar <= 2 SMMLV
+      expect(res.tieneDerechoAuxilioTransporte).toBe(true);
+      expect(res.auxilioTransporte).toBe(249095);
+      expect(res.baseSalarioCesantias).toBe(3049095); // 2.800.000 + 249.095
+
+      // Provisión mensual: 8.33% de 3.049.095 = 253.990
+      expect(res.provisionMensualCesantias).toBe(Math.round(3049095 * 0.0833));
+      // Intereses mensuales: 1% mensual (12% anual) = 30.479
+      expect(res.provisionMensualIntereses).toBe(Math.round(Math.round(3049095 * 0.0833) * 0.12));
+
+      // Acumulado anual: 360 días = 100% de la base = 3.049.095
+      expect(res.cesantiasAcumuladasYTD).toBe(3049095);
+      // Intereses anuales: 3.049.095 * 12% = 365.891
+      expect(res.interesesCesantiasAcumuladosYTD).toBe(Math.round(3049095 * 0.12));
+
+      // Fechas legales de corte
+      expect(res.fechaLimiteConsignacionFondo).toContain('14 de Febrero');
+      expect(res.fechaLimitePagoIntereses).toContain('31 de Enero');
+    });
+
+    it('Debe calcular la provisión de cesantías para Director Administrativo excluyendo Auxilio de Transporte (> 2 SMMLV)', () => {
+      const director: Empleado = {
+        ...empleadoBase,
+        id: 'e2',
+        nombre: 'Andrés Pinilla',
+        salarioBase: 4800000,
+        contrato: {
+          tipo: 'Término indefinido',
+          salario: '$ 4.800.000',
+          inicio: '2022-01-10',
+          fin: '—'
+        }
+      };
+
+      const liqDirector = calcularLiquidacionEmpleado(
+        director,
+        'Director Administrativo',
+        'ADM-001',
+        novedadesVacias,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      const res = calcularCesantiasEInteresesEmpleado(
+        director,
+        liqDirector,
+        12,
+        2026,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      expect(res.tieneDerechoAuxilioTransporte).toBe(false);
+      expect(res.auxilioTransporte).toBe(0);
+      expect(res.baseSalarioCesantias).toBe(4800000);
+      expect(res.provisionMensualCesantias).toBe(Math.round(4800000 * 0.0833));
+      expect(res.cesantiasAcumuladasYTD).toBe(4800000);
+      expect(res.interesesCesantiasAcumuladosYTD).toBe(Math.round(4800000 * 0.12));
+    });
+
+    it('Debe retornar 0 COP de provisión de cesantías para empleados con Salario Integral', () => {
+      const gerenteIntegral: Empleado = {
+        ...empleadoBase,
+        id: 'e-integral',
+        nombre: 'Gerente Integral',
+        salarioBase: 25000000,
+        compensacion: {
+          tipoSalario: 'Integral',
+          salarioBasico: 25000000,
+          periodicidadPago: 'Mensual',
+          auxilioTransporte: false,
+          formaPago: 'Transferencia bancaria',
+          banco: 'Bancolombia',
+          tipoCuenta: 'Ahorros',
+          numeroCuenta: '1234',
+          historialVigencias: []
+        },
+        contrato: {
+          tipo: 'Término indefinido',
+          salario: '$ 25.000.000 Integral',
+          inicio: '2020-01-01',
+          fin: '—'
+        }
+      };
+
+      const liq = calcularLiquidacionEmpleado(
+        gerenteIntegral,
+        'Gerente General',
+        'DIR-001',
+        novedadesVacias,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      const res = calcularCesantiasEInteresesEmpleado(
+        gerenteIntegral,
+        liq,
+        12,
+        2026,
+        PARAMETROS_COLOMBIA_2026
+      );
+
+      expect(res.esSalarioIntegral).toBe(true);
+      expect(res.provisionMensualCesantias).toBe(0);
+      expect(res.provisionMensualIntereses).toBe(0);
+      expect(res.cesantiasAcumuladasYTD).toBe(0);
+      expect(res.interesesCesantiasAcumuladosYTD).toBe(0);
+    });
+  });
 });
 
 describe('Suite de Pruebas: Días Festivos y Calendario Laboral Colombiano (festivosColombia)', () => {
@@ -739,4 +1043,350 @@ describe('Suite de Pruebas: Matriz de Peligros y Riesgos GTC 45', () => {
     expect(res.aceptabilidad).toBe('Aceptable');
   });
 });
+
+describe('Suite de Pruebas: Disponibilidad de Empleados por Fecha de Ingreso en Nómina Mensual', () => {
+  const empleadoAntiguo: Empleado = {
+    id: 'emp-antiguo',
+    nombre: 'Carlos Antiguo',
+    documento: '1010101',
+    email: 'carlos@empresa.com',
+    telefono: '3001112233',
+    cargoId: 'c1',
+    formacion: 'Ingeniero',
+    experiencia: '5 años',
+    salarioBase: 3000000,
+    contrato: { tipo: 'Término indefinido', inicio: '2024-01-15', fin: '—', salario: '$3.000.000' },
+    familia: [],
+    activo: true
+  };
+
+  const empleadoIngresoMarzo: Empleado = {
+    id: 'emp-marzo',
+    nombre: 'Mariana Ingreso Marzo',
+    documento: '2020202',
+    email: 'mariana@empresa.com',
+    telefono: '3002223344',
+    cargoId: 'c2',
+    formacion: 'Contadora',
+    experiencia: '3 años',
+    salarioBase: 2500000,
+    contrato: { tipo: 'Término indefinido', inicio: '2026-03-10', fin: '—', salario: '$2.500.000' },
+    familia: [],
+    activo: true
+  };
+
+  const empleadoIngresoJunio: Empleado = {
+    id: 'emp-junio',
+    nombre: 'Felipe Ingreso Junio',
+    documento: '3030303',
+    email: 'felipe@empresa.com',
+    telefono: '3003334455',
+    cargoId: 'c3',
+    formacion: 'Técnico',
+    experiencia: '2 años',
+    salarioBase: 1800000,
+    contrato: { tipo: 'Término fijo', inicio: '2026-06-01', fin: '2027-06-01', salario: '$1.800.000' },
+    familia: [],
+    activo: true
+  };
+
+  const empleadoRetiradoFebrero: Empleado = {
+    id: 'emp-retirado',
+    nombre: 'Pedro Retirado',
+    documento: '4040404',
+    email: 'pedro@empresa.com',
+    telefono: '3004445566',
+    cargoId: 'c4',
+    formacion: 'Operario',
+    experiencia: '1 año',
+    salarioBase: 1750905,
+    contrato: { tipo: 'Término indefinido', inicio: '2024-05-01', fin: '2026-02-15', salario: '$1.750.905' },
+    fechaRetiro: '2026-02-15',
+    familia: [],
+    activo: false
+  };
+
+  const empleadosLista = [empleadoAntiguo, empleadoIngresoMarzo, empleadoIngresoJunio, empleadoRetiradoFebrero];
+
+  it('Debe extraer correctamente la fecha de ingreso desde el contrato o expediente laboral', () => {
+    expect(obtenerFechaIngresoEmpleado(empleadoAntiguo)).toBe('2024-01-15');
+    expect(obtenerFechaIngresoEmpleado(empleadoIngresoMarzo)).toBe('2026-03-10');
+    expect(obtenerFechaIngresoEmpleado(empleadoIngresoJunio)).toBe('2026-06-01');
+  });
+
+  it('En Enero 2026 (2026-01): NO deben estar disponibles los empleados que ingresan en Marzo o Junio', () => {
+    const periodoEnero = crearPeriodoNomina(2026, 1, 'Mensual');
+
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoAntiguo, periodoEnero)).toBe(true);
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoRetiradoFebrero, periodoEnero)).toBe(true);
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoIngresoMarzo, periodoEnero)).toBe(false);
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoIngresoJunio, periodoEnero)).toBe(false);
+
+    const disponiblesEnero = filtrarEmpleadosDisponiblesEnPeriodo(empleadosLista, periodoEnero);
+    expect(disponiblesEnero.map(e => e.id)).toEqual(['emp-antiguo', 'emp-retirado']);
+  });
+
+  it('En Marzo 2026 (2026-03): Debe aparecer disponible el empleado con fecha de ingreso en Marzo 2026', () => {
+    const periodoMarzo = crearPeriodoNomina(2026, 3, 'Mensual');
+
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoAntiguo, periodoMarzo)).toBe(true);
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoIngresoMarzo, periodoMarzo)).toBe(true);
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoIngresoJunio, periodoMarzo)).toBe(false);
+    // El retirado en febrero NO debe aparecer en marzo
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoRetiradoFebrero, periodoMarzo)).toBe(false);
+
+    const disponiblesMarzo = filtrarEmpleadosDisponiblesEnPeriodo(empleadosLista, periodoMarzo);
+    expect(disponiblesMarzo.map(e => e.id)).toEqual(['emp-antiguo', 'emp-marzo']);
+  });
+
+  it('En Junio 2026 (2026-06): Deben aparecer disponibles los empleados de Marzo y Junio', () => {
+    const periodoJunio = crearPeriodoNomina(2026, 6, 'Mensual');
+
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoAntiguo, periodoJunio)).toBe(true);
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoIngresoMarzo, periodoJunio)).toBe(true);
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoIngresoJunio, periodoJunio)).toBe(true);
+    expect(estaEmpleadoDisponibleEnPeriodo(empleadoRetiradoFebrero, periodoJunio)).toBe(false);
+
+    const disponiblesJunio = filtrarEmpleadosDisponiblesEnPeriodo(empleadosLista, periodoJunio);
+    expect(disponiblesJunio.map(e => e.id)).toEqual(['emp-antiguo', 'emp-marzo', 'emp-junio']);
+  });
+
+  it('Debe calcular días laborados proporcionales en el mes de ingreso (mes comercial 30 días CST)', () => {
+    const periodoMarzo = crearPeriodoNomina(2026, 3, 'Mensual');
+    const periodoAbril = crearPeriodoNomina(2026, 4, 'Mensual');
+
+    // Mariana ingresó el 10 de Marzo: 30 - 10 + 1 = 21 días en marzo
+    const diasMarzo = calcularDiasDefectoPeriodoEmpleado(empleadoIngresoMarzo, periodoMarzo);
+    expect(diasMarzo).toBe(21);
+
+    // En abril (mes siguiente a su ingreso): 30 días completos
+    const diasAbril = calcularDiasDefectoPeriodoEmpleado(empleadoIngresoMarzo, periodoAbril);
+    expect(diasAbril).toBe(30);
+
+    // Empleado antiguo en marzo: 30 días completos
+    const diasAntiguo = calcularDiasDefectoPeriodoEmpleado(empleadoAntiguo, periodoMarzo);
+    expect(diasAntiguo).toBe(30);
+  });
+});
+
+describe('Suite de Pruebas: Motor de Provisión y Pasivo de Vacaciones (Art. 186-192 CST - 4.17%)', () => {
+  const empleadoOrdinario: Empleado = {
+    id: 'emp-vac-1',
+    nombre: 'Laura Vacaciones',
+    documento: '5555555',
+    email: 'laura@empresa.com',
+    telefono: '3110001122',
+    cargoId: 'c1',
+    formacion: 'Profesional',
+    experiencia: '3 años',
+    salarioBase: 2500000,
+    contrato: { tipo: 'Término indefinido', inicio: '2025-01-01', fin: '—', salario: '$2.500.000' },
+    familia: [],
+    activo: true
+  };
+
+  const empleadoIntegral: Empleado = {
+    id: 'emp-vac-2',
+    nombre: 'Director Integral',
+    documento: '7777777',
+    email: 'director@empresa.com',
+    telefono: '3159998877',
+    cargoId: 'c2',
+    formacion: 'Especialista',
+    experiencia: '10 años',
+    salarioBase: 25000000,
+    contrato: { tipo: 'Término indefinido', inicio: '2024-01-01', fin: '—', salario: '$25.000.000' },
+    compensacion: {
+      salarioBasico: 25000000,
+      tipoSalario: 'Integral',
+      periodicidadPago: 'Mensual',
+      auxilioTransporte: false,
+      formaPago: 'Transferencia bancaria',
+      banco: 'Bancolombia',
+      tipoCuenta: 'Ahorros',
+      numeroCuenta: '12345678',
+      historialVigencias: []
+    },
+    familia: [],
+    activo: true
+  };
+
+  const empleadoContratista: Empleado = {
+    id: 'emp-vac-3',
+    nombre: 'Asesor Honorarios',
+    documento: '8888888',
+    email: 'asesor@empresa.com',
+    telefono: '3201112233',
+    cargoId: 'c3',
+    formacion: 'Abogado',
+    experiencia: '7 años',
+    salarioBase: 4000000,
+    contrato: { tipo: 'Prestación de servicios', inicio: '2026-01-01', fin: '2026-12-31', salario: '$4.000.000' },
+    familia: [],
+    activo: true
+  };
+
+  const novedadBase: NovedadNominaEmpleado = {
+    diasTrabajados: 30,
+    horasExtrasDiurnas: 0,
+    horasExtrasNocturnas: 0,
+    horasFestivasDiurnas: 0,
+    horasFestivasNocturnas: 0,
+    recargoNocturnoOrdinario: 0,
+    bonificacionesSalariales: 0,
+    bonificacionesNoSalariales: 0,
+    comisiones: 0,
+    incapacidadDias: 0,
+    licenciaRemuneradaDias: 0,
+    prestamosYDeducciones: 0
+  };
+
+  it('Debe calcular la provisión mensual de vacaciones (4.17% = 15/360) sobre el salario básico sin Auxilio de Transporte', () => {
+    const liqOrdinario = calcularLiquidacionEmpleado(
+      empleadoOrdinario,
+      'Analista',
+      'ADM-01',
+      novedadBase,
+      PARAMETROS_COLOMBIA_2026
+    );
+
+    // Salario básico: $2.500.000 <= 2 SMMLV -> tiene derecho a Aux. Transporte ($249.095)
+    expect(liqOrdinario.tieneDerechoAuxilioTransporte).toBe(true);
+
+    const resVac = calcularVacacionesEmpleado(
+      empleadoOrdinario,
+      liqOrdinario,
+      3, // Marzo (mes 3)
+      2026,
+      PARAMETROS_COLOMBIA_2026
+    );
+
+    // La base de vacaciones NO debe incluir el auxilio de transporte (Art. 192 CST)
+    expect(resVac.baseSalarioVacaciones).toBe(2500000);
+    // Provisión mensual: 2.500.000 * 0.0417 = $104.250
+    expect(resVac.provisionMensualVacaciones).toBe(104250);
+    // Días causados en el mes: 1.25 días
+    expect(resVac.diasCausadosMes).toBe(1.25);
+    // Días acumulados en 3 meses (90 días): (90 * 15) / 360 = 3.75 días
+    expect(resVac.diasCausadosAno).toBe(3.75);
+    // Pasivo acumulado a marzo: (2.500.000 * 3.75) / 30 = $312.500
+    expect(resVac.vacacionesAcumuladasYTD).toBe(312500);
+  });
+
+  it('En Salario Integral: Las vacaciones SÍ se causan (15 días de descanso remunerado CST)', () => {
+    const liqIntegral = calcularLiquidacionEmpleado(
+      empleadoIntegral,
+      'Director',
+      'DIR-01',
+      novedadBase,
+      PARAMETROS_COLOMBIA_2026
+    );
+
+    const resVac = calcularVacacionesEmpleado(
+      empleadoIntegral,
+      liqIntegral,
+      6, // Junio (mes 6)
+      2026,
+      PARAMETROS_COLOMBIA_2026
+    );
+
+    expect(resVac.esSalarioIntegral).toBe(true);
+    expect(resVac.baseSalarioVacaciones).toBe(25000000);
+    // Provisión mensual: 25.000.000 * 0.0417 = $1.042.500
+    expect(resVac.provisionMensualVacaciones).toBe(1042500);
+    // Días causados en 6 meses (180 días): (180 * 15) / 360 = 7.5 días
+    expect(resVac.diasCausadosAno).toBe(7.5);
+    // Pasivo acumulado: (25.000.000 * 7.5) / 30 = $6.250.000
+    expect(resVac.vacacionesAcumuladasYTD).toBe(6250000);
+  });
+
+  it('En Contrato de Prestación de Servicios: Provisión y pasivo de vacaciones son 0 COP', () => {
+    const liqContratista = calcularLiquidacionEmpleado(
+      empleadoContratista,
+      'Asesor',
+      'LEG-01',
+      novedadBase,
+      PARAMETROS_COLOMBIA_2026
+    );
+
+    const resVac = calcularVacacionesEmpleado(
+      empleadoContratista,
+      liqContratista,
+      3,
+      2026,
+      PARAMETROS_COLOMBIA_2026
+    );
+
+    expect(resVac.baseSalarioVacaciones).toBe(0);
+    expect(resVac.provisionMensualVacaciones).toBe(0);
+    expect(resVac.diasCausadosMes).toBe(0);
+    expect(resVac.diasCausadosAno).toBe(0);
+    expect(resVac.vacacionesAcumuladasYTD).toBe(0);
+  });
+});
+
+describe('Suite de Pruebas: Provisión Mensual de Vacaciones (4.17%) y Pasivos Laborales en Saldos Iniciales', () => {
+  it('Debe calcular la provisión mensual de vacaciones como el 4.17% del salario básico ordinario', () => {
+    // Salario básico: $3.000.000 -> 4.17% = $125.100
+    const provVac = calcularProvisionMensualVacaciones(3000000);
+    expect(provVac).toBe(125100);
+  });
+
+  it('Debe calcular la provisión mensual de vacaciones para salario mínimo 2026 ($1.750.905)', () => {
+    // 1.750.905 * 0.0417 = 73012.7385 -> redondeado 73013
+    const provVac = calcularProvisionMensualVacaciones(1750905);
+    expect(provVac).toBe(73013);
+  });
+
+  it('Debe calcular la provisión mensual de vacaciones para Salario Integral (Art. 132 CST)', () => {
+    // Salario integral: $22.761.765 -> 4.17% = $949.166
+    const provVac = calcularProvisionMensualVacaciones(22761765, 0, 0.0417, 'Término indefinido', 'Integral');
+    expect(provVac).toBe(949166);
+  });
+
+  it('Debe retornar 0 COP para contratos de prestación de servicios o contratistas independientes', () => {
+    const provVac = calcularProvisionMensualVacaciones(5000000, 0, 0.0417, 'Prestación de servicios', 'Honorarios');
+    expect(provVac).toBe(0);
+  });
+
+  it('Debe calcular el desglose integral de pasivos laborales (Cesantías 8.33%, Intereses 1%, Prima 8.33%, Vacaciones 4.17% = 21.83%)', () => {
+    const itemSaldo = {
+      salarioBasico: 3000000,
+      tipoContrato: 'Término indefinido',
+      tipoSalario: 'Ordinario',
+      vacacionesDiasPendientes: 15,
+      vacacionesValorAcumuladoCOP: 1500000,
+      cesantiasSaldoAcumuladoCOP: 1500000,
+      interesesCesantiasAcumuladoCOP: 180000,
+      primaServiciosBaseSemestreCOP: 3000000,
+      diasTrabajadosSemestrePrima: 60,
+      primaServiciosValorAcumuladoCOP: 500000
+    };
+
+    const desglose = calcularPasivosLaboralesCompletos(itemSaldo);
+
+    // Vacaciones: 4.17% de 3.000.000 = $125.100
+    expect(desglose.provisionMensualVacaciones).toBe(125100);
+    expect(desglose.pasivoVacacionesAcumulado).toBe(1500000);
+
+    // Cesantías: 8.33% de 3.000.000 = $249.900
+    expect(desglose.provisionMensualCesantias).toBe(249900);
+    expect(desglose.pasivoCesantiasAcumulado).toBe(1500000);
+
+    // Intereses a cesantías: 12% anual sobre cesantías mensuales = $29.988
+    expect(desglose.provisionMensualIntereses).toBe(29988);
+    expect(desglose.pasivoInteresesAcumulado).toBe(180000);
+
+    // Prima de servicios: 8.33% de 3.000.000 = $249.900
+    expect(desglose.provisionMensualPrima).toBe(249900);
+    expect(desglose.pasivoPrimaAcumulado).toBe(500000);
+
+    // Total Pasivos Acumulados: 1.500.000 + 1.500.000 + 180.000 + 500.000 = $3.680.000
+    expect(desglose.totalPasivosAcumuladosCOP).toBe(3680000);
+
+    // Carga Mensual Prestacional (21.83%): 125.100 + 249.900 + 29.988 + 249.900 = $654.888
+    expect(desglose.totalProvisionMensualCOP).toBe(654888);
+  });
+});
+
 

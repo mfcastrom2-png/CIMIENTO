@@ -446,6 +446,7 @@ export interface Empleado {
   sst?: InfoSstEmpleado;
   documentos?: DocumentoExpedienteEmpleado[];
   historialLaboral?: EventoHistorialLaboral[];
+  saldoInicial?: SaldoInicialEmpleadoNomina;
 }
 
 export interface Solicitud {
@@ -848,6 +849,72 @@ export interface SimulacionLiquidacionDefinitiva {
   totalLiquidacionDefinitiva: number;
 }
 
+export interface CalculoPrimaSemestralResult {
+  empleadoId: string;
+  empleadoNombre: string;
+  documento: string;
+  cargoNombre: string;
+  tipoContrato: string;
+  esSalarioIntegral: boolean;
+  semestre: 1 | 2;
+  ano: number;
+  diasLaboradosSemestre: number;
+  salarioBasico: number;
+  promedioComisionesYRecargos: number;
+  tieneDerechoAuxilioTransporte: boolean;
+  auxilioTransporte: number;
+  baseSalarioPromedio: number;
+  primaSemestralCausada: number;
+  primaMensualProvision: number;
+  diasEquivalentesPrima: number;
+  fechaPagoLimite: string;
+}
+
+export interface CalculoCesantiasResult {
+  empleadoId: string;
+  empleadoNombre: string;
+  documento: string;
+  cargoNombre: string;
+  tipoContrato: string;
+  esSalarioIntegral: boolean;
+  ano: number;
+  mes: number;
+  diasLaboradosAno: number;
+  salarioBasico: number;
+  promedioComisionesYRecargos: number;
+  tieneDerechoAuxilioTransporte: boolean;
+  auxilioTransporte: number;
+  baseSalarioCesantias: number;
+  provisionMensualCesantias: number;
+  provisionMensualIntereses: number;
+  cesantiasAcumuladasYTD: number;
+  interesesCesantiasAcumuladosYTD: number;
+  fondoCesantias: string;
+  fechaLimiteConsignacionFondo: string;
+  fechaLimitePagoIntereses: string;
+}
+
+export interface CalculoVacacionesResult {
+  empleadoId: string;
+  empleadoNombre: string;
+  documento: string;
+  cargoNombre: string;
+  tipoContrato: string;
+  esSalarioIntegral: boolean;
+  ano: number;
+  mes: number;
+  diasLaboradosAno: number;
+  salarioBasico: number;
+  baseSalarioVacaciones: number;
+  diasCausadosMes: number;
+  diasCausadosAno: number;
+  diasDisfrutadosHistorico: number;
+  diasPendientesDisfrute: number;
+  provisionMensualVacaciones: number;
+  vacacionesAcumuladasYTD: number;
+  fechaIngreso: string;
+}
+
 // ==========================================
 // 2. MÓDULO DE SG-SST (RESOLUCIÓN 0312 DE 2019 - 21 ESTÁNDARES MÍNIMOS)
 // Para empresas de 11 a 50 trabajadores clasificadas en Riesgo I, II o III
@@ -1137,13 +1204,37 @@ export interface SaldoInicialEmpleadoNomina {
   fechaIngreso?: string;
   fechaCorteSaldos: string; // ej. "2025-12-31" o "2026-02-28"
 
-  // 1. Prestaciones Sociales y Pasivos Laborales Acumulados
+  // Datos contractuales y salariales de inicio de producción
+  salarioBasico?: number;
+  tipoSalario?: 'Ordinario' | 'Integral' | 'Por comisión' | string;
+  tipoContrato?: string;
+  diasTrabajadosAnoActual?: number;
+
+  // Afiliaciones a Seguridad Social
+  eps?: string;
+  fondoPensiones?: string;
+  arl?: string;
+  cajaCompensacion?: string;
+  fondoCesantias?: string;
+
+  // 1. Prestaciones Sociales y Pasivos Laborales Acumulados (CST)
   vacacionesDiasPendientes: number; // Días de vacaciones acumulados pendientes de disfrutar (Art. 186 CST)
   vacacionesValorAcumuladoCOP: number; // Provisión o valor acumulado de vacaciones pendientes
-  cesantiasSaldoAcumuladoCOP: number; // Saldo de cesantías acumuladas pendientes de liquidar o consignar
-  interesesCesantiasAcumuladoCOP: number; // Saldo de intereses a cesantías acumulados pendientes
-  primaServiciosBaseSemestreCOP: number; // Base o valor acumulado de prima de servicios del semestre en curso
-  diasTrabajadosSemestrePrima: number; // Días computables para prima del semestre
+  provisionMensualVacacionesCOP?: number; // Provisión mensual de vacaciones: 4.17% del salario básico (Art. 186 y 192 CST)
+  cesantiasSaldoAcumuladoCOP: number; // Saldo de cesantías acumuladas pendientes de liquidar o consignar (Art. 249 CST)
+  provisionMensualCesantiasCOP?: number; // Provisión mensual de cesantías: 8.33% de la base computable
+  interesesCesantiasAcumuladoCOP: number; // Saldo de intereses a cesantías acumulados pendientes (Ley 52/1975 - 12% anual)
+  provisionMensualInteresesCOP?: number; // Provisión mensual de intereses a cesantías: 1.0% mensual
+  totalPasivosLaboralesCOP?: number; // Pasivo laboral consolidado total (Vacaciones + Cesantías + Intereses + Prima)
+  totalProvisionMensualPrestacionesCOP?: number; // Provisión mensual consolidada total de prestaciones (21.83%)
+
+  // Prima de Servicios (Art. 306 CST & Ley 1788/2016 - Pago semestral: Junio y Diciembre)
+  semestrePrimaActual?: '1er Semestre (Ene - Jun)' | '2do Semestre (Jul - Dic)';
+  primaServiciosBaseSemestreCOP: number; // Base salarial mensual para cálculo de la prima del semestre en curso
+  diasTrabajadosSemestrePrima: number; // Días computables trabajados en el semestre actual (1 a 180 días)
+  primaServiciosValorAcumuladoCOP?: number; // Valor pasivo acumulado de prima pendiente de pago = (base * días) / 360
+  primaServiciosPagadaAnoCOP?: number; // Prima de servicios pagada en el semestre previo del año (DIAN Frm 220)
+  provisionMensualPrimaCOP?: number; // Provisión mensual de prima de servicios: 8.33% de la base computable
 
   // 2. Acumulados Tributarios y Certificado de Ingresos (Art. 378 / 383 ET - Formulario 220)
   ingresosLaboralesAcumuladosAnoCOP: number; // Ingresos brutos acumulados año en curso
@@ -1152,13 +1243,17 @@ export interface SaldoInicialEmpleadoNomina {
   fspAportesAcumuladosAnoCOP: number; // Fondo de Solidaridad Pensional acumulado
   retencionFuenteAcumuladaAnoCOP: number; // Retención en la fuente practicada acumulada
   cesantiasPagadasAnoCOP: number; // Cesantías e intereses efectivamente pagados en el año gravable
+  aporteVoluntarioPensionAnoCOP?: number; // Aportes AFC / AVC (Renta Exenta Art. 126-1 E.T.)
+  deduccionDependientesAnoCOP?: number; // Deducción por dependientes económicos o vivienda (Art. 387 E.T.)
+  saludPrepagadaAnoCOP?: number; // Deducción medicina prepagada / póliza de salud
 
   // 3. Préstamos, Libranzas y Deducciones Recurrentes Activas
   prestamoEmpresaSaldoCOP: number; // Saldo pendiente total de deuda
   prestamoEmpresaCuotaMensualCOP: number; // Valor a descontar periódicamente en nómina
   libranzaSaldoCOP: number; // Saldo pendiente de libranza bancaria o comercial
   libranzaCuotaMensualCOP: number; // Cuota periódica libranza
-  embargoJudicialSaldoCOP: number; // Saldo o cuota de embargo (ej. alimentos)
+  embargoJudicialSaldoCOP: number; // Saldo total embargo judicial
+  embargoJudicialCuotaMensualCOP?: number; // Cuota periódica embargo
   otrasDeduccionesFijasMensualCOP: number; // Aportes a fondos de empleados, cooperativas, etc.
 
   // 4. Metadatos de Auditoría y Estado
