@@ -78,12 +78,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const rolNormalizado = (profile.rol as RolSistema) || 'empleado';
+        const permisosRaw = (Array.isArray(profile.permisos) && profile.permisos.length > 0)
+          ? profile.permisos
+          : obtenerPermisosPorDefecto(rolNormalizado);
+        const permisosFiltrados = rolNormalizado === 'empleado'
+          ? permisosRaw.filter(p => p !== 'documentos')
+          : permisosRaw;
+
         const profileNormalizado: UsuarioSistema = {
           ...profile,
           rol: rolNormalizado,
-          permisos: (Array.isArray(profile.permisos) && profile.permisos.length > 0)
-            ? profile.permisos
-            : obtenerPermisosPorDefecto(rolNormalizado)
+          permisos: permisosFiltrados
         };
 
         setCurrentUser(profileNormalizado);
@@ -105,12 +110,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
           const rolDoc = (data.rol as RolSistema) || 'empleado';
+          const permisosRawDoc = (Array.isArray(data.permisos) && data.permisos.length > 0)
+            ? data.permisos
+            : obtenerPermisosPorDefecto(rolDoc);
+          const permisosFiltradosDoc = rolDoc === 'empleado'
+            ? permisosRawDoc.filter(p => p !== 'documentos')
+            : permisosRawDoc;
+
           const dataNormalizada: UsuarioSistema = {
             ...data,
             rol: rolDoc,
-            permisos: (Array.isArray(data.permisos) && data.permisos.length > 0)
-              ? data.permisos
-              : obtenerPermisosPorDefecto(rolDoc)
+            permisos: permisosFiltradosDoc
           };
           setCurrentUser(dataNormalizada);
           setUserRoleState(dataNormalizada.rol === 'empleado' ? 'empleado' : 'admin');
@@ -146,12 +156,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginSuccess = (usuario: UsuarioSistema) => {
     const rolNormalizado = (usuario.rol as RolSistema) || 'empleado';
+    const permisosRaw = (Array.isArray(usuario.permisos) && usuario.permisos.length > 0)
+      ? usuario.permisos
+      : obtenerPermisosPorDefecto(rolNormalizado);
+    const permisosFiltrados = rolNormalizado === 'empleado'
+      ? permisosRaw.filter(p => p !== 'documentos')
+      : permisosRaw;
+
     const usuarioNormalizado: UsuarioSistema = {
       ...usuario,
       rol: rolNormalizado,
-      permisos: (Array.isArray(usuario.permisos) && usuario.permisos.length > 0)
-        ? usuario.permisos
-        : obtenerPermisosPorDefecto(rolNormalizado)
+      permisos: permisosFiltrados
     };
     setCurrentUser(usuarioNormalizado);
     setUserRoleState(usuarioNormalizado.rol === 'empleado' ? 'empleado' : 'admin');

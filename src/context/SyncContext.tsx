@@ -299,13 +299,17 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setInventarioEpp(eppData);
       setSolicitudesEpp(solEppData);
       if (usrData && usrData.length > 0) {
-        const usrNormalizados = usrData.map(u => ({
-          ...u,
-          rol: u.rol || 'empleado',
-          permisos: (Array.isArray(u.permisos) && u.permisos.length > 0)
+        const usrNormalizados = usrData.map(u => {
+          const rolU = u.rol || 'empleado';
+          const permsRaw = (Array.isArray(u.permisos) && u.permisos.length > 0)
             ? u.permisos
-            : obtenerPermisosPorDefecto(u.rol || 'empleado')
-        }));
+            : obtenerPermisosPorDefecto(rolU);
+          return {
+            ...u,
+            rol: rolU,
+            permisos: rolU === 'empleado' ? permsRaw.filter(p => p !== 'documentos') : permsRaw
+          };
+        });
         setUsuariosList(usrNormalizados);
         try {
           localStorage.setItem('bgroup_usuarios_cache', JSON.stringify(usrNormalizados));

@@ -67,7 +67,7 @@ export const PERMISOS_POR_DEFECTO_POR_ROL: Record<RolSistema, string[]> = {
   ],
   empleado: [
     'dashboard', 'solicitudes', 'vacaciones', 'capacitaciones', 'evaluaciones',
-    'epps', 'votaciones-sst', 'nomina', 'documentos'
+    'epps', 'votaciones-sst', 'nomina'
   ]
 };
 

@@ -66,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Si el usuario autenticado real es colaborador/empleado, se rige estrictamente por sus permisos asignados
     if (rolReal === 'empleado') {
       if (modulo === 'evaluaciones') return true;
+      if (modulo === 'documentos') return false; // El repositorio y generador de documentos institucionales es administrativo
       return permisos.includes(modulo);
     }
     // Si un administrador real está simulando la vista de empleado, filtrar módulos administrativos para fidelidad de prueba
@@ -269,27 +270,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <Vote className={`w-4 h-4 ${currentView === 'votaciones-sst' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
                   <span>Votaciones</span>
-                </button>
-              </>
-            )}
-
-            {tienePermiso('documentos') && (
-              <>
-                <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
-                  Documentos & Certificados
-                </div>
-
-                <button
-                  id="nav-documentos-empleado"
-                  onClick={() => onNavigate('documentos')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    currentView === 'documentos'
-                      ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                      : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-                  }`}
-                >
-                  <FileText className={`w-4 h-4 ${currentView === 'documentos' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-                  <span>Mis Certificados Laborales</span>
                 </button>
               </>
             )}

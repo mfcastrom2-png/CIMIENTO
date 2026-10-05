@@ -725,13 +725,31 @@ function AppLayout() {
               <Route
                 path="/documentos"
                 element={
-                  <DocumentosView
-                    cargos={cargos}
-                    empleados={empleados}
-                    evaluaciones={evaluaciones}
-                    onOpenEvaluacionDetalle={(evalId) => setActiveEvaluacionDetalleId(evalId)}
-                    empresa={empresa}
-                  />
+                  currentUser?.rol === 'empleado' || (!isSuperAdmin && currentUser?.rol !== 'admin_gh' && currentUser?.rol !== 'lider_area' && currentUser?.rol !== 'responsable_sst' && !currentUser?.permisos?.includes('documentos')) ? (
+                    <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-xl shadow-xs border border-rose-200 text-center">
+                      <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <ShieldAlert className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-lg font-bold text-slate-800">Acceso Restringido a Documentos</h2>
+                      <p className="text-xs text-slate-500 mt-2">
+                        El Repositorio y Generador de Documentos Institucionales está reservado para la Dirección de Gestión Humana, Líderes y SST. Para solicitar y descargar sus certificados laborales personales, diríjase a su módulo de <strong>Mis Solicitudes & Trámites</strong> (Buzón Interno).
+                      </p>
+                      <button
+                        onClick={() => navigate('/dashboard')}
+                        className="mt-4 px-4 py-2 bg-[#18235C] text-white text-xs font-bold rounded-lg hover:bg-[#101740] transition-colors"
+                      >
+                        Volver al Dashboard
+                      </button>
+                    </div>
+                  ) : (
+                    <DocumentosView
+                      cargos={cargos}
+                      empleados={empleados}
+                      evaluaciones={evaluaciones}
+                      onOpenEvaluacionDetalle={(evalId) => setActiveEvaluacionDetalleId(evalId)}
+                      empresa={empresa}
+                    />
+                  )
                 }
               />
               <Route

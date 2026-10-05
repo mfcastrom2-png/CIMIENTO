@@ -121,9 +121,9 @@ describe('Suite de Pruebas: Matriz de Roles y Asignación de Permisos RBAC', () 
       expect(perms).toContain('epps');
       expect(perms).toContain('votaciones-sst');
       expect(perms).toContain('nomina');      // Consulta exclusiva de su propio desprendible
-      expect(perms).toContain('documentos');  // Descarga de su certificado laboral
 
-      // No debe tener administración de la empresa ni configuración
+      // No debe tener acceso al repositorio y generador institucional de documentos ni administración
+      expect(perms).not.toContain('documentos');
       expect(perms).not.toContain('empresa');
       expect(perms).not.toContain('estructura');
       expect(perms).not.toContain('cargos');

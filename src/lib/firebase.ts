@@ -220,9 +220,12 @@ export const obtenerPerfilUsuario = async (uid: string, emailOpcional?: string):
     if (userDoc.exists()) {
       const rawData = userDoc.data() as UsuarioSistema;
       const rolNormalizado = (rawData.rol as RolSistema) || 'empleado';
-      const permisosNormalizados = (Array.isArray(rawData.permisos) && rawData.permisos.length > 0)
+      const permisosRaw = (Array.isArray(rawData.permisos) && rawData.permisos.length > 0)
         ? rawData.permisos
         : obtenerPermisosPorDefecto(rolNormalizado);
+      const permisosNormalizados = rolNormalizado === 'empleado'
+        ? permisosRaw.filter(p => p !== 'documentos')
+        : permisosRaw;
       const data: UsuarioSistema = {
         ...rawData,
         rol: rolNormalizado,
