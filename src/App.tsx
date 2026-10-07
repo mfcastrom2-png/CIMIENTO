@@ -359,6 +359,24 @@ function AppLayout() {
                     onNavigate={(view) => navigate('/' + view)}
                     onOpenEvaluacionDetalle={(evalId) => setActiveEvaluacionDetalleId(evalId)}
                     onOpenGestionDatos={isSuperAdmin ? () => setGestionDatosModalOpen(true) : undefined}
+                    initialTab="anuncios"
+                  />
+                }
+              />
+              <Route
+                path="/muro"
+                element={
+                  <DashboardView
+                    cargos={cargos}
+                    empleados={empleados}
+                    solicitudes={solicitudes}
+                    evaluaciones={evaluaciones}
+                    userRole={userRole}
+                    currentUser={currentUser}
+                    onNavigate={(view) => navigate('/' + view)}
+                    onOpenEvaluacionDetalle={(evalId) => setActiveEvaluacionDetalleId(evalId)}
+                    onOpenGestionDatos={isSuperAdmin ? () => setGestionDatosModalOpen(true) : undefined}
+                    initialTab="muro"
                   />
                 }
               />

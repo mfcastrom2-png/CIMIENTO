@@ -87,11 +87,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="pb-4 border-b border-[#8FA7D6]/20 mb-4">
         {empresa?.identidadVisual?.logoUrl ? (
           <div className="flex flex-col gap-2">
-            <div className="bg-white/10 p-1.5 rounded-lg border border-[#8FA7D6]/40 flex items-center justify-center max-h-14 overflow-hidden">
+            <div className="bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-center max-h-16 overflow-hidden shadow-sm">
               <img
                 src={empresa.identidadVisual.logoUrl}
                 alt={empresa.nombreComercial || 'Logo'}
-                className="max-h-11 w-auto max-w-full object-contain"
+                className="max-h-12 w-auto max-w-full object-contain"
                 onError={(e) => {
                   (e.target as any).style.display = 'none';
                 }}
@@ -108,8 +108,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#101740] border border-[#8FA7D6]/60 flex items-center justify-center shrink-0 shadow-xs">
-              <span className="font-bold text-lg text-[#00FF00]">
+            <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
+              <span className="font-bold text-lg text-[#18235C]">
                 {empresa?.nombreComercial ? empresa.nombreComercial.charAt(0).toUpperCase() : 'B'}
               </span>
             </div>
@@ -134,18 +134,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {tienePermiso('dashboard') && (
-          <button
-            id="nav-dashboard"
-            onClick={() => onNavigate('dashboard')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
-              currentView === 'dashboard'
-                ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
-                : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
-            }`}
-          >
-            <LayoutDashboard className={`w-4 h-4 ${currentView === 'dashboard' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
-            <span>{esEmpleado ? 'Mi Dashboard' : 'Dashboard'}</span>
-          </button>
+          <>
+            <button
+              id="nav-dashboard"
+              onClick={() => onNavigate('dashboard')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'dashboard'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <LayoutDashboard className={`w-4 h-4 ${currentView === 'dashboard' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+              <span>{esEmpleado ? 'Tablero de Anuncios' : 'Dashboard'}</span>
+            </button>
+
+            <button
+              id="nav-muro"
+              onClick={() => onNavigate('muro')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'muro'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <BookOpen className={`w-4 h-4 ${currentView === 'muro' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+              <span>Muro de Documentos</span>
+            </button>
+          </>
         )}
 
         {/* SI ES EMPLEADO: SERVICIOS DIRECTOS DEL TRABAJADOR */}

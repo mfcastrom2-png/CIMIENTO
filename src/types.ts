@@ -1421,6 +1421,34 @@ export interface AnuncioSlide {
   destacado?: boolean;
 }
 
+export type CategoriaDocumentoMuro =
+  | 'Reglamentos & Políticas'
+  | 'Seguridad & SG-SST'
+  | 'Bienestar & Beneficios'
+  | 'Procedimientos & Manuales'
+  | 'Circulares & Comunicados'
+  | 'Legal & Normativa';
+
+export interface DocumentoMuroPDF {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  categoria: CategoriaDocumentoMuro;
+  urlPdf: string; // URL directa o enlace de Google Drive
+  nombreArchivo?: string;
+  codigoDocumento?: string; // Ej: RIT-001, POL-SST-002, MAN-CON-003
+  version?: string; // Ej: v2.0
+  fechaPublicacion: string;
+  fechaActualizacion?: string;
+  tamanoAprox?: string; // Ej: 1.4 MB
+  numPaginas?: number;
+  obligatorioLectura?: boolean;
+  destacado?: boolean;
+  activo: boolean; // Visibilidad para empleados
+  autorNombre: string;
+  tags?: string[];
+}
+
 export interface CentroTrabajo {
   id: string;
   nombre: string;

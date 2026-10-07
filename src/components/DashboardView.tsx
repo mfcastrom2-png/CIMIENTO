@@ -19,6 +19,11 @@ import {
   eliminarAnuncioFB,
   obtenerAnunciosFB
 } from '../lib/firebase';
+import { MuroDocumentosView } from './MuroDocumentosView';
+import {
+  convertirUrlGoogleDriveAImagen,
+  esUrlGoogleDrive
+} from '../utils/googleDriveUtils';
 import {
   Briefcase,
   Users,
@@ -67,6 +72,7 @@ interface DashboardViewProps {
   onNavigate: (view: string) => void;
   onOpenEvaluacionDetalle?: (evalId: string) => void;
   onOpenGestionDatos?: () => void;
+  initialTab?: 'anuncios' | 'muro' | 'metricas';
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -78,7 +84,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   onNavigate,
   onOpenEvaluacionDetalle: _onOpenEvaluacionDetalle,
-  onOpenGestionDatos
+  onOpenGestionDatos,
+  initialTab = 'anuncios'
 }) => {
   const esAdmin = userRole !== 'empleado' && (currentUser?.rol === 'superadmin' || currentUser?.rol === 'admin_gh' || userRole === 'admin');
 
@@ -121,8 +128,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
-  // Pestaña activa para administradores: 'anuncios' o 'metricas'
-  const [tabAdmin, setTabAdmin] = useState<'anuncios' | 'metricas'>('anuncios');
+  // Pestaña activa: 'anuncios' (Muro de Noticias), 'muro' (Visualización de Documentos PDF), 'metricas' (Métricas de Gestión)
+  const [tabActiva, setTabActiva] = useState<'anuncios' | 'muro' | 'metricas'>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setTabActiva(initialTab);
+    }
+  }, [initialTab]);
 
   // Control del Carrusel de Slides
   const slidesVisibles = useMemo(() => {
@@ -213,12 +226,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const id = anuncioEnEdicion ? anuncioEnEdicion.id : `slide-${Date.now()}`;
     const fecha = anuncioEnEdicion ? anuncioEnEdicion.fechaPublicacion : new Date().toISOString().split('T')[0];
 
+    const imagenProcesada = esUrlGoogleDrive(formImagenUrl)
+      ? convertirUrlGoogleDriveAImagen(formImagenUrl)
+      : (formImagenUrl.trim() || PLANTILLAS_IMAGENES_ANUNCIOS[0].url);
+
     const nuevoAnuncio: AnuncioSlide = {
       id,
       titulo: formTitulo.trim(),
       subtitulo: formSubtitulo.trim() || undefined,
       categoria: formCategoria,
-      imagenUrl: formImagenUrl.trim() || PLANTILLAS_IMAGENES_ANUNCIOS[0].url,
+      imagenUrl: imagenProcesada,
       descripcion: formDescripcion.trim(),
       fechaPublicacion: fecha,
       activo: formActivo,
@@ -302,42 +319,55 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Acciones principales de cabecera */}
         <div className="flex flex-wrap items-center gap-2">
           {esAdmin && (
-            <>
-              {/* Botón publicar nuevo slide */}
-              <button
-                onClick={abrirCrearAnuncio}
-                className="px-3.5 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-colors shadow-xs cursor-pointer"
-                title="Publicar una nueva imagen o slide con comunicado"
-              >
-                <Plus className="w-4 h-4 text-[#00FF00]" />
-                <span>Publicar Anuncio / Slide</span>
-              </button>
-
-              {/* Selector de pestañas para administradores */}
-              <div className="bg-slate-100 p-1 rounded-lg border border-[#8FA7D6] flex text-xs font-bold">
-                <button
-                  onClick={() => setTabAdmin('anuncios')}
-                  className={`px-3 py-1.5 rounded-md transition-colors ${
-                    tabAdmin === 'anuncios'
-                      ? 'bg-[#18235C] text-white shadow-2xs'
-                      : 'text-[#18235C] hover:bg-white'
-                  }`}
-                >
-                  Muro de Noticias
-                </button>
-                <button
-                  onClick={() => setTabAdmin('metricas')}
-                  className={`px-3 py-1.5 rounded-md transition-colors ${
-                    tabAdmin === 'metricas'
-                      ? 'bg-[#18235C] text-white shadow-2xs'
-                      : 'text-[#18235C] hover:bg-white'
-                  }`}
-                >
-                  Métricas de Gestión
-                </button>
-              </div>
-            </>
+            <button
+              onClick={abrirCrearAnuncio}
+              className="px-3.5 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-colors shadow-xs cursor-pointer"
+              title="Publicar una nueva imagen o slide con comunicado"
+            >
+              <Plus className="w-4 h-4 text-[#00FF00]" />
+              <span>Publicar Anuncio / Slide</span>
+            </button>
           )}
+
+          {/* Selector de pestañas: Muro de Noticias | Muro (Documentos PDF) | Métricas de Gestión */}
+          <div className="bg-slate-100 p-1 rounded-lg border border-[#8FA7D6] flex text-xs font-bold shadow-2xs">
+            <button
+              id="tab-muro-noticias"
+              onClick={() => setTabActiva('anuncios')}
+              className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                tabActiva === 'anuncios'
+                  ? 'bg-[#18235C] text-white shadow-2xs'
+                  : 'text-[#18235C] hover:bg-white'
+              }`}
+            >
+              Muro de Noticias
+            </button>
+            <button
+              id="tab-muro-documentos"
+              onClick={() => setTabActiva('muro')}
+              className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+                tabActiva === 'muro'
+                  ? 'bg-[#18235C] text-white shadow-2xs'
+                  : 'text-[#18235C] hover:bg-white'
+              }`}
+            >
+              <BookOpen className={`w-3.5 h-3.5 ${tabActiva === 'muro' ? 'text-[#00FF00]' : 'text-[#18235C]'}`} />
+              <span>Muro</span>
+            </button>
+            {esAdmin && (
+              <button
+                id="tab-metricas-gestion"
+                onClick={() => setTabActiva('metricas')}
+                className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                  tabActiva === 'metricas'
+                    ? 'bg-[#18235C] text-white shadow-2xs'
+                    : 'text-[#18235C] hover:bg-white'
+                }`}
+              >
+                Métricas de Gestión
+              </button>
+            )}
+          </div>
 
           {!esAdmin && (
             <button
@@ -352,7 +382,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* VISTA 1: TABLERO DE ANUNCIOS & MURO DE NOTICIAS (Slides para Empleados y Administrador) */}
-      {(!esAdmin || tabAdmin === 'anuncios') && (
+      {tabActiva === 'anuncios' && (
         <div className="space-y-6">
           {/* CARRUSEL DE SLIDES DE ALTO IMPACTO */}
           {slidesVisibles.length > 0 ? (
@@ -364,9 +394,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {/* Imagen de fondo del Slide */}
               <div className="absolute inset-0 z-0">
                 <img
-                  src={currentSlide.imagenUrl}
+                  src={convertirUrlGoogleDriveAImagen(currentSlide.imagenUrl)}
                   alt={currentSlide.titulo}
                   className="w-full h-full object-cover transition-opacity duration-700 brightness-[0.75]"
+                  onError={(e) => {
+                    (e.target as any).src = PLANTILLAS_IMAGENES_ANUNCIOS[0].url;
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#101740] via-[#101740]/60 to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-r from-[#101740]/80 via-transparent to-transparent" />
@@ -688,9 +721,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div>
                     <div className="relative h-40 w-full overflow-hidden bg-slate-100">
                       <img
-                        src={noticia.imagenUrl}
+                        src={convertirUrlGoogleDriveAImagen(noticia.imagenUrl)}
                         alt={noticia.titulo}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.target as any).src = PLANTILLAS_IMAGENES_ANUNCIOS[0].url;
+                        }}
                       />
                       <div className="absolute top-3 left-3">
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#18235C] text-[#00FF00] shadow-sm">
@@ -732,8 +768,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* VISTA 2: MÉTRICAS & GESTIÓN OPERATIVA (EXCLUSIVO ADMINISTRADOR) */}
-      {esAdmin && tabAdmin === 'metricas' && (
+      {/* VISTA 2: MURO - VISUALIZACIÓN DE DOCUMENTOS EN PDF (VISIBLE PARA EMPLEADOS Y ADMINISTRADORES) */}
+      {tabActiva === 'muro' && (
+        <MuroDocumentosView
+          currentUser={currentUser || null}
+          esAdmin={esAdmin}
+        />
+      )}
+
+      {/* VISTA 3: MÉTRICAS & GESTIÓN OPERATIVA (EXCLUSIVO ADMINISTRADOR) */}
+      {esAdmin && tabActiva === 'metricas' && (
         <div className="space-y-6">
           {/* Production & Cloud Database Readiness Banner */}
           <div className="p-4 rounded-xl bg-[#FFFFFF] border border-[#8FA7D6] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-[#282829] shadow-xs">
@@ -980,14 +1024,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   ))}
                 </div>
 
-                <div className="pt-1">
-                  <input
-                    type="url"
-                    placeholder="O pega aquí una URL directa de imagen (https://...)"
-                    value={formImagenUrl}
-                    onChange={e => setFormImagenUrl(e.target.value)}
-                    className="w-full p-2.5 rounded-lg border border-[#8FA7D6] bg-slate-50 text-xs font-mono"
-                  />
+                <div className="pt-1 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <input
+                      type="url"
+                      placeholder="O pega aquí una URL directa o enlace de Google Drive (https://...)"
+                      value={formImagenUrl}
+                      onChange={e => setFormImagenUrl(e.target.value)}
+                      className="w-full p-2.5 rounded-lg border border-[#8FA7D6] bg-slate-50 text-xs font-mono"
+                    />
+                  </div>
+
+                  {esUrlGoogleDrive(formImagenUrl) && (
+                    <div className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-2xs">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Enlace de Google Drive detectado — La imagen se convertirá automáticamente para visualización directa.</span>
+                    </div>
+                  )}
+
+                  {/* Vista previa en vivo de la imagen */}
+                  {formImagenUrl && (
+                    <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center gap-3">
+                      <img
+                        src={convertirUrlGoogleDriveAImagen(formImagenUrl)}
+                        alt="Vista previa"
+                        className="w-16 h-12 rounded object-cover border border-slate-300 shadow-2xs shrink-0"
+                        onError={(e) => {
+                          (e.target as any).src = PLANTILLAS_IMAGENES_ANUNCIOS[0].url;
+                        }}
+                      />
+                      <div className="text-[11px] text-slate-600 truncate flex-1 min-w-0">
+                        <span className="font-bold text-[#18235C] block">Vista previa de la imagen</span>
+                        <span className="text-[10px] text-slate-500 font-mono truncate block">{formImagenUrl}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1094,9 +1165,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Cabecera con imagen */}
             <div className="relative h-60 sm:h-72 w-full overflow-hidden bg-[#18235C]">
               <img
-                src={slideDetalle.imagenUrl}
+                src={convertirUrlGoogleDriveAImagen(slideDetalle.imagenUrl)}
                 alt={slideDetalle.titulo}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as any).src = PLANTILLAS_IMAGENES_ANUNCIOS[0].url;
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 

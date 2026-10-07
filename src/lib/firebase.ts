@@ -50,6 +50,7 @@ import {
   EventoAuditoria,
   AccionAuditoria,
   AnuncioSlide,
+  DocumentoMuroPDF,
   Capacitacion,
   ConfiguracionEmpresa,
   SaldoInicialEmpleadoNomina
@@ -1126,6 +1127,37 @@ export const obtenerAnunciosFB = async (): Promise<AnuncioSlide[]> => {
     return snap.docs.map(d => ({ ...(d.data() as AnuncioSlide), id: d.id }));
   } catch (error) {
     console.warn('Error fetching anuncios from Firestore, using local fallback:', error);
+    return [];
+  }
+};
+
+export const guardarDocumentoMuroFB = async (documento: DocumentoMuroPDF): Promise<void> => {
+  const path = 'documentos_muro';
+  try {
+    const docRef = doc(db, path, documento.id);
+    await setDoc(docRef, documento, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${path}/${documento.id}`);
+  }
+};
+
+export const eliminarDocumentoMuroFB = async (documentoId: string): Promise<void> => {
+  const path = 'documentos_muro';
+  try {
+    const docRef = doc(db, path, documentoId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${path}/${documentoId}`);
+  }
+};
+
+export const obtenerDocumentosMuroFB = async (): Promise<DocumentoMuroPDF[]> => {
+  const path = 'documentos_muro';
+  try {
+    const snap = await getDocs(collection(db, path));
+    return snap.docs.map(d => ({ ...(d.data() as DocumentoMuroPDF), id: d.id }));
+  } catch (error) {
+    console.warn('Error fetching documentos muro from Firestore, using local fallback:', error);
     return [];
   }
 };
