@@ -13,10 +13,14 @@ import {
   TrendingUp,
   ShieldAlert,
   FileSpreadsheet,
-  UserCheck
+  UserCheck,
+  FileDown,
+  Printer
 } from 'lucide-react';
 import { EvaluacionFormModal } from './EvaluacionFormModal';
 import { EvaluacionDetalleModal } from './EvaluacionDetalleModal';
+import { ReporteConsolidadoEvaluacionesModal } from './ReporteConsolidadoEvaluacionesModal';
+import { useCompanySyncOptional } from '../context/SyncContext';
 
 interface EvaluacionesAdminViewProps {
   evaluaciones: EvaluacionDesempeno[];
@@ -42,6 +46,10 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
   const [selectedEvaluacionForDetail, setSelectedEvaluacionForDetail] = useState<EvaluacionDesempeno | null>(null);
   const [selectedEvaluacionForEdit, setSelectedEvaluacionForEdit] = useState<EvaluacionDesempeno | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [reporteConsolidadoModalOpen, setReporteConsolidadoModalOpen] = useState(false);
+
+  const syncContext = useCompanySyncOptional();
+  const empresa = syncContext?.empresa;
 
   const esEmpleado = userRole === 'empleado';
   const effectiveEmpleadoId = currentEmpleadoId || currentUser?.empleadoId || '';
@@ -103,15 +111,27 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
           </p>
         </div>
 
-        {!esEmpleado && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsCreating(true)}
-            className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded flex items-center gap-2 shadow-xs transition-colors whitespace-nowrap"
+            type="button"
+            onClick={() => setReporteConsolidadoModalOpen(true)}
+            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-[#18235C] border border-[#8FA7D6] text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors whitespace-nowrap cursor-pointer"
+            title="Generar e imprimir informe consolidado en PDF con formato institucional para líderes"
           >
-            <Plus className="w-4 h-4" />
-            <span>Nueva Evaluación Técnica</span>
+            <FileDown className="w-4 h-4 text-emerald-600" />
+            <span>Reporte Consolidado PDF</span>
           </button>
-        )}
+
+          {!esEmpleado && (
+            <button
+              onClick={() => setIsCreating(true)}
+              className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-lg flex items-center gap-2 shadow-xs transition-colors whitespace-nowrap cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-[#00FF00]" />
+              <span>Nueva Evaluación Técnica</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -374,6 +394,16 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
           onClose={() => setSelectedEvaluacionForDetail(null)}
         />
       )}
+
+      {/* Modal Generador de Reporte Consolidado en PDF */}
+      <ReporteConsolidadoEvaluacionesModal
+        isOpen={reporteConsolidadoModalOpen}
+        onClose={() => setReporteConsolidadoModalOpen(false)}
+        evaluaciones={evaluaciones}
+        empleados={empleados}
+        cargos={cargos}
+        empresa={empresa}
+      />
     </div>
   );
 };

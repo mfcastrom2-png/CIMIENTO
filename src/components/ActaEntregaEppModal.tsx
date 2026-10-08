@@ -13,8 +13,13 @@ import {
   Calendar,
   Award,
   Download,
-  FileDown
+  FileDown,
+  PenTool
 } from 'lucide-react';
+import { CodigoQRVerificacion } from './CodigoQRVerificacion';
+import { FirmaDigitalStamp } from './FirmaDigitalStamp';
+import { HerramientaFirmaDigitalModal, DatosFirmaDigital } from './HerramientaFirmaDigitalModal';
+import { registrarCertificadoEmitido, generarHashIntegridadDocumento } from '../services/verificacionCertificadosService';
 
 interface ActaEntregaEppModalProps {
   solicitud: SolicitudEntregaEPP;
@@ -24,11 +29,33 @@ interface ActaEntregaEppModalProps {
 
 export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solicitud, empresa = initialEmpresa, onClose }) => {
   const [descargandoPdf, setDescargandoPdf] = useState(false);
-  const nombreArchivo = `Acta_Entrega_EPP_${solicitud.actaEntregaNumero || solicitud.id}_${solicitud.empleadoNombre.replace(/\s+/g, '_')}`;
+  const [modalFirmaOpen, setModalFirmaOpen] = useState(false);
+  const [firmanteActualTipo, setFirmanteActualTipo] = useState<'colaborador' | 'responsable'>('colaborador');
+  const [firmaColaborador, setFirmaColaborador] = useState<DatosFirmaDigital | null>(null);
+  const [firmaResponsable, setFirmaResponsable] = useState<DatosFirmaDigital | null>(null);
+
+  const codigoVerificacion = solicitud.actaEntregaNumero || `ACTA-EPP-${solicitud.id.slice(-6).toUpperCase()}`;
+  const nombreArchivo = `Acta_Entrega_EPP_${codigoVerificacion}_${solicitud.empleadoNombre.replace(/\s+/g, '_')}`;
 
   const handleDescargarPdf = async () => {
     setDescargandoPdf(true);
     try {
+      await registrarCertificadoEmitido({
+        codigoVerificacion,
+        tipoDocumento: 'Acta de Entrega de EPP',
+        titularNombre: solicitud.empleadoNombre,
+        titularDocumento: 'Documento Registrado',
+        titularCargo: solicitud.eppNombre,
+        fechaEmision: solicitud.fechaEntrega || new Date().toLocaleDateString('es-CO'),
+        fechaRegistroISO: new Date().toISOString(),
+        emisorRazonSocial: empresa?.razonSocial || empresa?.nombreComercial || 'Empresa',
+        emisorNit: `${empresa?.nit || 'NIT'}-${empresa?.digitoVerificacion || ''}`,
+        firmanteNombre: firmaResponsable?.firmanteNombre || solicitud.responsableEntrega || 'Responsable SG-SST',
+        firmanteCargo: 'Responsable SG-SST / Almacén',
+        hashIntegridad: generarHashIntegridadDocumento({ codigo: codigoVerificacion, elemento: solicitud.eppNombre, cant: solicitud.cantidad }),
+        estado: 'VIGENTE_AUTENTICO',
+        firmaDigitalUrl: firmaColaborador?.dataUrl || firmaResponsable?.dataUrl
+      });
       await descargarElementoComoPdf('area-impresion-acta-epp', nombreArchivo);
     } finally {
       setDescargandoPdf(false);
@@ -37,6 +64,20 @@ export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solici
 
   const handleImprimir = () => {
     imprimirDocumento(nombreArchivo, 'area-impresion-acta-epp');
+  };
+
+  const abrirModalFirmar = (tipo: 'colaborador' | 'responsable') => {
+    setFirmanteActualTipo(tipo);
+    setModalFirmaOpen(true);
+  };
+
+  const handleGuardarFirma = (firma: DatosFirmaDigital) => {
+    if (firmanteActualTipo === 'colaborador') {
+      setFirmaColaborador(firma);
+    } else {
+      setFirmaResponsable(firma);
+    }
+    setModalFirmaOpen(false);
   };
 
   return (
@@ -211,34 +252,70 @@ export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solici
             </ul>
           </div>
 
-          {/* Formal Signatures Section */}
-          <div className="grid grid-cols-2 gap-8 pt-6">
-            <div className="border-t-2 border-[#18235C] pt-2 text-center">
-              <div className="font-bold text-xs text-[#18235C]">{solicitud.empleadoNombre}</div>
-              <div className="text-[10px] text-[#282829]">Firma del Colaborador (Recibí Conforme)</div>
-              <div className="text-[10px] text-[#282829] font-mono">
-                C.C. Registrada en Hoja de Vida
+          {/* Formal Signatures and QR Authenticity Section */}
+          <div className="pt-6 border-t border-[#8FA7D6]/30">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+              {/* Firma Colaborador */}
+              <div className="sm:col-span-5">
+                <FirmaDigitalStamp
+                  firma={firmaColaborador}
+                  firmanteDefault={{
+                    nombre: solicitud.empleadoNombre,
+                    cargo: 'Colaborador (Recibí Conforme EPP)',
+                    documento: 'C.C. Registrada'
+                  }}
+                  labelCargo="Firma de Constancia de Entrega y Recibo"
+                  onOpenFirmarModal={() => abrirModalFirmar('colaborador')}
+                />
               </div>
-              <div className="text-[10px] text-[#18235C] font-semibold mt-1 flex items-center justify-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>Firmado y verificado digitalmente</span>
+
+              {/* Código QR de Autenticidad */}
+              <div className="sm:col-span-2 flex justify-center">
+                <CodigoQRVerificacion
+                  codigoVerificacion={codigoVerificacion}
+                  tipoDocumento="Acta de Entrega de EPP"
+                  titularNombre={solicitud.empleadoNombre}
+                  size={75}
+                />
+              </div>
+
+              {/* Firma Responsable SG-SST / Almacén */}
+              <div className="sm:col-span-5">
+                <FirmaDigitalStamp
+                  firma={firmaResponsable}
+                  firmanteDefault={{
+                    nombre: solicitud.responsableEntrega || 'Responsable SG-SST',
+                    cargo: 'Responsable SG-SST / Almacén',
+                    documento: 'Licencia SST Vigente'
+                  }}
+                  labelCargo="Autorizado según Resolución 0312 de 2019"
+                  onOpenFirmarModal={() => abrirModalFirmar('responsable')}
+                />
               </div>
             </div>
 
-            <div className="border-t-2 border-[#18235C] pt-2 text-center">
-              <div className="font-bold text-xs text-[#18235C]">{solicitud.responsableEntrega || 'Julián Castro (Vigía SST)'}</div>
-              <div className="text-[10px] text-[#282829]">Responsable SG-SST / Entrega de Almacén</div>
-              <div className="text-[10px] text-[#282829]">{empresa?.razonSocial || empresa?.nombreComercial || 'Empresa'}</div>
-              <div className="text-[10px] text-[#18235C] font-semibold mt-1 flex items-center justify-center gap-1">
-                <ShieldCheck className="w-3 h-3" />
-                <span>Autorizado bajo Res. 0312 de 2019</span>
-              </div>
+            <div className="mt-4 pt-2 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-400 font-mono">
+              <span>Cód. Verificación: {codigoVerificacion}</span>
+              <span>Acta de EPP con validez jurídica según Ley 527/1999 y Decreto 1072/2015</span>
             </div>
           </div>
 
         </div>
 
       </div>
+
+      {/* Modal de Firma Digital */}
+      <HerramientaFirmaDigitalModal
+        isOpen={modalFirmaOpen}
+        onClose={() => setModalFirmaOpen(false)}
+        onSaveSignature={handleGuardarFirma}
+        tituloDocumento={`Acta de Entrega de EPP: ${solicitud.eppNombre}`}
+        firmanteSugerido={{
+          nombre: firmanteActualTipo === 'colaborador' ? solicitud.empleadoNombre : (solicitud.responsableEntrega || 'Responsable SST'),
+          cargo: firmanteActualTipo === 'colaborador' ? 'Colaborador' : 'Responsable SG-SST',
+          documento: ''
+        }}
+      />
     </div>
   );
 };

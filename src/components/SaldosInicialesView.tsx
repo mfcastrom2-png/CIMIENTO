@@ -61,8 +61,13 @@ import {
   ExternalLink,
   Info,
   Calendar,
-  Layers
+  Layers,
+  PenTool
 } from 'lucide-react';
+import { CodigoQRVerificacion } from './CodigoQRVerificacion';
+import { FirmaDigitalStamp } from './FirmaDigitalStamp';
+import { HerramientaFirmaDigitalModal, DatosFirmaDigital } from './HerramientaFirmaDigitalModal';
+import { registrarCertificadoEmitido, generarHashIntegridadDocumento } from '../services/verificacionCertificadosService';
 
 interface SaldosInicialesViewProps {
   empleados: Empleado[];
@@ -117,6 +122,12 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
   const [saldoParaCertificado, setSaldoParaCertificado] = useState<SaldoInicialEmpleadoNomina | null>(null);
   const [modalNuevoManualOpen, setModalNuevoManualOpen] = useState(false);
   const [modalConfirmarLimpiarTodo, setModalConfirmarLimpiarTodo] = useState(false);
+
+  // Estados de Firma Digital y QR en Certificado de Saldos
+  const [modalFirmaCertificadoOpen, setModalFirmaCertificadoOpen] = useState(false);
+  const [tipoFirmanteCertificado, setTipoFirmanteCertificado] = useState<'emisor' | 'colaborador'>('emisor');
+  const [firmaCertificadoEmisor, setFirmaCertificadoEmisor] = useState<DatosFirmaDigital | null>(null);
+  const [firmaCertificadoColaborador, setFirmaCertificadoColaborador] = useState<DatosFirmaDigital | null>(null);
 
   // Copiado temporal en portapapeles
   const [copiadoPlantilla, setCopiadoPlantilla] = useState(false);
@@ -1654,22 +1665,82 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
               );
             })()}
 
-            {/* Firmas de Auditoría */}
-            <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs">
-              <div className="border-t border-slate-400 pt-2">
-                <div className="font-bold text-slate-900">{currentUser?.nombre || 'Gestión Humana & Nómina'}</div>
-                <div className="text-[11px] text-slate-500">Responsable de Nómina y Compensación</div>
+            {/* Firmas de Auditoría y Validación Digital con QR */}
+            <div className="pt-6 border-t border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+                {/* Firma Responsable Nómina */}
+                <div className="sm:col-span-5">
+                  <FirmaDigitalStamp
+                    firma={firmaCertificadoEmisor}
+                    firmanteDefault={{
+                      nombre: currentUser?.nombre || 'Dirección de Nómina y Compensación',
+                      cargo: 'Responsable de Nómina y Compensación',
+                      documento: currentUser?.documento || ''
+                    }}
+                    labelCargo="Firma de Certificación y Validación Contable"
+                    onOpenFirmarModal={() => {
+                      setTipoFirmanteCertificado('emisor');
+                      setModalFirmaCertificadoOpen(true);
+                    }}
+                  />
+                </div>
+
+                {/* Código QR de Validación de Autenticidad */}
+                <div className="sm:col-span-2 flex justify-center">
+                  <CodigoQRVerificacion
+                    codigoVerificacion={`SALDO-${saldoParaCertificado.id.toUpperCase()}-2026`}
+                    tipoDocumento="Certificado de Saldo y Pasivos"
+                    titularNombre={saldoParaCertificado.nombreCompleto}
+                    size={75}
+                  />
+                </div>
+
+                {/* Firma Colaborador */}
+                <div className="sm:col-span-5">
+                  <FirmaDigitalStamp
+                    firma={firmaCertificadoColaborador}
+                    firmanteDefault={{
+                      nombre: saldoParaCertificado.nombreCompleto,
+                      cargo: saldoParaCertificado.cargoNombre || 'Colaborador Titular',
+                      documento: saldoParaCertificado.documento
+                    }}
+                    labelCargo="Firma de Notificación y Enterado de Saldos"
+                    onOpenFirmarModal={() => {
+                      setTipoFirmanteCertificado('colaborador');
+                      setModalFirmaCertificadoOpen(true);
+                    }}
+                  />
+                </div>
               </div>
-              <div className="border-t border-slate-400 pt-2">
-                <div className="font-bold text-slate-900">{saldoParaCertificado.nombreCompleto}</div>
-                <div className="text-[11px] text-slate-500">Colaborador / C.C. {saldoParaCertificado.documento}</div>
+
+              <div className="mt-4 pt-2 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-400 font-mono">
+                <span>Cód. Verificación: SALDO-{saldoParaCertificado.id.toUpperCase()}-2026</span>
+                <span>Certificado oficial con validez jurídica según Ley 527/1999 de Firma Digital</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 print:hidden">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={async () => {
+                  await registrarCertificadoEmitido({
+                    codigoVerificacion: `SALDO-${saldoParaCertificado.id.toUpperCase()}-2026`,
+                    tipoDocumento: 'Certificado de Saldo y Pasivos',
+                    titularNombre: saldoParaCertificado.nombreCompleto,
+                    titularDocumento: saldoParaCertificado.documento,
+                    titularCargo: saldoParaCertificado.cargoNombre || 'Colaborador',
+                    fechaEmision: new Date().toLocaleDateString('es-CO'),
+                    fechaRegistroISO: new Date().toISOString(),
+                    emisorRazonSocial: empresa?.razonSocial || empresa?.nombreComercial || 'Empresa',
+                    emisorNit: `${empresa?.nit || 'NIT'}-${empresa?.digitoVerificacion || ''}`,
+                    firmanteNombre: firmaCertificadoEmisor?.firmanteNombre || currentUser?.nombre || 'Gestión Humana & Nómina',
+                    firmanteCargo: 'Responsable de Nómina y Compensación',
+                    hashIntegridad: generarHashIntegridadDocumento({ id: saldoParaCertificado.id, doc: saldoParaCertificado.documento }),
+                    estado: 'VIGENTE_AUTENTICO',
+                    firmaDigitalUrl: firmaCertificadoEmisor?.dataUrl || firmaCertificadoColaborador?.dataUrl
+                  });
+                  window.print();
+                }}
                 className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -1684,6 +1755,26 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Modal de Firma Digital para Certificado de Saldos */}
+          <HerramientaFirmaDigitalModal
+            isOpen={modalFirmaCertificadoOpen}
+            onClose={() => setModalFirmaCertificadoOpen(false)}
+            onSaveSignature={(firma) => {
+              if (tipoFirmanteCertificado === 'emisor') {
+                setFirmaCertificadoEmisor(firma);
+              } else {
+                setFirmaCertificadoColaborador(firma);
+              }
+              setModalFirmaCertificadoOpen(false);
+            }}
+            tituloDocumento={`Certificado de Saldos: ${saldoParaCertificado.nombreCompleto}`}
+            firmanteSugerido={{
+              nombre: tipoFirmanteCertificado === 'emisor' ? (currentUser?.nombre || 'Gestión Humana') : saldoParaCertificado.nombreCompleto,
+              cargo: tipoFirmanteCertificado === 'emisor' ? 'Responsable de Nómina' : (saldoParaCertificado.cargoNombre || 'Colaborador'),
+              documento: tipoFirmanteCertificado === 'emisor' ? '' : saldoParaCertificado.documento
+            }}
+          />
         </div>
       )}
 

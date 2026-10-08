@@ -253,10 +253,10 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
   // -------------------------------------------------------------
   const abrirModalNuevaArea = () => {
     setAreaAEditar(null);
-    const codigosExistentes = areas.map(a => a.codigo);
+    const codigosExistentes = areasUnicas.map(a => a.codigo);
     setAreaFormCodigo(generarSiguienteCodigo('AR', codigosExistentes));
     setAreaFormNombre('');
-    setAreaFormProcesoId(procesos[0]?.id || '');
+    setAreaFormProcesoId(procesosUnicos[0]?.id || 'proc_2');
     setAreaFormLider('');
     setAreaFormDescripcion('');
     setModalAreaOpen(true);
@@ -266,7 +266,7 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
     setAreaAEditar(area);
     setAreaFormCodigo(area.codigo || '');
     setAreaFormNombre(area.nombre);
-    setAreaFormProcesoId(area.procesoId || '');
+    setAreaFormProcesoId(area.procesoId || procesosUnicos[0]?.id || 'proc_2');
     setAreaFormLider(area.lider || '');
     setAreaFormDescripcion(area.descripcion || '');
     setModalAreaOpen(true);
@@ -278,28 +278,30 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
 
     setGuardandoArea(true);
     try {
-      const procesoRelacionado = procesos.find(p => p.id === areaFormProcesoId);
+      const procesoRelacionado = procesosUnicos.find(p => p.id === areaFormProcesoId) || procesosUnicos[0];
+      const procesoIdFinal = procesoRelacionado?.id || 'proc_2';
+      const procesoNombreFinal = procesoRelacionado?.nombre || 'Operaciones de Ingeniería y Montajes';
 
       if (areaAEditar) {
         const areaActualizada: AreaOrganizacion = {
           ...areaAEditar,
           codigo: areaFormCodigo.trim() || areaAEditar.codigo,
           nombre: areaFormNombre.trim(),
-          procesoId: areaFormProcesoId || undefined,
-          procesoNombre: procesoRelacionado?.nombre || undefined,
+          procesoId: procesoIdFinal,
+          procesoNombre: procesoNombreFinal,
           lider: areaFormLider.trim() || undefined,
           descripcion: areaFormDescripcion.trim() || undefined
         };
         if (onUpdateArea) await onUpdateArea(areaActualizada);
         setMensajeExito(`Área "${areaActualizada.nombre}" modificada con éxito.`);
       } else {
-        const codigosExistentes = areas.map(a => a.codigo);
+        const codigosExistentes = areasUnicas.map(a => a.codigo);
         const nuevaArea: AreaOrganizacion = {
           id: uid('ar'),
           codigo: areaFormCodigo.trim() || generarSiguienteCodigo('AR', codigosExistentes),
           nombre: areaFormNombre.trim(),
-          procesoId: areaFormProcesoId || undefined,
-          procesoNombre: procesoRelacionado?.nombre || undefined,
+          procesoId: procesoIdFinal,
+          procesoNombre: procesoNombreFinal,
           lider: areaFormLider.trim() || undefined,
           descripcion: areaFormDescripcion.trim() || undefined
         };
@@ -433,12 +435,12 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
     }
   };
 
-  // Deduplicación estricta de cargos, áreas y procesos para evitar renderizados dobles
+  // Deduplicación estricta y eliminación de áreas / procesos huérfanos o fantasmas
   const cargosUnicos = useMemo(() => {
     const seenIds = new Set<string>();
     const seenNames = new Set<string>();
     return cargos.filter(c => {
-      if (!c || !c.id) return false;
+      if (!c || !c.id || !c.nombre || !c.nombre.trim()) return false;
       const normalizedName = (c.nombre || '').trim().toLowerCase();
       if (seenIds.has(c.id) || (normalizedName && seenNames.has(normalizedName))) {
         return false;
@@ -449,25 +451,56 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
     });
   }, [cargos]);
 
-  const areasUnicas = useMemo(() => {
-    const seenIds = new Set<string>();
-    return areas.filter(a => {
-      if (!a || !a.id) return false;
-      if (seenIds.has(a.id)) return false;
-      seenIds.add(a.id);
-      return true;
-    });
-  }, [areas]);
-
   const procesosUnicos = useMemo(() => {
     const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
     return procesos.filter(p => {
-      if (!p || !p.id) return false;
-      if (seenIds.has(p.id)) return false;
+      if (!p || !p.id || !p.nombre || !p.nombre.trim()) return false;
+      const normName = p.nombre.trim().toLowerCase();
+      if (seenIds.has(p.id) || seenNames.has(normName)) return false;
       seenIds.add(p.id);
+      seenNames.add(normName);
       return true;
     });
   }, [procesos]);
+
+  const areasUnicas = useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+    const validProcIds = new Set(procesosUnicos.map(p => p.id));
+    const procMapByName = new Map(procesosUnicos.map(p => [p.nombre.trim().toLowerCase(), p]));
+
+    return areas
+      .filter(a => {
+        // Eliminar áreas fantasmas (sin id o sin nombre válido)
+        if (!a || !a.id || !a.nombre || !a.nombre.trim()) return false;
+        const normName = a.nombre.trim().toLowerCase();
+        if (seenIds.has(a.id) || seenNames.has(normName)) return false;
+        seenIds.add(a.id);
+        seenNames.add(normName);
+        return true;
+      })
+      .map(a => {
+        // Reconciliar áreas huérfanas vinculándolas a un proceso válido
+        let pId = a.procesoId;
+        let pNom = a.procesoNombre;
+        if (!pId || !validProcIds.has(pId)) {
+          if (pNom && procMapByName.has(pNom.trim().toLowerCase())) {
+            const found = procMapByName.get(pNom.trim().toLowerCase())!;
+            pId = found.id;
+            pNom = found.nombre;
+          } else if (procesosUnicos[0]) {
+            pId = procesosUnicos[0].id;
+            pNom = procesosUnicos[0].nombre;
+          }
+        }
+        return {
+          ...a,
+          procesoId: pId,
+          procesoNombre: pNom
+        };
+      });
+  }, [areas, procesosUnicos]);
 
   // Validar dependencias jerárquicas seguras
   const cargosValidos = useMemo(() => {
@@ -872,13 +905,25 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
                   Áreas de la Estructura Orgánica ({areasUnicas.length})
                 </h3>
               </div>
-              <button
-                onClick={abrirModalNuevaArea}
-                className="px-3 py-1.5 bg-[#18235C] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 hover:bg-[#101740]"
-              >
-                <Plus className="w-3.5 h-3.5 text-[#00FF00]" />
-                <span>Nueva Área</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => setModalDepurarOpen(true)}
+                    className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center gap-1 border border-rose-200 transition-colors shadow-2xs"
+                    title="Eliminar áreas huérfanas o fantasmas y restablecer catálogo corporativo base"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                    <span className="hidden sm:inline">Depurar Áreas</span>
+                  </button>
+                )}
+                <button
+                  onClick={abrirModalNuevaArea}
+                  className="px-3 py-1.5 bg-[#18235C] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 hover:bg-[#101740]"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#00FF00]" />
+                  <span>Nueva Área</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -1275,14 +1320,15 @@ export const EstructuraView: React.FC<EstructuraViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-[#18235C] mb-1">Proceso al que Pertenece:</label>
+                <label className="block font-bold text-[#18235C] mb-1">Proceso al que Pertenece *:</label>
                 <select
+                  required
                   value={areaFormProcesoId}
                   onChange={e => setAreaFormProcesoId(e.target.value)}
                   className="w-full p-2 rounded-xl border border-[#8FA7D6] bg-[#F8FAFC]"
                 >
-                  <option value="">— Ninguno / Independiente —</option>
-                  {procesos.map(p => (
+                  <option value="">— Seleccione proceso obligatorio —</option>
+                  {procesosUnicos.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.nombre} ({p.tipo})
                     </option>

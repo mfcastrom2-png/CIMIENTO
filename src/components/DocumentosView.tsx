@@ -7,12 +7,22 @@ import {
   FileDown,
   Printer,
   Sliders,
-  Eye
+  Eye,
+  ShieldCheck,
+  PenTool,
+  QrCode
 } from 'lucide-react';
 import {
   PrevisualizacionImpresionModal,
   SeccionImprimible
 } from './PrevisualizacionImpresionModal';
+import { CodigoQRVerificacion } from './CodigoQRVerificacion';
+import { FirmaDigitalStamp } from './FirmaDigitalStamp';
+import { HerramientaFirmaDigitalModal, DatosFirmaDigital } from './HerramientaFirmaDigitalModal';
+import { registrarCertificadoEmitido, generarHashIntegridadDocumento } from '../services/verificacionCertificadosService';
+import { ReporteConsolidadoEvaluacionesModal } from './ReporteConsolidadoEvaluacionesModal';
+import { ReporteConsolidadoCapacitacionesModal } from './ReporteConsolidadoCapacitacionesModal';
+import { CAPACITACIONES_INICIALES } from '../data/capacitacionesData';
 
 interface DocumentosViewProps {
   cargos: Cargo[];
@@ -34,6 +44,16 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [modalPreviewOpen, setModalPreviewOpen] = useState(false);
 
+  // Estados para Firma Digital
+  const [modalFirmaOpen, setModalFirmaOpen] = useState(false);
+  const [firmanteActualTipo, setFirmanteActualTipo] = useState<'emisor' | 'receptor'>('emisor');
+  const [firmaEmisor, setFirmaEmisor] = useState<DatosFirmaDigital | null>(null);
+  const [firmaReceptor, setFirmaReceptor] = useState<DatosFirmaDigital | null>(null);
+
+  // Estados para Reportes Consolidados
+  const [modalReporteEvalsOpen, setModalReporteEvalsOpen] = useState(false);
+  const [modalReportePacOpen, setModalReportePacOpen] = useState(false);
+
   // Consumo dinámico del estado global con fallback a props
   const syncContext = useCompanySyncOptional();
   const empresaActiva = empresa || syncContext?.empresa;
@@ -51,6 +71,10 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
   const cargo = cargos.find(c => c.id === selectedCargoId) || cargos[0];
   const empleado = empleados.find(e => e.id === selectedEmpleadoId) || empleados[0];
   const empCargo = cargos.find(c => c.id === empleado?.cargoId);
+
+  const codigoVerificacionDoc = selectedDocType === 'ficha'
+    ? `MAN-${cargo?.ficha.identificacion.codigo || cargo?.id.toUpperCase() || 'GH01'}-2026`
+    : `EVAL-${empleado?.documento || empleado?.id.toUpperCase() || 'E01'}-100PTS`;
 
   const nombreArchivoExportacion = selectedDocType === 'ficha'
     ? `Manual_Cargo_${cargo?.nombre || 'Ficha'}`
@@ -91,8 +115,8 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
     },
     {
       id: 'firmas-ficha',
-      nombre: '6. Firmas y Validación Institucional',
-      descripcion: 'Sello de aprobación de GH y compromiso del colaborador.',
+      nombre: '6. Firmas, QR y Validación Digital',
+      descripcion: 'Sello de aprobación de GH, código QR y compromiso del colaborador.',
       seleccionado: true
     }
   ];
@@ -119,8 +143,8 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
     },
     {
       id: 'firmas-acta',
-      nombre: '4. Firmas y Constancia de Retroalimentación',
-      descripcion: 'Firmas del jefe inmediato evaluador y del colaborador.',
+      nombre: '4. Firmas, QR y Constancia de Retroalimentación',
+      descripcion: 'Firmas con firma digital, QR de validez y retroalimentación.',
       seleccionado: true
     }
   ];
@@ -130,10 +154,42 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
   const handleExportarPdfDirecto = async () => {
     setExportandoPdf(true);
     try {
+      // Registrar certificado en el sistema para que sea verificable por QR
+      await registrarCertificadoEmitido({
+        codigoVerificacion: codigoVerificacionDoc,
+        tipoDocumento: selectedDocType === 'ficha' ? 'Manual de Cargo y Funciones' : 'Acta de Evaluación de Desempeño',
+        titularNombre: selectedDocType === 'ficha' ? (cargo?.nombre || 'Cargo Institucional') : (empleado?.nombre || 'Colaborador'),
+        titularDocumento: selectedDocType === 'ficha' ? (cargo?.ficha.identificacion.codigo || 'GH-MC') : (empleado?.documento || 'CC'),
+        titularCargo: selectedDocType === 'ficha' ? cargo?.nombre : empCargo?.nombre,
+        fechaEmision: new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }),
+        fechaRegistroISO: new Date().toISOString(),
+        emisorRazonSocial: razonSocial,
+        emisorNit: nitCompleto,
+        firmanteNombre: firmaEmisor?.firmanteNombre || empresaActiva?.representanteLegal?.nombre || 'Dirección de Gestión Humana',
+        firmanteCargo: firmaEmisor?.firmanteCargo || 'Gestión Humana y Compensación',
+        hashIntegridad: generarHashIntegridadDocumento({ codigo: codigoVerificacionDoc, tipo: selectedDocType, fecha: new Date().toISOString() }),
+        estado: 'VIGENTE_AUTENTICO',
+        firmaDigitalUrl: firmaEmisor?.dataUrl
+      });
+
       await exportarContenedorAPDF('area-impresion-repositorio-documentos', nombreArchivoExportacion);
     } finally {
       setExportandoPdf(false);
     }
+  };
+
+  const abrirModalFirmar = (tipo: 'emisor' | 'receptor') => {
+    setFirmanteActualTipo(tipo);
+    setModalFirmaOpen(true);
+  };
+
+  const handleGuardarFirma = (firma: DatosFirmaDigital) => {
+    if (firmanteActualTipo === 'emisor') {
+      setFirmaEmisor(firma);
+    } else {
+      setFirmaReceptor(firma);
+    }
+    setModalFirmaOpen(false);
   };
 
   return (
@@ -183,29 +239,52 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
 
       {/* Control Selector (Hidden during print) */}
       <div className="bg-white p-4 rounded-xl border border-[#8FA7D6]/30 shadow-xs space-y-4 print:hidden">
-        <div className="flex flex-wrap gap-2 text-xs">
-          <button
-            id="tab-doc-ficha"
-            onClick={() => setSelectedDocType('ficha')}
-            className={`px-3.5 py-2 rounded-lg font-semibold transition-colors ${
-              selectedDocType === 'ficha'
-                ? 'bg-[#18235C] text-white shadow-xs'
-                : 'bg-slate-100 text-[#282829]/70 hover:bg-[#8FA7D6]/20 hover:text-[#18235C]'
-            }`}
-          >
-            Ficha Oficial de Manual de Cargo
-          </button>
-          <button
-            id="tab-doc-acta"
-            onClick={() => setSelectedDocType('acta_eval')}
-            className={`px-3.5 py-2 rounded-lg font-semibold transition-colors ${
-              selectedDocType === 'acta_eval'
-                ? 'bg-[#18235C] text-white shadow-xs'
-                : 'bg-slate-100 text-[#282829]/70 hover:bg-[#8FA7D6]/20 hover:text-[#18235C]'
-            }`}
-          >
-            Acta de Evaluación Técnica de Desempeño
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8FA7D6]/20 pb-3">
+          <div className="flex flex-wrap gap-2 text-xs">
+            <button
+              id="tab-doc-ficha"
+              onClick={() => setSelectedDocType('ficha')}
+              className={`px-3.5 py-2 rounded-lg font-semibold transition-colors ${
+                selectedDocType === 'ficha'
+                  ? 'bg-[#18235C] text-white shadow-xs'
+                  : 'bg-slate-100 text-[#282829]/70 hover:bg-[#8FA7D6]/20 hover:text-[#18235C]'
+              }`}
+            >
+              Ficha Oficial de Manual de Cargo
+            </button>
+            <button
+              id="tab-doc-acta"
+              onClick={() => setSelectedDocType('acta_eval')}
+              className={`px-3.5 py-2 rounded-lg font-semibold transition-colors ${
+                selectedDocType === 'acta_eval'
+                  ? 'bg-[#18235C] text-white shadow-xs'
+                  : 'bg-slate-100 text-[#282829]/70 hover:bg-[#8FA7D6]/20 hover:text-[#18235C]'
+              }`}
+            >
+              Acta de Evaluación Técnica de Desempeño
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setModalReporteEvalsOpen(true)}
+              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#18235C] border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              title="Generar informe consolidado de evaluaciones de desempeño en PDF"
+            >
+              <FileDown className="w-3.5 h-3.5 text-blue-700" />
+              <span>Reporte Consolidado Evaluaciones</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setModalReportePacOpen(true)}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              title="Generar informe consolidado del Plan de Capacitaciones (PAC) en PDF"
+            >
+              <FileDown className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Reporte Consolidado PAC</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-3 border-t border-[#8FA7D6]/20">
@@ -373,15 +452,51 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               </div>
             </div>
 
-            {/* Sección 6: Firmas */}
-            <div data-seccion-id="firmas-ficha" className="seccion-imprimible grid grid-cols-2 gap-8 pt-8 border-t border-[#8FA7D6]/30">
-              <div className="border-t border-[#18235C] pt-2 text-center">
-                <span className="font-bold text-[#18235C] block">Aprobado por: Gerencia de Gestión Humana</span>
-                <span className="text-[10px] text-[#282829]/70">Firma y Sello de Validación · {razonSocial}</span>
+            {/* Sección 6: Firmas y Validación Digital con QR */}
+            <div data-seccion-id="firmas-ficha" className="seccion-imprimible pt-8 border-t-2 border-[#18235C]/20">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-end">
+                {/* Firma Emisor / Aprobador */}
+                <div className="sm:col-span-5">
+                  <FirmaDigitalStamp
+                    firma={firmaEmisor}
+                    firmanteDefault={{
+                      nombre: empresaActiva?.representanteLegal?.nombre || 'Dirección de Gestión Humana',
+                      cargo: 'Aprobado: Gestión Humana & Organización',
+                      documento: empresaActiva?.representanteLegal?.numeroDocumento
+                    }}
+                    labelCargo="Firma de Validación y Aprobación Institucional"
+                    onOpenFirmarModal={() => abrirModalFirmar('emisor')}
+                  />
+                </div>
+
+                {/* Código QR de Validación de Autenticidad */}
+                <div className="sm:col-span-2 flex justify-center">
+                  <CodigoQRVerificacion
+                    codigoVerificacion={codigoVerificacionDoc}
+                    tipoDocumento="Manual de Cargo y Funciones"
+                    titularNombre={cargo.nombre}
+                    size={80}
+                  />
+                </div>
+
+                {/* Firma Receptor / Colaborador */}
+                <div className="sm:col-span-5">
+                  <FirmaDigitalStamp
+                    firma={firmaReceptor}
+                    firmanteDefault={{
+                      nombre: 'Colaborador Titular Asignado',
+                      cargo: `Titular del Cargo: ${cargo.nombre}`,
+                      documento: 'C.C. Registrada en Hoja de Vida'
+                    }}
+                    labelCargo="Firma de Enterado, Notificación y Compromiso"
+                    onOpenFirmarModal={() => abrirModalFirmar('receptor')}
+                  />
+                </div>
               </div>
-              <div className="border-t border-[#18235C] pt-2 text-center">
-                <span className="font-bold text-[#18235C] block">Recibido por: Colaborador Asignado</span>
-                <span className="text-[10px] text-[#282829]/70">Firma de Enterado y Compromiso</span>
+
+              <div className="mt-4 pt-2 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-400 font-mono">
+                <span>Cód. Verificación: {codigoVerificacionDoc}</span>
+                <span>Documento oficial con validez jurídica según Ley 527 de 1999</span>
               </div>
             </div>
           </div>
@@ -490,15 +605,51 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
               </p>
             </div>
 
-            {/* Sección 4: Firmas */}
-            <div data-seccion-id="firmas-acta" className="seccion-imprimible grid grid-cols-2 gap-8 pt-8 border-t border-[#8FA7D6]/30">
-              <div className="border-t border-[#18235C] pt-2 text-center">
-                <span className="font-bold text-[#18235C] block">Firma Evaluador (Jefe Inmediato)</span>
-                <span className="text-[10px] text-[#282829]/70">Certifica veracidad de evidencias y calificaciones · {razonSocial}</span>
+            {/* Sección 4: Firmas y Validación Digital con QR */}
+            <div data-seccion-id="firmas-acta" className="seccion-imprimible pt-8 border-t-2 border-[#18235C]/20">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-end">
+                {/* Firma Evaluador */}
+                <div className="sm:col-span-5">
+                  <FirmaDigitalStamp
+                    firma={firmaEmisor}
+                    firmanteDefault={{
+                      nombre: 'Líder Evaluador / Jefe Inmediato',
+                      cargo: 'Evaluador Responsable de Gestión de Desempeño',
+                      documento: 'C.C. Registrada'
+                    }}
+                    labelCargo="Certifica veracidad de evidencias y calificaciones"
+                    onOpenFirmarModal={() => abrirModalFirmar('emisor')}
+                  />
+                </div>
+
+                {/* Código QR de Validación de Autenticidad */}
+                <div className="sm:col-span-2 flex justify-center">
+                  <CodigoQRVerificacion
+                    codigoVerificacion={codigoVerificacionDoc}
+                    tipoDocumento="Acta de Evaluación de Desempeño"
+                    titularNombre={empleado.nombre}
+                    size={80}
+                  />
+                </div>
+
+                {/* Firma Colaborador Evaluado */}
+                <div className="sm:col-span-5">
+                  <FirmaDigitalStamp
+                    firma={firmaReceptor}
+                    firmanteDefault={{
+                      nombre: empleado.nombre,
+                      cargo: empCargo?.nombre || 'Colaborador Evaluado',
+                      documento: empleado.documento
+                    }}
+                    labelCargo="Constancia de retroalimentación recibida"
+                    onOpenFirmarModal={() => abrirModalFirmar('receptor')}
+                  />
+                </div>
               </div>
-              <div className="border-t border-[#18235C] pt-2 text-center">
-                <span className="font-bold text-[#18235C] block">Firma Colaborador Evaluado</span>
-                <span className="text-[10px] text-[#282829]/70">Constancia de retroalimentación recibida</span>
+
+              <div className="mt-4 pt-2 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-400 font-mono">
+                <span>Cód. Autenticidad: {codigoVerificacionDoc}</span>
+                <span>Acta técnica con validez jurídica según Ley 527 de 1999 de Firma Digital</span>
               </div>
             </div>
           </div>
@@ -514,6 +665,39 @@ export const DocumentosView: React.FC<DocumentosViewProps> = ({
         nombreArchivo={nombreArchivoExportacion}
         elementoContenedorId="area-impresion-repositorio-documentos"
         seccionesDisponibles={seccionesActivas}
+      />
+
+      {/* Modal Herramienta de Firma Digital */}
+      <HerramientaFirmaDigitalModal
+        isOpen={modalFirmaOpen}
+        onClose={() => setModalFirmaOpen(false)}
+        onSaveSignature={handleGuardarFirma}
+        tituloDocumento={selectedDocType === 'ficha' ? `Manual de Funciones: ${cargo?.nombre}` : `Acta de Evaluación: ${empleado?.nombre}`}
+        firmanteSugerido={{
+          nombre: firmanteActualTipo === 'emisor' ? (empresaActiva?.representanteLegal?.nombre || 'Gestión Humana') : (empleado?.nombre || 'Colaborador'),
+          cargo: firmanteActualTipo === 'emisor' ? 'Dirección de Gestión Humana' : (empCargo?.nombre || 'Colaborador'),
+          documento: firmanteActualTipo === 'emisor' ? (empresaActiva?.representanteLegal?.numeroDocumento || '') : (empleado?.documento || '')
+        }}
+      />
+
+      {/* Modal Reporte Consolidado de Evaluaciones */}
+      <ReporteConsolidadoEvaluacionesModal
+        isOpen={modalReporteEvalsOpen}
+        onClose={() => setModalReporteEvalsOpen(false)}
+        evaluaciones={evaluaciones}
+        empleados={empleados}
+        cargos={cargos}
+        empresa={empresaActiva}
+      />
+
+      {/* Modal Reporte Consolidado del Plan de Capacitaciones */}
+      <ReporteConsolidadoCapacitacionesModal
+        isOpen={modalReportePacOpen}
+        onClose={() => setModalReportePacOpen(false)}
+        capacitaciones={CAPACITACIONES_INICIALES}
+        empleados={empleados}
+        cargos={cargos}
+        empresa={empresaActiva}
       />
     </div>
   );

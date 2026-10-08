@@ -27,7 +27,9 @@ import {
   Mail,
   Layers,
   Target,
-  Database
+  Database,
+  QrCode,
+  PenTool
 } from 'lucide-react';
 import { Role, UsuarioSistema, RolSistema, ConfiguracionEmpresa } from '../types';
 
@@ -186,6 +188,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span>Mi Desprendible de Pago</span>
               </button>
             )}
+
+            <button
+              id="nav-firma-digital-empleado"
+              onClick={() => onNavigate('firma-digital')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'firma-digital' || currentView === 'firma'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <PenTool className={`w-4 h-4 ${currentView === 'firma-digital' || currentView === 'firma' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+              <span>Mi Firma Digital</span>
+            </button>
 
             {tienePermiso('epps') && (
               <button
@@ -672,6 +687,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <FileText className={`w-4 h-4 ${currentView === 'documentos' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
                 <span>Documentos y actas</span>
+              </button>
+            )}
+
+            {/* Verificar Certificados: Exclusivo Gestión Humana y Administrador */}
+            {(rol === 'superadmin' || rol === 'admin_gh') && (
+              <button
+                id="nav-verificador-certificados"
+                onClick={() => onNavigate('verificar-certificados')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  currentView === 'verificar-certificados' || currentView === 'verificar'
+                    ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                    : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                }`}
+                title="Verificar autenticidad de diplomas SST y certificados laborales (Exclusivo GH y Administrador)"
+              >
+                <div className="flex items-center gap-3">
+                  <QrCode className={`w-4 h-4 ${currentView === 'verificar-certificados' || currentView === 'verificar' ? 'text-[#18235C]' : 'text-[#00FF00]'}`} />
+                  <span>Verificar Certificados</span>
+                </div>
+                <span className="text-[10px] bg-[#101740] text-[#00FF00] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                  <Lock className="w-2.5 h-2.5 text-[#00FF00]" />
+                  GH/Admin
+                </span>
+              </button>
+            )}
+
+            {/* Estudio de Firma Digital */}
+            {(rol === 'superadmin' || rol === 'admin_gh') && (
+              <button
+                id="nav-firma-digital-admin"
+                onClick={() => onNavigate('firma-digital')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                  currentView === 'firma-digital' || currentView === 'firma'
+                    ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                    : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+                }`}
+                title="Herramienta institucional de dibujo, configuración y estampado de firma digital"
+              >
+                <div className="flex items-center gap-3">
+                  <PenTool className={`w-4 h-4 ${currentView === 'firma-digital' || currentView === 'firma' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                  <span>Estudio de Firma Digital</span>
+                </div>
+                <span className="text-[10px] bg-[#8FA7D6]/20 text-[#8FA7D6] px-1.5 py-0.5 rounded font-bold">
+                  Ley 527
+                </span>
               </button>
             )}
 

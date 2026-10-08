@@ -133,7 +133,10 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const guardadas = localStorage.getItem('bgroup_areas');
       if (guardadas) {
         const parsed = JSON.parse(guardadas);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = parsed.filter(a => a && a.id && a.nombre && a.nombre.trim() !== '');
+          if (valid.length > 0) return valid;
+        }
       }
     } catch {}
     return shouldOmitMocks ? [] : initialAreas;
@@ -143,7 +146,10 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const guardadas = localStorage.getItem('bgroup_procesos');
       if (guardadas) {
         const parsed = JSON.parse(guardadas);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = parsed.filter(p => p && p.id && p.nombre && p.nombre.trim() !== '');
+          if (valid.length > 0) return valid;
+        }
       }
     } catch {}
     return shouldOmitMocks ? [] : initialProcesos;
@@ -265,26 +271,51 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
 
+      let uniqueProc = initialProcesos;
       if (procData && procData.length > 0) {
         const seenP = new Set<string>();
-        const uniqueProc = procData.filter(p => {
-          if (!p || !p.id || seenP.has(p.id)) return false;
+        const filteredProc = procData.filter(p => {
+          if (!p || !p.id || !p.nombre || !p.nombre.trim() || seenP.has(p.id)) return false;
           seenP.add(p.id);
           return true;
         });
-        setProcesos(uniqueProc);
-        try {
-          localStorage.setItem('bgroup_procesos', JSON.stringify(uniqueProc));
-        } catch {}
+        if (filteredProc.length > 0) uniqueProc = filteredProc;
       }
+      setProcesos(uniqueProc);
+      try {
+        localStorage.setItem('bgroup_procesos', JSON.stringify(uniqueProc));
+      } catch {}
+
+      const validProcIds = new Set(uniqueProc.map(p => p.id));
+      const procMapByName = new Map(uniqueProc.map(p => [p.nombre.trim().toLowerCase(), p]));
 
       if (areaData && areaData.length > 0) {
         const seenA = new Set<string>();
-        const uniqueArea = areaData.filter(a => {
-          if (!a || !a.id || seenA.has(a.id)) return false;
-          seenA.add(a.id);
-          return true;
-        });
+        const uniqueArea = areaData
+          .filter(a => {
+            if (!a || !a.id || !a.nombre || !a.nombre.trim() || seenA.has(a.id)) return false;
+            seenA.add(a.id);
+            return true;
+          })
+          .map(a => {
+            let pId = a.procesoId;
+            let pNom = a.procesoNombre;
+            if (!pId || !validProcIds.has(pId)) {
+              if (pNom && procMapByName.has(pNom.trim().toLowerCase())) {
+                const found = procMapByName.get(pNom.trim().toLowerCase())!;
+                pId = found.id;
+                pNom = found.nombre;
+              } else if (uniqueProc[0]) {
+                pId = uniqueProc[0].id;
+                pNom = uniqueProc[0].nombre;
+              }
+            }
+            return {
+              ...a,
+              procesoId: pId,
+              procesoNombre: pNom
+            };
+          });
         setAreas(uniqueArea);
         try {
           localStorage.setItem('bgroup_areas', JSON.stringify(uniqueArea));
@@ -648,13 +679,31 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleDeleteProceso = async (id: string) => {
     const victima = procesos.find(p => p.id === id);
-    setProcesos(prev => {
-      const updated = prev.filter(p => p.id !== id);
+    const restantes = procesos.filter(p => p.id !== id);
+    setProcesos(restantes);
+    try {
+      localStorage.setItem('bgroup_procesos', JSON.stringify(restantes));
+    } catch {}
+
+    // Reasignar áreas vinculadas al proceso eliminado para prevenir áreas huérfanas
+    setAreas(prev => {
+      const fallbackProc = restantes[0];
+      const updatedAreas = prev.map(a => {
+        if (a.procesoId === id) {
+          return {
+            ...a,
+            procesoId: fallbackProc?.id,
+            procesoNombre: fallbackProc?.nombre
+          };
+        }
+        return a;
+      });
       try {
-        localStorage.setItem('bgroup_procesos', JSON.stringify(updated));
+        localStorage.setItem('bgroup_areas', JSON.stringify(updatedAreas));
       } catch {}
-      return updated;
+      return updatedAreas;
     });
+
     try {
       await eliminarProcesoFB(id, victima?.nombre, currentUser);
     } catch (err) {

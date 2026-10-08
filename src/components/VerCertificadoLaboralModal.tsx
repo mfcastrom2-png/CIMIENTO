@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CertificadoLaboralData, formatMonedaCOPCertificado } from '../utils/generadorCertificados';
 import { imprimirDocumento, descargarElementoComoPdf } from '../utils/printUtils';
-import { Printer, X, FileText, ShieldCheck, Download, FileDown, CheckCircle2 } from 'lucide-react';
+import { Printer, X, FileText, ShieldCheck, Download, FileDown, CheckCircle2, PenTool } from 'lucide-react';
+import { CodigoQRVerificacion } from './CodigoQRVerificacion';
+import { HerramientaFirmaDigitalModal, DatosFirmaDigital } from './HerramientaFirmaDigitalModal';
+import { FirmaDigitalStamp } from './FirmaDigitalStamp';
+import { registrarCertificadoEmitido, generarHashIntegridadDocumento } from '../services/verificacionCertificadosService';
 
 interface VerCertificadoLaboralModalProps {
   certificado: CertificadoLaboralData;
@@ -14,6 +18,41 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
 }) => {
   const [incluirSalario, setIncluirSalario] = useState<boolean>(true);
   const [descargandoPdf, setDescargandoPdf] = useState<boolean>(false);
+  const [modalFirmaOpen, setModalFirmaOpen] = useState<boolean>(false);
+  const [firmaDigital, setFirmaDigital] = useState<DatosFirmaDigital | null>(null);
+
+  // Auto-registrar el certificado emitido en la base para validación pública inmediata
+  useEffect(() => {
+    const hash = generarHashIntegridadDocumento({
+      codigo: certificado.codigoVerificacion,
+      titular: certificado.empleado.nombre,
+      doc: certificado.empleado.documento,
+      cargo: certificado.cargoNombre,
+      fecha: certificado.fechaEmision
+    });
+
+    registrarCertificadoEmitido({
+      codigoVerificacion: certificado.codigoVerificacion,
+      tipoDocumento: 'Certificado Laboral',
+      titularNombre: certificado.empleado.nombre,
+      titularDocumento: certificado.empleado.documento,
+      titularCargo: certificado.cargoNombre,
+      fechaEmision: certificado.fechaEmision,
+      fechaRegistroISO: new Date().toISOString(),
+      emisorRazonSocial: certificado.empresa.razonSocial || 'B GROUP INGENIERIA S.A.S.',
+      emisorNit: `${certificado.empresa.nit || '901.458.789'}-${certificado.empresa.digitoVerificacion || '3'}`,
+      firmanteNombre: certificado.firmanteNombre,
+      firmanteCargo: certificado.firmanteCargo,
+      hashIntegridad: hash,
+      estado: 'VIGENTE_AUTENTICO',
+      detallesEspecificos: {
+        tipoContrato: certificado.tipoContrato,
+        fechaIngreso: certificado.fechaIngreso,
+        centroTrabajo: certificado.centroTrabajoNombre,
+        salarioCOP: certificado.salarioBasicoCOP
+      }
+    });
+  }, [certificado]);
 
   const nombreArchivo = `Certificado_Laboral_${certificado.empleado.nombre.replace(/\s+/g, '_')}_${certificado.codigoVerificacion}`;
 
@@ -58,7 +97,7 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
             <div>
               <h3 className="font-bold text-base leading-tight">Certificado Laboral Autogenerado</h3>
               <span className="text-[11px] text-[#8FA7D6] block">
-                Documento Oficial autorizado y firmado electrónicamente — Código: <strong className="font-mono text-white">{certificado.codigoVerificacion}</strong>
+                Documento Oficial con QR y Firma Digital — Código: <strong className="font-mono text-white">{certificado.codigoVerificacion}</strong>
               </span>
             </div>
           </div>
@@ -72,6 +111,16 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
               />
               <span className="font-semibold text-[11px]">Incluir Salario</span>
             </label>
+            <button
+              type="button"
+              id="btn-firmar-digital-certificado"
+              onClick={() => setModalFirmaOpen(true)}
+              className="px-3 py-1.5 bg-blue-950/80 hover:bg-blue-900 text-[#00FF00] font-bold rounded-lg text-xs flex items-center gap-1.5 border border-[#00FF00]/40 shadow-xs transition-all cursor-pointer"
+              title="Abrir herramienta de firma digital para estampar trazo manual o tipográfico"
+            >
+              <PenTool className="w-4 h-4 text-[#00FF00]" />
+              <span>{firmaDigital ? 'Firma Estampada' : 'Firmar Digital'}</span>
+            </button>
             <button
               type="button"
               id="btn-descargar-pdf-certificado"
@@ -108,11 +157,13 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
           <div className="flex items-start justify-between border-b-2 border-[#18235C] pb-4 font-sans gap-4">
             <div className="flex items-center gap-3">
               {certificado.empresa.identidadVisual?.logoUrl ? (
-                <img
-                  src={certificado.empresa.identidadVisual.logoUrl}
-                  alt={certificado.empresa.nombreComercial || 'Logo'}
-                  className="max-h-16 w-auto max-w-[170px] object-contain shrink-0"
-                />
+                <div className="bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
+                  <img
+                    src={certificado.empresa.identidadVisual.logoUrl}
+                    alt={certificado.empresa.nombreComercial || 'Logo'}
+                    className="max-h-16 w-auto max-w-[170px] object-contain shrink-0"
+                  />
+                </div>
               ) : (
                 <div className="w-12 h-12 bg-[#18235C] text-[#00FF00] font-black text-xl flex items-center justify-center rounded-xl shrink-0 shadow-xs">
                   {nombreEmpresa.charAt(0)}
@@ -195,26 +246,32 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
             </p>
           </div>
 
-          {/* Firma Electrónica y Sello */}
-          <div className="pt-10 flex items-end justify-between font-sans border-t border-slate-200 text-xs">
-            <div className="space-y-2">
-              <div className="w-52 h-12 border-b-2 border-[#18235C] flex items-end pb-1 font-mono text-[10px] text-emerald-700 italic">
-                [Firma Electrónica Autorizada]
-              </div>
-              <div>
-                <strong className="block text-[#18235C] font-bold uppercase text-xs">{certificado.firmanteNombre}</strong>
-                <span className="text-slate-600 block text-[11px] font-medium">{certificado.firmanteCargo}</span>
-                <span className="text-slate-500 block text-[10px] font-bold">{nombreEmpresa}</span>
-              </div>
+          {/* Firma Electrónica y Código QR Oficial */}
+          <div className="pt-8 flex items-end justify-between font-sans border-t border-slate-200 text-xs gap-4">
+            {/* Sello de Firma Digital */}
+            <div className="flex-1 max-w-sm">
+              <FirmaDigitalStamp
+                firma={firmaDigital}
+                firmanteDefault={{
+                  nombre: certificado.firmanteNombre,
+                  cargo: certificado.firmanteCargo,
+                  documento: certificado.empresa.representanteLegal?.tipoDocumento ? `${certificado.empresa.representanteLegal.tipoDocumento} Firmante` : undefined
+                }}
+                labelCargo="Firma Autorizada · Gestión Humana"
+                onOpenFirmarModal={() => setModalFirmaOpen(true)}
+              />
             </div>
 
-            {/* Código QR de Verificación CST */}
-            <div className="p-3 bg-slate-50 border border-slate-300 rounded-xl text-center text-[9px] text-slate-500 space-y-1">
-              <div className="w-16 h-16 bg-[#18235C] mx-auto rounded-lg flex items-center justify-center text-white text-[10px] font-mono font-bold shadow-2xs">
-                QR CST
-              </div>
-              <span className="block font-bold text-[#18235C]">Validez Digital CST</span>
-              <span className="font-mono">Cód: {certificado.codigoVerificacion.slice(-8)}</span>
+            {/* Código QR Auténtico de Verificación */}
+            <div className="shrink-0">
+              <CodigoQRVerificacion
+                codigoVerificacion={certificado.codigoVerificacion}
+                tipoDocumento="Certificado Laboral"
+                titularNombre={certificado.empleado.nombre}
+                titularDocumento={certificado.empleado.documento}
+                fechaEmision={certificado.fechaEmision}
+                size={84}
+              />
             </div>
           </div>
         </div>
@@ -234,6 +291,19 @@ export const VerCertificadoLaboralModal: React.FC<VerCertificadoLaboralModalProp
           </button>
         </div>
       </div>
+
+      {/* Modal de Firma Digital Integrada */}
+      <HerramientaFirmaDigitalModal
+        isOpen={modalFirmaOpen}
+        onClose={() => setModalFirmaOpen(false)}
+        onSaveSignature={(firma) => setFirmaDigital(firma)}
+        tituloDocumento={`Certificado Laboral - ${certificado.empleado.nombre}`}
+        firmanteSugerido={{
+          nombre: certificado.firmanteNombre,
+          cargo: certificado.firmanteCargo
+        }}
+      />
     </div>
   );
 };
+

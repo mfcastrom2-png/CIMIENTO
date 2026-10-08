@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   HashRouter as Router,
   Routes,
@@ -37,6 +37,8 @@ import { GestionDatosModal } from './components/GestionDatosModal';
 import { EmpresaConfigView } from './components/EmpresaConfigView';
 import { ConfiguracionBuzonCorreoView } from './components/ConfiguracionBuzonCorreoView';
 import { SaldosInicialesView } from './components/SaldosInicialesView';
+import { FirmaDigitalStudioView } from './components/FirmaDigitalStudioView';
+import { VerificadorCertificadosView } from './components/VerificadorCertificadosView';
 
 import {
   Bell,
@@ -49,7 +51,9 @@ import {
   Lock,
   RefreshCw,
   AlertTriangle,
-  Building2
+  Building2,
+  QrCode,
+  PenTool
 } from 'lucide-react';
 
 function AppLayout() {
@@ -106,17 +110,49 @@ function AppLayout() {
   const [activeEvaluacionDetalleId, setActiveEvaluacionDetalleId] = useState<string | null>(null);
   const [gestionDatosModalOpen, setGestionDatosModalOpen] = useState(false);
 
+  // Redirigir a verificación si la URL contiene parámetro ?verificar=
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const codigoVerificar = params.get('verificar');
+      if (codigoVerificar && !location.pathname.includes('verificar')) {
+        navigate(`/verificar-certificados?verificar=${encodeURIComponent(codigoVerificar)}`);
+      }
+    }
+  }, [location.pathname, navigate]);
+
   // Derivar la vista actual desde el path del enrutador
   const currentPath = location.pathname.replace('/', '') || 'dashboard';
 
   const pendientesCount = solicitudes.filter(s => s.estado === 'Pendiente').length;
   const currentEvaluacionDetalle = evaluaciones.find(e => e.id === activeEvaluacionDetalleId);
 
+  // Detección de ruta de verificación pública para externos (escaneo QR sin sesión)
+  const queryParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const paramVerificar = queryParams.get('verificar') || queryParams.get('codigo');
+  const isPublicVerificationRoute = location.pathname.startsWith('/verificar') || Boolean(paramVerificar);
+
   if (!currentUser) {
+    if (isPublicVerificationRoute) {
+      return (
+        <VerificadorCertificadosView
+          empresa={empresa}
+          isPublicLanding={true}
+          onIrALogin={() => {
+            navigate('/', { replace: true });
+          }}
+        />
+      );
+    }
+
     return (
       <LoginView
+        empresa={empresa}
         usuarios={usuariosList}
         onLoginSuccess={loginSuccess}
+        onIrAVerificacion={() => {
+          navigate('/verificar');
+        }}
       />
     );
   }
@@ -807,6 +843,76 @@ function AppLayout() {
                       empresa={empresa}
                     />
                   )
+                }
+              />
+              <Route
+                path="/verificar-certificados"
+                element={
+                  !isSuperAdmin && currentUser?.rol !== 'admin_gh' ? (
+                    <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-2xl shadow-xs border border-amber-200 text-center space-y-3">
+                      <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                        <Lock className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-lg font-bold text-[#18235C]">Módulo Exclusivo para Gestión Humana y Administración</h2>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        La verificación interna y auditoría de autenticidad documental está reservada exclusivamente para el rol de Gestión Humana y Administradores de la plataforma.
+                      </p>
+                      <button
+                        onClick={() => navigate('/dashboard')}
+                        className="mt-2 px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                      >
+                        Volver a Mi Tablero
+                      </button>
+                    </div>
+                  ) : (
+                    <VerificadorCertificadosView empresa={empresa} />
+                  )
+                }
+              />
+              <Route
+                path="/verificar"
+                element={
+                  !isSuperAdmin && currentUser?.rol !== 'admin_gh' ? (
+                    <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-2xl shadow-xs border border-amber-200 text-center space-y-3">
+                      <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                        <Lock className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-lg font-bold text-[#18235C]">Módulo Exclusivo para Gestión Humana y Administración</h2>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        La verificación interna y auditoría de autenticidad documental está reservada exclusivamente para el rol de Gestión Humana y Administradores de la plataforma.
+                      </p>
+                      <button
+                        onClick={() => navigate('/dashboard')}
+                        className="mt-2 px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                      >
+                        Volver a Mi Tablero
+                      </button>
+                    </div>
+                  ) : (
+                    <VerificadorCertificadosView empresa={empresa} />
+                  )
+                }
+              />
+              <Route
+                path="/firma-digital"
+                element={
+                  <FirmaDigitalStudioView
+                    currentUser={currentUser}
+                    empleados={empleados}
+                    cargos={cargos}
+                    empresa={empresa}
+                  />
+                }
+              />
+              <Route
+                path="/firma"
+                element={
+                  <FirmaDigitalStudioView
+                    currentUser={currentUser}
+                    empleados={empleados}
+                    cargos={cargos}
+                    empresa={empresa}
+                  />
                 }
               />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

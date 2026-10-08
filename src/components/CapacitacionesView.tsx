@@ -70,6 +70,7 @@ import {
   Layers,
   Eye
 } from 'lucide-react';
+import { ReporteConsolidadoCapacitacionesModal } from './ReporteConsolidadoCapacitacionesModal';
 
 interface CapacitacionesViewProps {
   cargos: Cargo[];
@@ -170,6 +171,7 @@ export function CapacitacionesView({
   // Modal para restablecer registros (Superadmin)
   const [modalDepurarOpen, setModalDepurarOpen] = useState(false);
   const [depurando, setDepurando] = useState(false);
+  const [modalReportePacOpen, setModalReportePacOpen] = useState(false);
 
   const handleEjecutarDepuracionCapacitaciones = async () => {
     setDepurando(true);
@@ -1206,6 +1208,16 @@ export function CapacitacionesView({
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setModalReportePacOpen(true)}
+              className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs self-start sm:self-auto cursor-pointer"
+              title="Generar e imprimir informe consolidado del Plan Anual de Capacitación (PAC) en formato PDF institucional"
+            >
+              <FileDown className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Reporte Consolidado PAC (PDF)</span>
+            </button>
+
             {isSuperAdmin && esAdmin && (
               <button
                 id="btn-depurar-capacitaciones"
@@ -4019,6 +4031,16 @@ export function CapacitacionesView({
           </div>
         </div>
       )}
+
+      {/* Modal Generador de Reporte Consolidado PAC en PDF */}
+      <ReporteConsolidadoCapacitacionesModal
+        isOpen={modalReportePacOpen}
+        onClose={() => setModalReportePacOpen(false)}
+        capacitaciones={capacitaciones}
+        empleados={empleados}
+        cargos={cargos}
+        empresa={empresaActiva}
+      />
     </div>
   );
 }

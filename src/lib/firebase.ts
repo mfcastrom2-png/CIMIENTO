@@ -56,6 +56,7 @@ import {
   SaldoInicialEmpleadoNomina
 } from '../types';
 import { obtenerPermisosPorDefecto } from '../data/usuariosYVotacionesData';
+import { initialAreas, initialProcesos, INITIAL_CARGOS } from '../data/initialData';
 
 // 1. Inicialización de Firebase con soporte de Long Polling para proxies y contenedores
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -975,25 +976,59 @@ export const limpiarCapacitacionesFB = async () => {
   }
 };
 
-// Limpieza modular y dedicada para la Estructura Orgánica y Cargos
+// Limpieza modular y dedicada para la Estructura Orgánica, Áreas, Procesos y Cargos
 export const limpiarEstructuraOrganicaFB = async (cargosBaseIds: string[] = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7']) => {
   const batch = writeBatch(db);
 
   try {
+    // 1. Depuración de Cargos
     const cargosSnapshot = await getDocs(collection(db, 'cargos'));
     cargosSnapshot.forEach(docSnap => {
-      // Eliminar cargos adicionales que hayan sido creados como pruebas no corporativas
       if (!cargosBaseIds.includes(docSnap.id)) {
         batch.delete(docSnap.ref);
       }
     });
+
+    // 2. Depuración de Áreas huérfanas o fantasmas
+    const baseAreaIds = initialAreas.map(a => a.id);
+    const areasSnapshot = await getDocs(collection(db, 'areas'));
+    areasSnapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      // Si el área no tiene nombre válido o es fantasma
+      if (!data?.nombre || !baseAreaIds.includes(docSnap.id)) {
+        batch.delete(docSnap.ref);
+      }
+    });
+
+    // Restaurar/sincronizar áreas corporativas estándar
+    for (const area of initialAreas) {
+      batch.set(doc(db, 'areas', area.id), limpiarParaFirestore(area), { merge: true });
+    }
+
+    // 3. Depuración de Procesos huérfanos o fantasmas
+    const baseProcIds = initialProcesos.map(p => p.id);
+    const procesosSnapshot = await getDocs(collection(db, 'procesos'));
+    procesosSnapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      if (!data?.nombre || !baseProcIds.includes(docSnap.id)) {
+        batch.delete(docSnap.ref);
+      }
+    });
+
+    // Restaurar/sincronizar procesos corporativos estándar
+    for (const proc of initialProcesos) {
+      batch.set(doc(db, 'procesos', proc.id), limpiarParaFirestore(proc), { merge: true });
+    }
+
     await batch.commit();
   } catch (e) {
-    console.warn('Error al depurar cargos en Firebase:', e);
+    console.warn('Error al depurar estructura orgánica en Firebase:', e);
   }
 
   if (typeof window !== 'undefined') {
     localStorage.setItem('bgroup_estructura_limpia', 'true');
+    localStorage.setItem('bgroup_areas', JSON.stringify(initialAreas));
+    localStorage.setItem('bgroup_procesos', JSON.stringify(initialProcesos));
   }
 };
 
