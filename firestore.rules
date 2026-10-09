@@ -60,9 +60,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 1. Configuración de la Empresa y Parámetros de Nómina (Lectura pública institucional, escritura admin)
+    // 1. Configuración de la Empresa y Parámetros de Nómina (Lectura pública institucional para login y verificador, escritura admin)
     match /configuracion_empresa/{docId} {
-      allow read: if signedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -357,6 +357,35 @@ service cloud.firestore {
           )
         );
       allow write: if isSSTorAdmin();
+    }
+
+    // 18. Módulo Cimiento Comercial (Cajas, Saldos, Cobros, Contratos y Arqueos Inmutables)
+    match /clientes_comerciales/{clienteId} {
+      allow read: if signedIn();
+      allow write: if isAdmin() || hasRole(['superadmin', 'admin_gh', 'cajero', 'asesor_comercial']);
+    }
+
+    match /cajas_turnos/{cajaId} {
+      allow read: if signedIn();
+      allow write: if isAdmin() || hasRole(['superadmin', 'admin_gh', 'cajero', 'asesor_comercial']);
+    }
+
+    match /pagos_recaudos/{pagoId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /contratos_clientes/{contratoId} {
+      allow read: if signedIn();
+      allow write: if isAdmin() || hasRole(['superadmin', 'admin_gh', 'asesor_comercial']);
+    }
+
+    // Arqueo de caja inmutable para asesores comerciales; solo administradores pueden modificar o corregir registros
+    match /arqueos_cajas/{arqueoId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isAdmin();
     }
 
     // Default deny catch-all

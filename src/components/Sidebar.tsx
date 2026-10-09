@@ -29,9 +29,12 @@ import {
   Target,
   Database,
   QrCode,
-  PenTool
+  PenTool,
+  ArrowRight
 } from 'lucide-react';
 import { Role, UsuarioSistema, RolSistema, ConfiguracionEmpresa } from '../types';
+import { CorporateLogo } from './CorporateLogo';
+import { LogoCimientoComercial } from './logos/LogosModulos';
 
 interface SidebarProps {
   currentRole?: Role;
@@ -43,6 +46,7 @@ interface SidebarProps {
   currentUser?: UsuarioSistema | null;
   onLogout?: () => void;
   empresa?: ConfiguracionEmpresa;
+  onCambiarModulo?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -54,7 +58,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userSubtitle = 'B GROUP INGENIERIA S.A.S.',
   currentUser,
   onLogout,
-  empresa
+  empresa,
+  onCambiarModulo
 }) => {
   // Rol institucional real verificado desde el perfil de base de datos
   const rolReal: RolSistema = currentUser?.rol || 'empleado';
@@ -86,44 +91,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className="w-64 bg-[#18235C] text-white flex flex-col shrink-0 min-h-screen p-5 select-none border-r border-[#101740]">
       {/* Brand Header */}
-      <div className="pb-4 border-b border-[#8FA7D6]/20 mb-4">
-        {empresa?.identidadVisual?.logoUrl ? (
-          <div className="flex flex-col gap-2">
-            <div className="bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-center max-h-16 overflow-hidden shadow-sm">
-              <img
-                src={empresa.identidadVisual.logoUrl}
-                alt={empresa.nombreComercial || 'Logo'}
-                className="max-h-12 w-auto max-w-full object-contain"
-                onError={(e) => {
-                  (e.target as any).style.display = 'none';
-                }}
-              />
+      <div className="pb-4 border-b border-[#8FA7D6]/20 mb-4 space-y-2">
+        <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center max-h-16 overflow-hidden">
+          <CorporateLogo
+            logoUrl={empresa?.identidadVisual?.logoUrl}
+            nombreComercial={empresa?.nombreComercial || 'B GROUP INGENIERIA'}
+            size="sm"
+            imageClassName="max-h-11 w-auto max-w-full object-contain"
+          />
+        </div>
+        <div className="min-w-0 px-1">
+          <span className="text-sm font-bold tracking-wide text-white block leading-tight truncate" title={empresa?.nombreComercial || 'B GROUP'}>
+            {empresa?.nombreComercial || 'B GROUP'}
+          </span>
+          <span className="text-[10px] text-[#8FA7D6] tracking-wider font-semibold block leading-tight truncate" title={empresa?.razonSocial || 'INGENIERIA S.A.S.'}>
+            {empresa?.razonSocial || 'INGENIERIA S.A.S.'}
+          </span>
+        </div>
+
+        {/* Acceso a Cimiento Comercial: Solo para roles administrativos */}
+        {(rolReal === 'superadmin' || rolReal === 'admin_gh') && onCambiarModulo && (
+          <button
+            type="button"
+            onClick={onCambiarModulo}
+            className="w-full mt-2 py-1.5 px-2.5 rounded-xl bg-gradient-to-r from-[#F59E0B]/20 via-[#D97706]/20 to-[#B45309]/20 hover:from-[#F59E0B]/30 hover:to-[#D97706]/30 border border-[#F59E0B]/40 text-[#FDE68A] text-[11px] font-bold flex items-center justify-between transition-all cursor-pointer shadow-xs"
+            title="Ingresar a la terminal de gestión comercial"
+          >
+            <div className="flex items-center gap-1.5 truncate">
+              <LogoCimientoComercial size={16} />
+              <span className="truncate">Cimiento Comercial</span>
             </div>
-            <div className="min-w-0">
-              <span className="text-sm font-bold tracking-wide text-white block leading-tight truncate" title={empresa?.nombreComercial || 'B GROUP'}>
-                {empresa?.nombreComercial || 'B GROUP'}
-              </span>
-              <span className="text-[10px] text-[#8FA7D6] tracking-wider font-semibold block leading-tight truncate" title={empresa?.razonSocial || 'INGENIERIA S.A.S.'}>
-                {empresa?.razonSocial || 'INGENIERIA S.A.S.'}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
-              <span className="font-bold text-lg text-[#18235C]">
-                {empresa?.nombreComercial ? empresa.nombreComercial.charAt(0).toUpperCase() : 'B'}
-              </span>
-            </div>
-            <div className="min-w-0">
-              <span className="text-base font-bold tracking-wide text-white block leading-tight truncate" title={empresa?.nombreComercial || 'B GROUP'}>
-                {empresa?.nombreComercial || 'B GROUP'}
-              </span>
-              <span className="text-[10px] text-[#8FA7D6] tracking-wider font-semibold block leading-tight truncate" title={empresa?.razonSocial || 'INGENIERIA S.A.S.'}>
-                {empresa?.razonSocial || 'INGENIERIA S.A.S.'}
-              </span>
-            </div>
-          </div>
+            <ArrowRight className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
+          </button>
         )}
       </div>
 

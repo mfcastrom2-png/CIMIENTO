@@ -35,6 +35,7 @@ import {
   getDepartamentoPorMunicipio 
 } from '../data/colombiaData';
 import { formatDriveDirectUrl, isGoogleDriveUrl } from '../utils/driveUtils';
+import { CorporateLogo } from './CorporateLogo';
 
 interface EmpresaConfigViewProps {
   empresa: ConfiguracionEmpresa;
@@ -1349,7 +1350,10 @@ export const EmpresaConfigView: React.FC<EmpresaConfigViewProps> = ({
                           />
                         </div>
                         <span className="text-[10px] text-slate-500 block leading-tight">
-                          Admite enlaces públicos de Google Drive o URLs web directas.
+                          Admite URLs directas o enlaces de Google Drive.
+                        </span>
+                        <span className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200 block leading-tight">
+                          💡 <strong>Consejo Google Drive:</strong> Configure el archivo en Drive como <em>"Cualquier persona con el enlace puede ver"</em> para que se visualice a todos los usuarios sin requerir iniciar sesión en Google.
                         </span>
                       </div>
                     </div>
@@ -1388,20 +1392,12 @@ export const EmpresaConfigView: React.FC<EmpresaConfigViewProps> = ({
                     Vista Previa del Membrete
                   </span>
                   <div className="w-full min-h-[100px] p-3 bg-white rounded-lg border border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
-                    {formData.identidadVisual?.logoUrl ? (
-                      <img
-                        src={formData.identidadVisual.logoUrl}
-                        alt="Logo de la empresa"
-                        className="max-h-20 w-auto max-w-full object-contain"
-                        onError={(e) => {
-                          (e.target as any).src = 'https://via.placeholder.com/200x60?text=Formato+No+Valido';
-                        }}
-                      />
-                    ) : (
-                      <div className="px-6 py-3 rounded-lg bg-[#18235C] text-[#00FF00] font-black text-xl flex items-center justify-center border-2 border-[#8FA7D6] shadow-xs">
-                        {formData.nombreComercial ? formData.nombreComercial.toUpperCase() : 'B GROUP INGENIERIA'}
-                      </div>
-                    )}
+                    <CorporateLogo
+                      logoUrl={formData.identidadVisual?.logoUrl}
+                      nombreComercial={formData.nombreComercial || formData.razonSocial}
+                      imageClassName="max-h-20 w-auto max-w-full object-contain"
+                      size="lg"
+                    />
                   </div>
                   <span className="text-xs text-slate-700 mt-2 font-bold">{formData.nombreComercial || formData.razonSocial}</span>
                   <span className="text-[10px] text-slate-500 font-mono">NIT {formData.nit}-{formData.digitoVerificacion}</span>

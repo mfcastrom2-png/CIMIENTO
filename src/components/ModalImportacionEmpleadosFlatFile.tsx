@@ -12,6 +12,8 @@ import {
   ENCABEZADOS_CSV_EMPLEADOS
 } from '../services/importacionEmpleadosService';
 import { guardarEmpleadoFB, registrarEventoAuditoria } from '../lib/firebase';
+import * as XLSX from 'xlsx';
+import { descargarPlantillaExcelEmpleados } from '../utils/excelTemplateUtils';
 import {
   Upload,
   FileSpreadsheet,
@@ -58,33 +60,45 @@ export const ModalImportacionEmpleadosFlatFile: React.FC<ModalImportacionEmplead
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Manejar descarga de plantilla oficial
+  // Manejar descarga de plantilla oficial en Excel
   const handleDescargarPlantilla = () => {
-    const csvContent = '\uFEFF' + generarPlantillaCsvEmpleados();
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Plantilla_Importacion_Empleados_BGroup_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    descargarPlantillaExcelEmpleados();
   };
 
-  // Procesar archivo seleccionado
+  // Procesar archivo seleccionado (Excel o CSV)
   const handleSeleccionarArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setNombreArchivo(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const contenido = event.target?.result as string;
-      setTextoPegado(contenido);
-      procesarTexto(contenido);
-    };
-    reader.readAsText(file, 'UTF-8');
+    const esExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+    if (esExcel) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const buffer = event.target?.result as ArrayBuffer;
+          const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+          const sheetName = wb.SheetNames[0];
+          const sheet = wb.Sheets[sheetName];
+          const csv = XLSX.utils.sheet_to_csv(sheet);
+          setTextoPegado(csv);
+          procesarTexto(csv);
+        } catch (err) {
+          console.error('Error parseando excel:', err);
+          setMensajeError('No se pudo leer el archivo Excel. Asegúrese de que sea un archivo .xlsx válido.');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const contenido = event.target?.result as string;
+        setTextoPegado(contenido);
+        procesarTexto(contenido);
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
   };
 
   const procesarTexto = (contenido: string) => {
@@ -200,15 +214,16 @@ export const ModalImportacionEmpleadosFlatFile: React.FC<ModalImportacionEmplead
                 <button
                   type="button"
                   onClick={handleDescargarPlantilla}
-                  className="text-[11px] font-bold text-[#18235C] hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-[11px] font-bold text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200"
+                  title="Descargar libro Microsoft Excel (.xlsx)"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Descargar Plantilla CSV</span>
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Descargar Plantilla Excel (.xlsx)</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleCargarPrueba}
-                  className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-[11px] font-bold text-[#18235C] hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Cargar Ejemplo</span>
@@ -218,21 +233,21 @@ export const ModalImportacionEmpleadosFlatFile: React.FC<ModalImportacionEmplead
 
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-[#8FA7D6] hover:border-[#18235C] bg-white rounded-xl p-5 text-center cursor-pointer transition-colors"
+              className="border-2 border-dashed border-[#8FA7D6] hover:border-emerald-600 bg-white rounded-xl p-5 text-center cursor-pointer transition-colors"
             >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.tsv,.txt"
+                accept=".xlsx,.xls,.csv,.tsv,.txt"
                 onChange={handleSeleccionarArchivo}
                 className="hidden"
               />
-              <Upload className="w-7 h-7 text-[#18235C] mx-auto mb-1" />
+              <FileSpreadsheet className="w-7 h-7 text-emerald-600 mx-auto mb-1" />
               <p className="text-xs font-bold text-[#18235C]">
-                Sube tu archivo .CSV o .TSV de colaboradores
+                Sube tu archivo Excel (.xlsx / .xls) o CSV de colaboradores
               </p>
               <p className="text-[10px] text-slate-500">
-                {nombreArchivo ? `Archivo activo: ${nombreArchivo}` : 'Formatos: .csv separado por comas o punto y coma'}
+                {nombreArchivo ? `Archivo activo: ${nombreArchivo}` : 'Formatos: Microsoft Excel (.xlsx, .xls) o archivo plano .csv'}
               </p>
             </div>
 

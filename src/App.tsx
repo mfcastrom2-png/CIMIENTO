@@ -39,6 +39,10 @@ import { ConfiguracionBuzonCorreoView } from './components/ConfiguracionBuzonCor
 import { SaldosInicialesView } from './components/SaldosInicialesView';
 import { FirmaDigitalStudioView } from './components/FirmaDigitalStudioView';
 import { VerificadorCertificadosView } from './components/VerificadorCertificadosView';
+import { ModuloSelectorView } from './components/ModuloSelectorView';
+import { CimientoComercialDashboard } from './components/comercial/CimientoComercialDashboard';
+import { LogoCimientoComercial } from './components/logos/LogosModulos';
+import { ModuloSistema } from './types';
 
 import {
   Bell,
@@ -110,6 +114,13 @@ function AppLayout() {
   const [activeEvaluacionDetalleId, setActiveEvaluacionDetalleId] = useState<string | null>(null);
   const [gestionDatosModalOpen, setGestionDatosModalOpen] = useState(false);
 
+  // Selector de módulo: 'selector' (página previa), 'humano' (SG-SST & Talento) o 'comercial' (Cajero & Cobro)
+  const [moduloActivo, setModuloActivo] = useState<'selector' | 'humano' | 'comercial'>(() => {
+    const guardado = sessionStorage.getItem('cimiento_modulo_activo');
+    if (guardado === 'humano' || guardado === 'comercial') return guardado;
+    return 'selector';
+  });
+
   // Redirigir a verificación si la URL contiene parámetro ?verificar=
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -149,7 +160,11 @@ function AppLayout() {
       <LoginView
         empresa={empresa}
         usuarios={usuariosList}
-        onLoginSuccess={loginSuccess}
+        onLoginSuccess={(usr) => {
+          sessionStorage.removeItem('cimiento_modulo_activo');
+          setModuloActivo('selector');
+          loginSuccess(usr);
+        }}
         onIrAVerificacion={() => {
           navigate('/verificar');
         }}
@@ -157,9 +172,52 @@ function AppLayout() {
     );
   }
 
+  // 1. Vista Previa de Selección de Módulos (CIMIENTO HUMANO vs CIMIENTO COMERCIAL)
+  if (moduloActivo === 'selector') {
+    return (
+      <ModuloSelectorView
+        currentUser={currentUser}
+        empresa={empresa}
+        onSeleccionarModulo={(mod) => {
+          sessionStorage.setItem('cimiento_modulo_activo', mod);
+          setModuloActivo(mod);
+        }}
+        onLogout={() => {
+          sessionStorage.removeItem('cimiento_modulo_activo');
+          logout();
+        }}
+      />
+    );
+  }
+
+  // 2. Módulo de Gestión Comercial (Cajero, Cobros, Saldos, Contratos Drive y Arqueos)
+  if (moduloActivo === 'comercial') {
+    const esAdminComercial = currentUser.rol === 'superadmin' || currentUser.rol === 'admin_gh';
+    if (!esAdminComercial) {
+      // Los roles empleados solo podrán ver las opciones comerciales si tienen roles administrativos
+      sessionStorage.setItem('cimiento_modulo_activo', 'humano');
+      setModuloActivo('humano');
+    } else {
+      return (
+        <CimientoComercialDashboard
+          currentUser={currentUser}
+          empresa={empresa}
+          onVolverAHumano={() => {
+            sessionStorage.setItem('cimiento_modulo_activo', 'humano');
+            setModuloActivo('humano');
+          }}
+          onLogout={() => {
+            sessionStorage.removeItem('cimiento_modulo_activo');
+            logout();
+          }}
+        />
+      );
+    }
+  }
+
   return (
     <div className="flex h-screen bg-[#FFFFFF] text-[#282829] overflow-hidden font-sans">
-      {/* Sidebar de navegación con integración react-router-dom */}
+      {/* Sidebar de navegación con integración react-router-dom y cambio de módulo */}
       <Sidebar
         currentRole={userRole}
         currentView={currentPath}
@@ -168,6 +226,10 @@ function AppLayout() {
         currentUser={currentUser}
         onLogout={logout}
         empresa={empresa}
+        onCambiarModulo={() => {
+          sessionStorage.removeItem('cimiento_modulo_activo');
+          setModuloActivo('selector');
+        }}
       />
 
       {/* Main Content Area */}
@@ -178,6 +240,22 @@ function AppLayout() {
             <span className="hidden sm:inline-block text-xs font-semibold px-2.5 py-1 rounded-md bg-[#101740] text-[#8FA7D6] border border-[#8FA7D6]/30">
               {new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </span>
+
+            {/* Acceso directo a Cimiento Comercial para administradores */}
+            {(currentUser?.rol === 'superadmin' || currentUser?.rol === 'admin_gh') && (
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.setItem('cimiento_modulo_activo', 'comercial');
+                  setModuloActivo('comercial');
+                }}
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-[#F59E0B]/20 to-[#D97706]/20 hover:from-[#F59E0B]/30 hover:to-[#D97706]/30 border border-[#F59E0B]/40 text-[#FDE68A] text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="Acceder al módulo de Cimiento Comercial"
+              >
+                <LogoCimientoComercial size={16} />
+                <span>Cimiento Comercial</span>
+              </button>
+            )}
 
             {/* Empresa Activa Badge */}
             {empresa?.nombreComercial && (

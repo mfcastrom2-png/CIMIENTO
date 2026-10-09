@@ -48,7 +48,7 @@
   footer,
   .sidebar,
   .no-print,
-  .print\\:hidden,
+  [class*="print:hidden"],
   button,
   .btn-print-hidden,
   input[type="button"],

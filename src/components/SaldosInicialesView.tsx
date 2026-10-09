@@ -31,6 +31,8 @@ import {
   eliminarSaldoInicialFB,
   registrarEventoAuditoria
 } from '../lib/firebase';
+import * as XLSX from 'xlsx';
+import { descargarPlantillaExcelSaldosNomina } from '../utils/excelTemplateUtils';
 import {
   Upload,
   FileSpreadsheet,
@@ -219,33 +221,44 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
     };
   }, [saldosGuardados, mapaEmpleadosPorDoc]);
 
-  // Manejador de descarga de plantilla CSV oficial
+  // Manejador de descarga de plantilla Excel oficial
   const handleDescargarPlantilla = () => {
-    const csvContent = '\uFEFF' + generarPlantillaCsvSaldos();
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Plantilla_Saldos_Iniciales_Nomina_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    descargarPlantillaExcelSaldosNomina();
   };
 
-  // Manejador de carga de archivo
+  // Manejador de carga de archivo (Excel o CSV)
   const handleSeleccionarArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setNombreArchivo(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const contenido = event.target?.result as string;
-      setTextoPegado(contenido);
-      procesarTexto(contenido);
-    };
-    reader.readAsText(file, 'UTF-8');
+    const esExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+    if (esExcel) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const buffer = event.target?.result as ArrayBuffer;
+          const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const csv = XLSX.utils.sheet_to_csv(sheet);
+          setTextoPegado(csv);
+          procesarTexto(csv);
+        } catch (err) {
+          console.error('Error parseando excel de saldos:', err);
+          setMensajeError('No se pudo leer el archivo Excel de saldos iniciales.');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const contenido = event.target?.result as string;
+        setTextoPegado(contenido);
+        procesarTexto(contenido);
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
   };
 
   // Procesar texto CSV / Clipboard
@@ -611,11 +624,11 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
           <button
             type="button"
             onClick={handleDescargarPlantilla}
-            className="px-3 py-2 bg-white hover:bg-slate-50 text-[#18235C] border border-[#8FA7D6] text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-            title="Descargar plantilla Excel/CSV estructurada con encabezados oficiales"
+            className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            title="Descargar libro oficial Microsoft Excel (.xlsx) estructurado con columnas y ejemplos"
           >
-            <Download className="w-3.5 h-3.5 text-[#18235C]" />
-            <span>Descargar Plantilla CSV</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Descargar Plantilla Excel (.xlsx)</span>
           </button>
 
           <button
@@ -814,21 +827,21 @@ export const SaldosInicialesView: React.FC<SaldosInicialesViewProps> = ({
               {/* Zona Drag & Drop / File Input */}
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-[#8FA7D6] hover:border-[#18235C] bg-slate-50/60 hover:bg-slate-50 rounded-xl p-6 text-center cursor-pointer transition-colors"
+                className="border-2 border-dashed border-[#8FA7D6] hover:border-emerald-600 bg-slate-50/60 hover:bg-emerald-50/20 rounded-xl p-6 text-center cursor-pointer transition-colors"
               >
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.txt,.tsv"
+                  accept=".xlsx,.xls,.csv,.txt,.tsv"
                   onChange={handleSeleccionarArchivo}
                   className="hidden"
                 />
-                <Upload className="w-8 h-8 text-[#18235C] mx-auto mb-2" />
+                <FileSpreadsheet className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
                 <p className="text-xs font-bold text-[#18235C]">
-                  Haz clic aquí para seleccionar tu archivo CSV / TSV o arrástralo
+                  Haz clic aquí para seleccionar tu archivo Excel (.xlsx / .xls) o CSV
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Formatos admitidos: .csv (separado por coma o punto y coma), .txt, exportaciones directas de Excel
+                  Formatos admitidos: Microsoft Excel (.xlsx, .xls) o archivo plano .csv (separado por coma o punto y coma)
                 </p>
               </div>
 

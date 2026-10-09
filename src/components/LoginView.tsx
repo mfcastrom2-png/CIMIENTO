@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { UsuarioSistema, ConfiguracionEmpresa } from '../types';
+import { CorporateLogo } from './CorporateLogo';
 import {
   loginConEmail,
   loginConGoogle,
@@ -226,7 +227,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 Somos un equipo, una misma red y <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#38BDF8] via-[#60A5FA] to-[#A78BFA]">una sola conexión</span>
               </h1>
               <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl">
-                Plataforma integrada para la gestión del talento humano, intermente estamos conectado en una misma red
+                Plataforma integrada para la gestión del talento humano, estamos conectados en una misma red
               </p>
             </div>
 
@@ -255,32 +256,16 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
               {/* ENCABEZADO DE LA TARJETA CON EL LOGO USADO EN TODO EL SISTEMA */}
               <div className="text-center pb-5 mb-5 border-b border-slate-100">
-                {/* Contenedor del Logo Institucional con fondo blanco puro y marco elegante */}
+                {/* Contenedor del Logo Institucional con fondo blanco puro y compatibilidad universal Google Drive */}
                 <div className="flex justify-center mb-3">
-                  {logoUrl && !imgError ? (
-                    <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center max-h-20 min-h-[56px] w-auto max-w-[240px] transition-transform hover:scale-105">
-                      <img
-                        src={logoUrl}
-                        alt={nombreComercial}
-                        className="max-h-14 w-auto max-w-full object-contain"
-                        onError={() => setImgError(true)}
-                      />
-                    </div>
-                  ) : (
-                    <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 px-4 py-2.5">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#18235C] to-[#0D153B] text-white flex items-center justify-center shrink-0 shadow-md">
-                        <span className="font-extrabold text-xl text-white font-mono">B</span>
-                      </div>
-                      <div className="text-left">
-                        <span className="text-sm font-black text-[#18235C] tracking-tight block leading-tight">
-                          {nombreComercial}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-bold tracking-wider block leading-tight uppercase">
-                          Telecomunicaciones & TIC
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center max-h-20 min-h-[56px] w-auto max-w-[260px] transition-transform hover:scale-105">
+                    <CorporateLogo
+                      logoUrl={logoUrl}
+                      nombreComercial={nombreComercial}
+                      size="md"
+                      imageClassName="max-h-14 w-auto max-w-full object-contain"
+                    />
+                  </div>
                 </div>
 
                 <h2 className="text-xl font-extrabold text-[#18235C] tracking-tight">

@@ -435,6 +435,18 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Carga inicial y refresco bajo demanda sin listeners onSnapshot permanentes
   useEffect(() => {
+    // Carga pública temprana de la configuración institucional (logo, lema) para Login y Verificador
+    obtenerEmpresaFB().then(empresaData => {
+      if (empresaData && empresaData.razonSocial) {
+        setEmpresa(empresaData);
+        try {
+          localStorage.setItem('bgroup_empresa_config', JSON.stringify(empresaData));
+        } catch {}
+      }
+    }).catch(() => {
+      // Uso de caché local o valores predeterminados
+    });
+
     if (!authReady || !fbUser) {
       setCloudSynced(false);
       return;

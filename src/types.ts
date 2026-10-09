@@ -1654,3 +1654,135 @@ export interface IndicadorSST {
   acciones?: AccionMejoraIndicadorSST[];
 }
 
+// ==========================================
+// MÓDULO CIMIENTO COMERCIAL & SUBMÓDULOS
+// ==========================================
+
+export type ModuloSistema = 'humano' | 'comercial';
+
+export interface ClienteComercial {
+  id: string;
+  codigo: string; // ej. "CLI-0012"
+  nombre: string;
+  identificacion: string;
+  tipoIdentificacion: 'CC' | 'NIT' | 'CE' | 'Pasaporte';
+  direccion: string;
+  ciudad: string;
+  telefono: string;
+  email: string;
+  planServicio: string; // ej. "Fibra Óptica 300 Mbps Dedicado"
+  velocidadMbps?: number;
+  saldoPendiente: number; // Saldo deudor en pesos COP
+  fechaVencimiento: string;
+  estado: 'Al día' | 'En mora' | 'Suspendido' | 'Retirado';
+  ultimoPagoFecha?: string;
+  ultimoPagoMonto?: number;
+  fechaCreacion: string;
+  contratoId?: string;
+}
+
+export interface CajaTurno {
+  id: string;
+  codigo: string; // ej. "CAJA-2026-001"
+  cajeroId: string;
+  cajeroNombre: string;
+  fechaApertura: string;
+  fechaCierre?: string;
+  montoApertura: number; // Base de caja en efectivo
+  totalRecaudadoEfectivo: number;
+  totalRecaudadoDigital: number;
+  totalEgresos: number;
+  saldoEsperadoEfectivo: number;
+  saldoRealEfectivo?: number;
+  diferencia?: number;
+  estado: 'Abierta' | 'Cerrada';
+  observaciones?: string;
+}
+
+export interface PagoRecaudo {
+  id: string;
+  codigoRecibo: string; // ej. "REC-2026-00045"
+  clienteId: string;
+  clienteNombre: string;
+  clienteIdentificacion: string;
+  monto: number;
+  fecha: string;
+  metodoPago: 'Efectivo' | 'Nequi' | 'Daviplata' | 'Bancolombia' | 'Transferencia' | 'Tarjeta';
+  referenciaTransaccion?: string;
+  cajaTurnoId?: string;
+  cajeroNombre: string;
+  saldoAnterior: number;
+  saldoActual: number;
+  concepto: string;
+  comprobanteEnviadoWhatsapp?: boolean;
+  comprobanteEnviadoEmail?: boolean;
+  comprobanteCompartido?: boolean;
+  telefonoDestinoWhatsapp?: string;
+  emailDestino?: string;
+  observaciones?: string;
+}
+
+export interface ArqueoCaja {
+  id: string;
+  codigo: string; // ej. "ARQ-2026-0018"
+  fecha: string;
+  cajaTurnoId: string;
+  asesorId: string;
+  asesorNombre: string;
+  // Conteo físico de billetes y monedas
+  billetes100k: number;
+  billetes50k: number;
+  billetes20k: number;
+  billetes10k: number;
+  billetes5k: number;
+  billetes2k: number;
+  monedasTotal: number;
+  efectivoTotalFisico: number;
+  digitalTotal: number;
+  totalFisico: number;
+  totalSistema: number;
+  diferencia: number;
+  estado: 'Cuadrado' | 'Faltante' | 'Sobrante';
+  inmutable: boolean; // Verdadero para asesores comerciales
+  creadoPor: string;
+  fechaCreacion: string;
+  hashAuditoria: string; // SHA-256 de seguridad
+  observacionesAsesor?: string;
+  // Ajuste administrativo autorizado (Solo administradores)
+  modificadoPorAdmin?: {
+    adminId: string;
+    adminNombre: string;
+    fechaModificacion: string;
+    motivoAjuste: string;
+    valoresPrevios: {
+      totalFisico: number;
+      totalSistema: number;
+      diferencia: number;
+    };
+  };
+}
+
+export interface ContratoCliente {
+  id: string;
+  codigoContrato: string; // ej. "CTR-TELCO-2026-089"
+  clienteId: string;
+  clienteNombre: string;
+  clienteIdentificacion: string;
+  fechaContrato: string;
+  planServicio: string;
+  velocidadMbps: number;
+  tarifaMensual: number;
+  permanenciaMeses: number;
+  direccionInstalacion: string;
+  ipAsignada?: string;
+  firmaDigitalUrl?: string; // Data URL de la firma en canvas
+  firmaNombre: string;
+  firmaCedula: string;
+  firmaFecha: string;
+  hashIntegridadSha256: string;
+  carpetaDriveId?: string;
+  urlCarpetaDrive?: string;
+  estado: 'Borrador' | 'Firmado' | 'Activo' | 'Cancelado';
+  archivoContratoDriveUrl?: string;
+}
+
