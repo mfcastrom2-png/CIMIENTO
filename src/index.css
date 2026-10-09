@@ -6,12 +6,196 @@
     --color-lila: #8FA7D6;
     --color-accent: #00FF00;
     --color-carbon: #282829;
+    --shadow-soft: 0 10px 30px rgba(24, 35, 92, 0.12);
+    --shadow-strong: 0 18px 40px rgba(24, 35, 92, 0.18);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     color: #282829;
     background-color: #FFFFFF;
+  }
+
+  button,
+  [type="button"],
+  [type="submit"] {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+  }
+
+  button:hover,
+  [type="button"]:hover,
+  [type="submit"]:hover {
+    transform: translateY(-1px);
+  }
+}
+
+@layer components {
+  .btn-base {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.9rem;
+    border: 1px solid transparent;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    padding: 0.75rem 1rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .btn-base:focus-visible {
+    outline: 2px solid rgba(143, 167, 214, 0.8);
+    outline-offset: 2px;
+  }
+
+  .btn-base svg {
+    flex-shrink: 0;
+  }
+
+  .btn-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.72rem;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #18235C 0%, #243a7a 100%);
+    color: #FFFFFF;
+    box-shadow: 0 8px 18px rgba(24, 35, 92, 0.2);
+    border-color: rgba(143, 167, 214, 0.35);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 12px 22px rgba(24, 35, 92, 0.26);
+    filter: brightness(1.04);
+  }
+
+  .btn-secondary {
+    background: rgba(143, 167, 214, 0.08);
+    color: #18235C;
+    border-color: rgba(143, 167, 214, 0.28);
+    box-shadow: 0 6px 16px rgba(24, 35, 92, 0.06);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(143, 167, 214, 0.14);
+    border-color: rgba(143, 167, 214, 0.45);
+  }
+
+  .btn-ghost {
+    background: rgba(16, 23, 64, 0.6);
+    color: #E7ECFF;
+    border-color: rgba(143, 167, 214, 0.28);
+  }
+
+  .btn-ghost:hover {
+    background: rgba(24, 35, 92, 0.82);
+    border-color: rgba(143, 167, 214, 0.45);
+  }
+
+  .btn-success {
+    background: linear-gradient(135deg, #18b479 0%, #2dd4bf 100%);
+    color: #0F172A;
+    border-color: rgba(45, 212, 191, 0.3);
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.18);
+  }
+
+  .btn-success:hover {
+    filter: brightness(1.02);
+  }
+
+  .btn-warning {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: #1F2937;
+    border-color: rgba(245, 158, 11, 0.3);
+    box-shadow: 0 10px 20px rgba(245, 158, 11, 0.16);
+  }
+
+  .btn-warning:hover {
+    filter: brightness(1.02);
+  }
+
+  .btn-icon {
+    padding: 0.5rem 0.625rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+  }
+
+  .module-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 18px 38px rgba(10, 15, 38, 0.18);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .module-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 22px 48px rgba(10, 15, 38, 0.22);
+  }
+
+  .module-card-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(135deg, rgba(24, 35, 92, 0.96) 0%, rgba(37, 99, 235, 0.86) 100%);
+    color: #FFFFFF;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+  }
+
+  .module-card-button:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.03);
+  }
+
+  .sidebar-nav {
+    padding-right: 0.25rem;
+  }
+
+  .sidebar-nav button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 0.85rem;
+    border-radius: 0.9rem;
+    border: 1px solid transparent;
+    transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .sidebar-nav button:hover {
+    border-color: rgba(143, 167, 214, 0.25);
+    background: rgba(143, 167, 214, 0.08);
+    transform: translateX(2px);
+  }
+
+  .sidebar-nav button > div {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
   }
 }
 
