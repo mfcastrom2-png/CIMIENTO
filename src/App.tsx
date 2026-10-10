@@ -43,6 +43,7 @@ import { ModuloSelectorView } from './components/ModuloSelectorView';
 import { CimientoComercialDashboard } from './components/comercial/CimientoComercialDashboard';
 import { LogoCimientoComercial } from './components/logos/LogosModulos';
 import { ModuloSistema } from './types';
+import { ModulosPortalView } from './components/navigation/ModulosPortalView';
 
 import {
   Bell,
@@ -57,7 +58,8 @@ import {
   AlertTriangle,
   Building2,
   QrCode,
-  PenTool
+  PenTool,
+  Layers
 } from 'lucide-react';
 
 function AppLayout() {
@@ -114,14 +116,12 @@ function AppLayout() {
   const [activeEvaluacionDetalleId, setActiveEvaluacionDetalleId] = useState<string | null>(null);
   const [gestionDatosModalOpen, setGestionDatosModalOpen] = useState(false);
 
-  // Selector de módulo: 'selector' (página previa), 'humano' (SG-SST & Talento) o 'comercial' (Cajero & Cobro)
   const [moduloActivo, setModuloActivo] = useState<'selector' | 'humano' | 'comercial'>(() => {
     const guardado = sessionStorage.getItem('cimiento_modulo_activo');
     if (guardado === 'humano' || guardado === 'comercial') return guardado;
     return 'selector';
   });
 
-  // Redirigir a verificación si la URL contiene parámetro ?verificar=
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -132,13 +132,11 @@ function AppLayout() {
     }
   }, [location.pathname, navigate]);
 
-  // Derivar la vista actual desde el path del enrutador
   const currentPath = location.pathname.replace('/', '') || 'dashboard';
 
   const pendientesCount = solicitudes.filter(s => s.estado === 'Pendiente').length;
   const currentEvaluacionDetalle = evaluaciones.find(e => e.id === activeEvaluacionDetalleId);
 
-  // Detección de ruta de verificación pública para externos (escaneo QR sin sesión)
   const queryParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const paramVerificar = queryParams.get('verificar') || queryParams.get('codigo');
   const isPublicVerificationRoute = location.pathname.startsWith('/verificar') || Boolean(paramVerificar);
@@ -172,7 +170,6 @@ function AppLayout() {
     );
   }
 
-  // 1. Vista Previa de Selección de Módulos (CIMIENTO HUMANO vs CIMIENTO COMERCIAL)
   if (moduloActivo === 'selector') {
     return (
       <ModuloSelectorView
@@ -190,11 +187,9 @@ function AppLayout() {
     );
   }
 
-  // 2. Módulo de Gestión Comercial (Cajero, Cobros, Saldos, Contratos Drive y Arqueos)
   if (moduloActivo === 'comercial') {
     const esAdminComercial = currentUser.rol === 'superadmin' || currentUser.rol === 'admin_gh';
     if (!esAdminComercial) {
-      // Los roles empleados solo podrán ver las opciones comerciales si tienen roles administrativos
       sessionStorage.setItem('cimiento_modulo_activo', 'humano');
       setModuloActivo('humano');
     } else {
@@ -217,7 +212,6 @@ function AppLayout() {
 
   return (
     <div className="flex h-screen bg-[#FFFFFF] text-[#282829] overflow-hidden font-sans">
-      {/* Sidebar de navegación con integración react-router-dom y cambio de módulo */}
       <Sidebar
         currentRole={userRole}
         currentView={currentPath}
@@ -232,16 +226,23 @@ function AppLayout() {
         }}
       />
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#FFFFFF]">
-        {/* Top Navbar Institucional */}
         <header className="h-14 bg-[#18235C] border-b border-[#101740] px-4 sm:px-6 flex items-center justify-between shrink-0 z-10 text-white shadow-xs">
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline-block text-xs font-semibold px-2.5 py-1 rounded-md bg-[#101740] text-[#8FA7D6] border border-[#8FA7D6]/30">
               {new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </span>
 
-            {/* Acceso directo a Cimiento Comercial para administradores */}
+            <button
+              type="button"
+              onClick={() => navigate('/portal')}
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#101740] hover:bg-[#18235C] text-[#8FA7D6] hover:text-white border border-[#8FA7D6]/30 text-xs font-medium transition-colors"
+              title="Abrir portal de módulos"
+            >
+              <Layers className="w-3.5 h-3.5 text-[#00FF00]" />
+              <span>Portal de Módulos</span>
+            </button>
+
             {(currentUser?.rol === 'superadmin' || currentUser?.rol === 'admin_gh') && (
               <button
                 type="button"
@@ -257,7 +258,6 @@ function AppLayout() {
               </button>
             )}
 
-            {/* Empresa Activa Badge */}
             {empresa?.nombreComercial && (
               <button
                 type="button"
@@ -277,25 +277,23 @@ function AppLayout() {
               </button>
             )}
 
-            {/* Botón de Refresco Bajo Demanda (eliminando onSnapshot) */}
             <button
               type="button"
               onClick={() => recargarDatosBajoDemanda()}
               disabled={cargandoNube}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#101740] hover:bg-[#18235C] text-[#8FA7D6] hover:text-white border border-[#8FA7D6]/30 text-xs font-medium transition-colors cursor-pointer disabled:opacity-60 shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#101740] hover:bg-[#18235C] text-[#8FA7D6] hover:text-white border border-[#8FA7D6]/30 text-xs font-medium transition-colors cursor-pointer disabled:opacity-60"
               title="Consultar lote actualizado de Firestore bajo demanda"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${cargandoNube ? 'animate-spin text-white' : 'text-[#8FA7D6]'}`} />
               <span className="hidden md:inline">{cargandoNube ? 'Consultando...' : 'Actualizar Nube'}</span>
             </button>
 
-            {/* Cloud Database Status Pill */}
             {isSuperAdmin ? (
               <button
                 type="button"
                 id="btn-gestion-datos-nube"
                 onClick={() => setGestionDatosModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#101740] hover:bg-[#18235C] text-white border border-[#8FA7D6]/40 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#101740] hover:bg-[#18235C] text-white border border-[#8FA7D6]/40 text-xs font-semibold transition-colors cursor-pointer"
                 title="Administrar base de datos en la nube (Exclusivo Superadministrador)"
               >
                 <Cloud className="w-3.5 h-3.5 text-[#8FA7D6]" />
@@ -315,7 +313,6 @@ function AppLayout() {
               </div>
             )}
 
-            {/* Insignia de perfil verificado o selector de simulación para administradores */}
             {currentUser?.rol === 'empleado' ? (
               <div
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-[#101740] rounded-full border border-[#8FA7D6]/30 text-xs shadow-2xs"
@@ -330,7 +327,6 @@ function AppLayout() {
                 </span>
               </div>
             ) : (isSuperAdmin || currentUser?.rol === 'admin_gh') ? (
-              /* Selector de vista para administradores y gestión humana */
               <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-[#101740] rounded-lg border border-[#8FA7D6]/30 text-xs">
                 <span className="text-[11px] font-bold text-[#8FA7D6] flex items-center gap-1" title="Alternar entre vista de gestión y portal del colaborador">
                   <User className="w-3 h-3 text-[#8FA7D6]" />
@@ -361,7 +357,6 @@ function AppLayout() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Botón de Auditoría Directo (Solo para roles autorizados) */}
             {(isSuperAdmin || currentUser?.rol === 'admin_gh' || currentUser?.permisos?.includes('auditoria')) && (
               <button
                 onClick={() => navigate('/auditoria')}
@@ -377,7 +372,6 @@ function AppLayout() {
               </button>
             )}
 
-            {/* Botón base de datos (Exclusivo Superadministrador) */}
             {isSuperAdmin && (
               <button
                 onClick={() => setGestionDatosModalOpen(true)}
@@ -389,7 +383,6 @@ function AppLayout() {
               </button>
             )}
 
-            {/* Quick Pending Alert */}
             {pendientesCount > 0 && (
               <button
                 onClick={() => navigate('/solicitudes')}
@@ -400,7 +393,6 @@ function AppLayout() {
               </button>
             )}
 
-            {/* Profile Avatar & Logout */}
             <div className="flex items-center gap-2 pl-3 border-l border-[#8FA7D6]/30">
               <div className="w-8 h-8 rounded-lg bg-[#8FA7D6] text-[#18235C] flex items-center justify-center font-bold text-xs shadow-2xs border border-[#8FA7D6]">
                 {currentUser.nombre ? currentUser.nombre.slice(0, 2).toUpperCase() : 'GH'}
@@ -424,7 +416,6 @@ function AppLayout() {
           </div>
         </header>
 
-        {/* Banner de Estado de Conexión Offline / Error de Firestore */}
         {cloudError && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between text-xs text-amber-900 shrink-0">
             <div className="flex items-center gap-2">
@@ -436,7 +427,7 @@ function AppLayout() {
             <button
               onClick={() => recargarDatosBajoDemanda()}
               disabled={cargandoNube}
-              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-xs transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-xs transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${cargandoNube ? 'animate-spin' : ''}`} />
               <span>Reintentar</span>
@@ -444,11 +435,19 @@ function AppLayout() {
           </div>
         )}
 
-        {/* Dynamic Route View Body */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#FFFFFF]">
           <div className="max-w-7xl mx-auto">
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route
+                path="/portal"
+                element={
+                  <ModulosPortalView
+                    userRole={userRole}
+                    onNavigate={(view) => navigate('/' + view)}
+                  />
+                }
+              />
               <Route
                 path="/empresa"
                 element={
@@ -807,9 +806,7 @@ function AppLayout() {
                       </p>
                     </div>
                   ) : (
-                    <ParametrosNominaView
-                      isSuperAdmin={isSuperAdmin}
-                    />
+                    <ParametrosNominaView isSuperAdmin={isSuperAdmin} />
                   )
                 }
               />
@@ -864,7 +861,7 @@ function AppLayout() {
                       </div>
                       <h2 className="text-lg font-bold text-slate-800">Acceso Restringido a Documentos</h2>
                       <p className="text-xs text-slate-500 mt-2">
-                        El Repositorio y Generador de Documentos Institucionales está reservado para la Dirección de Gestión Humana, Líderes y SST. Para solicitar y descargar sus certificados laborales personales, diríjase a su módulo de <strong>Mis Solicitudes & Trámites</strong> (Buzón Interno).
+                        El Repositorio y Generador de Documentos Institucionales está reservado para la Dirección de Gestión Humana, Líderes y SST.
                       </p>
                       <button
                         onClick={() => navigate('/dashboard')}
@@ -999,7 +996,6 @@ function AppLayout() {
         </main>
       </div>
 
-      {/* Modal de Detalle Transversal de Evaluación */}
       {currentEvaluacionDetalle && (
         <EvaluacionDetalleModal
           evaluacion={currentEvaluacionDetalle}
@@ -1009,7 +1005,6 @@ function AppLayout() {
         />
       )}
 
-      {/* Modal de Gestión de Datos en la Nube y Preparación de Producción */}
       {isSuperAdmin && gestionDatosModalOpen && (
         <GestionDatosModal
           onClose={() => setGestionDatosModalOpen(false)}
