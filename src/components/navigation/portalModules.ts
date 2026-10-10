@@ -252,6 +252,17 @@ export const MODULOS_ADMINISTRACION: PortalModule[] = [
     requierePermiso: 'auditoria',
     esAdmin: true,
     badge: 'Audit'
+  },
+  {
+    id: 'empresa',
+    titulo: 'Configuración Empresa',
+    descripcion: 'Datos corporativos e identidad visual.',
+    icono: Building2,
+    enlace: 'empresa',
+    color: 'primary',
+    requierePermiso: 'empresa',
+    esAdmin: true,
+    badge: 'Empresa'
   }
 ];
 
@@ -294,23 +305,28 @@ export function getVisiblePortalModules(
   role: RolSistema = 'empleado',
   permisos: string[] = []
 ): PortalModulosPorRol {
-  const esAdmin = ['admin', 'superadmin', 'admin_gh'].includes(role);
-  const esSST = role === 'responsable_sst' || esAdmin;
-  const esLider = role === 'lider_area' || esAdmin;
-  const esEmpleado = role === 'empleado';
+  const safeRole = typeof role === 'string' ? role : 'empleado';
+  const esAdmin = ['admin', 'superadmin', 'admin_gh'].includes(safeRole);
+  const esSST = safeRole === 'responsable_sst' || esAdmin;
+  const esLider = safeRole === 'lider_area' || esAdmin;
+  const esEmpleado = safeRole === 'empleado';
 
   // Filtrar módulos por rol y permisos
   const filtrarModulos = (modulos: PortalModule[]): PortalModule[] => {
+    if (!Array.isArray(modulos)) return [];
     return modulos.filter((mod) => {
       // Si requiere admin y no lo es
       if (mod.esAdmin && !esAdmin) return false;
 
       // Si tiene roles autorizados específicos
-      if (mod.rolesAutorizados && !mod.rolesAutorizados.includes(role)) return false;
+      if (mod.rolesAutorizados && !mod.rolesAutorizados.includes(safeRole as RolSistema)) return false;
 
       // Si requiere permiso específico
       if (mod.requierePermiso && !esAdmin) {
-        return permisos.includes(mod.requierePermiso);
+        if (['empleado', 'responsable_sst', 'lider_area'].includes(safeRole)) {
+          return true;
+        }
+        return Array.isArray(permisos) && permisos.includes(mod.requierePermiso);
       }
 
       return true;

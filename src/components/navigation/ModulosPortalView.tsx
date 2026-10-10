@@ -5,7 +5,7 @@ import { getVisiblePortalModules } from './portalModules';
 import { RolSistema, UsuarioSistema } from '../../types';
 
 interface ModulosPortalViewProps {
-  userRole: RolSistema;
+  userRole: RolSistema | 'admin';
   onNavigate: (view: string) => void;
 }
 
@@ -13,7 +13,8 @@ export function ModulosPortalView({
   userRole,
   onNavigate
 }: ModulosPortalViewProps) {
-  const modulos = getVisiblePortalModules(userRole);
+  const rolEfectivo: RolSistema = userRole === 'admin' ? 'superadmin' : (userRole || 'empleado');
+  const modulos = getVisiblePortalModules(rolEfectivo);
   const [expandedCategory, setExpandedCategory] = useState<string | null>('gestion-humana');
 
   useEffect(() => {
@@ -29,37 +30,43 @@ export function ModulosPortalView({
       id: 'gestion-humana',
       name: 'Gestión Humana',
       icon: Users,
-      modules: modulos.filter(m => m.categoria === 'gestion-humana')
+      modules: Array.isArray(modulos?.gestionHumana) ? modulos.gestionHumana : []
     },
     {
       id: 'seguridad-sst',
       name: 'Seguridad y Salud en el Trabajo',
       icon: Shield,
-      modules: modulos.filter(m => m.categoria === 'seguridad-sst')
+      modules: Array.isArray(modulos?.sst) ? modulos.sst : []
     },
     {
       id: 'nomina-prestaciones',
       name: 'Nómina y Prestaciones',
       icon: Receipt,
-      modules: modulos.filter(m => m.categoria === 'nomina-prestaciones')
+      modules: Array.isArray(modulos?.finanzas) ? modulos.finanzas : []
     },
     {
       id: 'documentacion',
       name: 'Documentación',
       icon: FileText,
-      modules: modulos.filter(m => m.categoria === 'documentacion')
+      modules: Array.isArray(modulos?.documentos) ? modulos.documentos : []
     },
     {
       id: 'formacion',
       name: 'Formación y Desarrollo',
       icon: GraduationCap,
-      modules: modulos.filter(m => m.categoria === 'formacion')
+      modules: Array.isArray(modulos?.capacitacion) ? modulos.capacitacion : []
     },
     {
       id: 'administracion',
       name: 'Administración y Control',
       icon: Settings,
-      modules: modulos.filter(m => m.categoria === 'administracion')
+      modules: Array.isArray(modulos?.administracion) ? modulos.administracion : []
+    },
+    {
+      id: 'solicitudes-servicios',
+      name: 'Solicitudes y Peticiones',
+      icon: ClipboardList,
+      modules: Array.isArray(modulos?.solicitudes) ? modulos.solicitudes : []
     }
   ];
 
