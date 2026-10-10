@@ -1,19 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { getVisiblePortalModules } from './portalModules';
+import { getVisiblePortalModules, MODULOS_GESTION_HUMANA } from './portalModules';
 
 describe('getVisiblePortalModules', () => {
-  it('muestra módulos de SST para administradores y SST', () => {
-    expect(getVisiblePortalModules('admin').sst.length).toBeGreaterThan(0);
-    expect(getVisiblePortalModules('superadmin').sst.length).toBeGreaterThan(0);
-    expect(getVisiblePortalModules('responsable_sst').sst.length).toBeGreaterThan(0);
+  it('muestra módulos básicos para empleados', () => {
+    const result = getVisiblePortalModules('empleado', []);
+    expect(result.gestionHumana.length).toBeGreaterThan(0);
   });
 
-  it('oculta módulos de SST para colaboradores', () => {
-    expect(getVisiblePortalModules('empleado').sst).toHaveLength(0);
+  it('muestra módulos de SST para responsable_sst', () => {
+    const result = getVisiblePortalModules('responsable_sst', []);
+    expect(result.sst.length).toBeGreaterThan(0);
   });
 
-  it('mantiene los módulos base de gestión humana para todos', () => {
-    expect(getVisiblePortalModules('empleado').gestionHumana.length).toBeGreaterThan(0);
-    expect(getVisiblePortalModules('admin').gestionHumana.length).toBeGreaterThan(0);
+  it('muestra todos los módulos administrativos para admin_gh', () => {
+    const result = getVisiblePortalModules('admin_gh', []);
+    expect(result.administracion.length).toBeGreaterThan(0);
+    expect(result.finanzas.length).toBeGreaterThan(0);
+    expect(result.documentos.length).toBeGreaterThan(0);
+  });
+
+  it('respeta permisos específicos', () => {
+    const result = getVisiblePortalModules('lider_area', ['empleados', 'solicitudes']);
+    expect(result.gestionHumana.length).toBeGreaterThan(0);
+  });
+
+  it('oculta módulos administrativos para empleados', () => {
+    const result = getVisiblePortalModules('empleado', []);
+    expect(result.administracion.length).toBe(0);
+    expect(result.finanzas.length).toBe(0);
+  });
+
+  it('gestión humana siempre es visible', () => {
+    const resultEmpleado = getVisiblePortalModules('empleado', []);
+    const resultAdmin = getVisiblePortalModules('superadmin', []);
+    expect(resultEmpleado.gestionHumana.length).toBeGreaterThan(0);
+    expect(resultAdmin.gestionHumana.length).toBeGreaterThan(0);
   });
 });

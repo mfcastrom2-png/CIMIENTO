@@ -1,5 +1,42 @@
-import { Briefcase, BookOpen, ClipboardList, Shield, BarChart3, Users, Building2, FileCheck2 } from 'lucide-react';
-import type { PortalModule } from './ModulosPortalCard';
+import {
+  Briefcase,
+  BookOpen,
+  ClipboardList,
+  Shield,
+  BarChart3,
+  Users,
+  Building2,
+  FileCheck2,
+  Palmtree,
+  FileText,
+  Mail,
+  UserCog,
+  Database,
+  QrCode,
+  PenTool,
+  Receipt,
+  Scale,
+  Lock,
+  Vote,
+  HardHat,
+  Award,
+  GraduationCap,
+  LucideIcon
+} from 'lucide-react';
+import type { RolSistema } from '../../types';
+
+export interface PortalModule {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  icono: LucideIcon;
+  enlace: string;
+  color: 'primary' | 'secondary' | 'accent' | 'success' | 'warning' | 'danger';
+  requierePermiso?: string;
+  rolesAutorizados?: RolSistema[];
+  badge?: string;
+  esAdmin?: boolean;
+}
 
 export const MODULOS_GESTION_HUMANA: PortalModule[] = [
   {
@@ -8,7 +45,8 @@ export const MODULOS_GESTION_HUMANA: PortalModule[] = [
     descripcion: 'Gestión 360° de colaboradores.',
     icono: Users,
     enlace: 'empleados',
-    color: 'primary'
+    color: 'primary',
+    requierePermiso: 'empleados'
   },
   {
     id: 'manual-cargos',
@@ -16,7 +54,8 @@ export const MODULOS_GESTION_HUMANA: PortalModule[] = [
     descripcion: 'Fichas y perfiles por competencias.',
     icono: BookOpen,
     enlace: 'cargos',
-    color: 'primary'
+    color: 'primary',
+    requierePermiso: 'cargos'
   },
   {
     id: 'estructura',
@@ -24,7 +63,8 @@ export const MODULOS_GESTION_HUMANA: PortalModule[] = [
     descripcion: 'Diseño y análisis jerárquico.',
     icono: Briefcase,
     enlace: 'estructura',
-    color: 'secondary'
+    color: 'secondary',
+    requierePermiso: 'estructura'
   },
   {
     id: 'evaluaciones',
@@ -32,7 +72,8 @@ export const MODULOS_GESTION_HUMANA: PortalModule[] = [
     descripcion: 'Gestión de competencias y rendimiento.',
     icono: ClipboardList,
     enlace: 'evaluaciones',
-    color: 'accent'
+    color: 'accent',
+    requierePermiso: 'evaluaciones'
   }
 ];
 
@@ -40,10 +81,12 @@ export const MODULOS_SST: PortalModule[] = [
   {
     id: 'sg-sst',
     titulo: 'Sistema SG-SST',
-    descripcion: 'Conformidad Res. 0312.',
+    descripcion: 'Conformidad Res. 0312 (21 Estándares).',
     icono: Shield,
     enlace: 'sst',
-    color: 'primary'
+    color: 'primary',
+    requierePermiso: 'sst',
+    badge: '21'
   },
   {
     id: 'indicadores-sst',
@@ -51,7 +94,9 @@ export const MODULOS_SST: PortalModule[] = [
     descripcion: 'Seguimiento PHVA y métricas.',
     icono: BarChart3,
     enlace: 'indicadores-sst',
-    color: 'secondary'
+    color: 'secondary',
+    requierePermiso: 'indicadores-sst',
+    badge: 'PHVA'
   },
   {
     id: 'matriz-riesgos',
@@ -59,7 +104,9 @@ export const MODULOS_SST: PortalModule[] = [
     descripcion: 'Mapeo GTC 45 y control.',
     icono: Building2,
     enlace: 'matriz-gtc45',
-    color: 'accent'
+    color: 'accent',
+    requierePermiso: 'matriz-gtc45',
+    badge: 'GTC 45'
   },
   {
     id: 'examenes',
@@ -67,16 +114,216 @@ export const MODULOS_SST: PortalModule[] = [
     descripcion: 'Seguimiento ocupacional y salud.',
     icono: FileCheck2,
     enlace: 'sst-examenes',
-    color: 'primary'
+    color: 'success',
+    requierePermiso: 'sst-examenes'
+  },
+  {
+    id: 'epps',
+    titulo: 'Inventario de EPPs',
+    descripcion: 'Gestión de equipos de protección.',
+    icono: HardHat,
+    enlace: 'epps',
+    color: 'warning',
+    requierePermiso: 'epps',
+    badge: 'Almacén'
+  },
+  {
+    id: 'votaciones-sst',
+    titulo: 'Votaciones & Comités',
+    descripcion: 'COPASST y participación SST.',
+    icono: Vote,
+    enlace: 'votaciones-sst',
+    color: 'primary',
+    requierePermiso: 'votaciones-sst',
+    badge: 'COPASST'
   }
 ];
 
-export function getVisiblePortalModules(role?: string) {
-  const normalizedRole = role || 'admin';
-  const adminRoles = ['admin', 'superadmin', 'admin_gh', 'lider_area', 'responsable_sst'];
+export const MODULOS_FINANZAS_COMPENSACION: PortalModule[] = [
+  {
+    id: 'nomina',
+    titulo: 'Nómina y Prestaciones',
+    descripcion: 'Gestión de liquidación y pagos.',
+    icono: Receipt,
+    enlace: 'nomina',
+    color: 'primary',
+    requierePermiso: 'nomina',
+    esAdmin: true
+  },
+  {
+    id: 'parametros-nomina',
+    titulo: 'Parámetros de Nómina',
+    descripcion: 'Configuración SMMLV y variables.',
+    icono: Scale,
+    enlace: 'parametros-nomina',
+    color: 'secondary',
+    requierePermiso: 'parametros-nomina',
+    esAdmin: true,
+    badge: 'SMMLV'
+  },
+  {
+    id: 'saldos-iniciales',
+    titulo: 'Saldos Iniciales',
+    descripcion: 'Carga masiva de datos iniciales.',
+    icono: Database,
+    enlace: 'saldos-iniciales',
+    color: 'accent',
+    requierePermiso: 'saldos-iniciales',
+    esAdmin: true,
+    badge: 'Carga'
+  },
+  {
+    id: 'vacaciones',
+    titulo: 'Control de Vacaciones',
+    descripcion: 'Gestión de descansos y derechos.',
+    icono: Palmtree,
+    enlace: 'vacaciones',
+    color: 'success',
+    requierePermiso: 'vacaciones',
+    badge: 'Art. 186'
+  }
+];
+
+export const MODULOS_DOCUMENTOS_GOBERNANZA: PortalModule[] = [
+  {
+    id: 'documentos',
+    titulo: 'Documentos Institucionales',
+    descripcion: 'Repositorio y generador de documentos.',
+    icono: FileText,
+    enlace: 'documentos',
+    color: 'primary',
+    requierePermiso: 'documentos',
+    esAdmin: true
+  },
+  {
+    id: 'verificar-certificados',
+    titulo: 'Verificar Certificados',
+    descripcion: 'Auditoría de autenticidad documental.',
+    icono: QrCode,
+    enlace: 'verificar-certificados',
+    color: 'warning',
+    requierePermiso: 'documentos',
+    esAdmin: true,
+    badge: 'QR'
+  },
+  {
+    id: 'firma-digital',
+    titulo: 'Estudio de Firma Digital',
+    descripcion: 'Herramienta institucional de firmas.',
+    icono: PenTool,
+    enlace: 'firma-digital',
+    color: 'accent',
+    requierePermiso: 'documentos',
+    esAdmin: true,
+    badge: 'Ley 527'
+  }
+];
+
+export const MODULOS_ADMINISTRACION: PortalModule[] = [
+  {
+    id: 'usuarios',
+    titulo: 'Gestión de Usuarios',
+    descripcion: 'Control de acceso y permisos.',
+    icono: UserCog,
+    enlace: 'usuarios',
+    color: 'primary',
+    requierePermiso: 'usuarios',
+    esAdmin: true,
+    badge: 'RBAC'
+  },
+  {
+    id: 'buzon-correo',
+    titulo: 'Buzón de Notificaciones',
+    descripcion: 'Configuración SMTP y envíos.',
+    icono: Mail,
+    enlace: 'buzon-correo',
+    color: 'secondary',
+    requierePermiso: 'buzon-correo',
+    esAdmin: true,
+    badge: 'SMTP'
+  },
+  {
+    id: 'auditoria',
+    titulo: 'Auditoría & Trazabilidad',
+    descripcion: 'Libro Mayor Inmutable (DIAN/CST).',
+    icono: Lock,
+    enlace: 'auditoria',
+    color: 'danger',
+    requierePermiso: 'auditoria',
+    esAdmin: true,
+    badge: 'Audit'
+  }
+];
+
+export const MODULOS_CAPACITACION: PortalModule[] = [
+  {
+    id: 'capacitaciones',
+    titulo: 'Capacitaciones',
+    descripcion: 'Programa de formación y desarrollo.',
+    icono: GraduationCap,
+    enlace: 'capacitaciones',
+    color: 'primary',
+    requierePermiso: 'capacitaciones',
+    badge: '2026'
+  }
+];
+
+export const MODULOS_SOLICITUDES: PortalModule[] = [
+  {
+    id: 'solicitudes',
+    titulo: 'Solicitudes',
+    descripcion: 'Permisos, licencias y certificados.',
+    icono: ClipboardList,
+    enlace: 'solicitudes',
+    color: 'primary',
+    requierePermiso: 'solicitudes'
+  }
+];
+
+export interface PortalModulosPorRol {
+  gestionHumana: PortalModule[];
+  sst: PortalModule[];
+  finanzas: PortalModule[];
+  documentos: PortalModule[];
+  administracion: PortalModule[];
+  capacitacion: PortalModule[];
+  solicitudes: PortalModule[];
+}
+
+export function getVisiblePortalModules(
+  role: RolSistema = 'empleado',
+  permisos: string[] = []
+): PortalModulosPorRol {
+  const esAdmin = ['admin', 'superadmin', 'admin_gh'].includes(role);
+  const esSST = role === 'responsable_sst' || esAdmin;
+  const esLider = role === 'lider_area' || esAdmin;
+  const esEmpleado = role === 'empleado';
+
+  // Filtrar módulos por rol y permisos
+  const filtrarModulos = (modulos: PortalModule[]): PortalModule[] => {
+    return modulos.filter((mod) => {
+      // Si requiere admin y no lo es
+      if (mod.esAdmin && !esAdmin) return false;
+
+      // Si tiene roles autorizados específicos
+      if (mod.rolesAutorizados && !mod.rolesAutorizados.includes(role)) return false;
+
+      // Si requiere permiso específico
+      if (mod.requierePermiso && !esAdmin) {
+        return permisos.includes(mod.requierePermiso);
+      }
+
+      return true;
+    });
+  };
 
   return {
-    gestionHumana: MODULOS_GESTION_HUMANA,
-    sst: adminRoles.includes(normalizedRole) ? MODULOS_SST : []
+    gestionHumana: filtrarModulos(MODULOS_GESTION_HUMANA),
+    sst: esSST ? filtrarModulos(MODULOS_SST) : [],
+    finanzas: esAdmin ? filtrarModulos(MODULOS_FINANZAS_COMPENSACION) : [],
+    documentos: esAdmin || esLider ? filtrarModulos(MODULOS_DOCUMENTOS_GOBERNANZA) : [],
+    administracion: esAdmin ? filtrarModulos(MODULOS_ADMINISTRACION) : [],
+    capacitacion: filtrarModulos(MODULOS_CAPACITACION),
+    solicitudes: filtrarModulos(MODULOS_SOLICITUDES)
   };
 }
