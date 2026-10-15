@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { EvaluacionDesempeno, Empleado, Cargo, EstadoEvaluacion, Role, UsuarioSistema } from '../types';
 import {
   Award,
@@ -51,8 +51,7 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
   const syncContext = useCompanySyncOptional();
   const empresa = syncContext?.empresa;
 
-  const esEmpleado = userRole === 'empleado';
-  const effectiveEmpleadoId = currentEmpleadoId || currentUser?.empleadoId || '';
+  const esEmpleado = userRole === 'empleado' || currentUser?.rol === 'empleado';
 
   // Filters
   const [filterEstado, setFilterEstado] = useState<string>('TODOS');
@@ -61,15 +60,29 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
   const getEmpleado = (id: string) => empleados.find(e => e.id === id);
   const getCargo = (id: string) => cargos.find(c => c.id === id);
 
-  // Filtered evaluations: if employee, filter to own evaluations
-  const baseEvaluaciones = esEmpleado && effectiveEmpleadoId
-    ? evaluaciones.filter(ev => {
-        if (ev.empleadoId === effectiveEmpleadoId) return true;
-        const emp = getEmpleado(ev.empleadoId);
-        if (currentUser?.email && emp?.email === currentUser.email) return true;
-        return false;
-      })
-    : evaluaciones;
+  const currentEmp = useMemo(() => {
+    return (
+      empleados.find(e => currentEmpleadoId && e.id === currentEmpleadoId) ||
+      empleados.find(e => currentUser?.empleadoId && e.id === currentUser.empleadoId) ||
+      empleados.find(e => currentUser?.email && e.email?.toLowerCase().trim() === currentUser.email?.toLowerCase().trim()) ||
+      empleados.find(e => currentUser?.documento && (e.documento === currentUser.documento || e.persona?.numeroDocumento === currentUser.documento)) ||
+      (esEmpleado && empleados.length > 0 ? empleados[0] : null)
+    );
+  }, [empleados, currentEmpleadoId, currentUser, esEmpleado]);
+
+  // Filtered evaluations: if employee, strictly filter to own evaluations only
+  const baseEvaluaciones = useMemo(() => {
+    if (!esEmpleado) return evaluaciones;
+    return evaluaciones.filter(ev => {
+      if (currentEmp && ev.empleadoId === currentEmp.id) return true;
+      if (currentEmpleadoId && ev.empleadoId === currentEmpleadoId) return true;
+      if (currentUser?.empleadoId && ev.empleadoId === currentUser.empleadoId) return true;
+      const emp = getEmpleado(ev.empleadoId);
+      if (currentUser?.email && emp?.email?.toLowerCase().trim() === currentUser.email?.toLowerCase().trim()) return true;
+      if (currentUser?.documento && (emp?.documento === currentUser.documento || emp?.persona?.numeroDocumento === currentUser.documento)) return true;
+      return false;
+    });
+  }, [evaluaciones, esEmpleado, currentEmp, currentEmpleadoId, currentUser, empleados]);
 
   const filtered = baseEvaluaciones.filter(ev => {
     const emp = getEmpleado(ev.empleadoId);
@@ -112,15 +125,17 @@ export const EvaluacionesAdminView: React.FC<EvaluacionesAdminViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setReporteConsolidadoModalOpen(true)}
-            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-[#18235C] border border-[#8FA7D6] text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors whitespace-nowrap cursor-pointer"
-            title="Generar e imprimir informe consolidado en PDF con formato institucional para líderes"
-          >
-            <FileDown className="w-4 h-4 text-emerald-600" />
-            <span>Reporte Consolidado PDF</span>
-          </button>
+          {!esEmpleado && (
+            <button
+              type="button"
+              onClick={() => setReporteConsolidadoModalOpen(true)}
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-[#18235C] border border-[#8FA7D6] text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors whitespace-nowrap cursor-pointer"
+              title="Generar e imprimir informe consolidado en PDF con formato institucional para líderes"
+            >
+              <FileDown className="w-4 h-4 text-emerald-600" />
+              <span>Reporte Consolidado PDF</span>
+            </button>
+          )}
 
           {!esEmpleado && (
             <button

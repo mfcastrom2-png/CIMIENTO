@@ -55,14 +55,15 @@ interface ExpedienteDigitalViewProps {
   currentUser?: UsuarioSistema | null;
   solicitudes?: Solicitud[];
   evaluaciones?: EvaluacionDesempeno[];
-  onVolver: () => void;
-  onEditar: (emp: Empleado) => void;
-  onGestionarEstado: (emp: Empleado) => void;
+  onVolver?: () => void;
+  onEditar?: (emp: Empleado) => void;
+  onGestionarEstado?: (emp: Empleado) => void;
   onEliminar?: (emp: Empleado) => void;
   onActualizarEmpleado?: (emp: Empleado) => Promise<void> | void;
   onVincularUsuario?: (emp: Empleado) => void;
   usuarioVinculado?: UsuarioSistema | null;
   initialTab?: string;
+  esEmpleado?: boolean;
 }
 
 export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
@@ -81,8 +82,10 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
   onActualizarEmpleado,
   onVincularUsuario,
   usuarioVinculado,
-  initialTab = 'general'
+  initialTab = 'general',
+  esEmpleado = false
 }) => {
+  const esColaborador = esEmpleado || currentUser?.rol === 'empleado';
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [docModalPreview, setDocModalPreview] = useState<DocumentoExpedienteEmpleado | null>(null);
   const [modalSubirDoc, setModalSubirDoc] = useState(false);
@@ -170,17 +173,17 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
   const tabs = [
     { id: 'general', label: '1. Identificación', icon: User },
     { id: 'contacto', label: '2. Contacto & Residencia', icon: MapPin },
-    { id: 'laboral', label: '3. Información Laboral', icon: Briefcase },
-    { id: 'estructura', label: '4. Cargo & Estructura', icon: Layers },
-    { id: 'compensacion', label: '5. Compensación', icon: DollarSign },
-    { id: 'seguridadSocial', label: '6. Seguridad Social', icon: ShieldCheck },
+    { id: 'laboral', label: '3. Vinculación Laboral & Contrato', icon: Briefcase },
+    { id: 'estructura', label: '4. Cargo & Estructura Orgánica', icon: Layers },
+    { id: 'compensacion', label: '5. Compensación & Pagos', icon: DollarSign },
+    { id: 'seguridadSocial', label: '6. Seguridad Social Integral', icon: ShieldCheck },
     { id: 'saldosIniciales', label: '7. Saldos Iniciales / Empalme', icon: Database },
     { id: 'academica', label: '8. Formación Académica', icon: GraduationCap },
-    { id: 'experiencia', label: '8. Experiencia Laboral', icon: History },
-    { id: 'sst', label: '9. Información SST', icon: HardHat },
-    { id: 'documentos', label: `10. Documentos (${(empleado.documentos || []).length})`, icon: FileText },
-    { id: 'historial', label: `Historial Laboral (${(empleado.historialLaboral || []).length})`, icon: Clock },
-    { id: 'solicitudes', label: `Solicitudes (${solicitudes.length})`, icon: Calendar }
+    { id: 'experiencia', label: '9. Experiencia Laboral', icon: History },
+    { id: 'sst', label: '10. Información SST (SG-SST)', icon: HardHat },
+    { id: 'documentos', label: `11. Documentos (${(empleado.documentos || []).length})`, icon: FileText },
+    { id: 'historial', label: `12. Bitácora Laboral (${(empleado.historialLaboral || []).length})`, icon: Clock },
+    { id: 'solicitudes', label: `13. Solicitudes (${solicitudes.length})`, icon: Calendar }
   ];
 
   return (
@@ -189,13 +192,15 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
       <div className="bg-white rounded-xl border border-[#8FA7D6] p-5 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
-            <button
-              onClick={onVolver}
-              className="p-2.5 rounded-lg border border-[#8FA7D6] bg-[#F8FAFC] hover:bg-white text-[#18235C] transition-colors cursor-pointer"
-              title="Volver a la Gestión de Empleados"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
+            {onVolver && !esColaborador && (
+              <button
+                onClick={onVolver}
+                className="p-2.5 rounded-lg border border-[#8FA7D6] bg-[#F8FAFC] hover:bg-white text-[#18235C] transition-colors cursor-pointer"
+                title="Volver a la Gestión de Empleados"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
 
             <div className="flex items-center gap-3.5">
               {empleado.persona?.fotoUrl ? (
@@ -219,6 +224,11 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                     {empleado.codigo || empleado.codigoInterno || 'S/C'}
                   </span>
                   {estadoBadge()}
+                  {esColaborador && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#18235C] text-[#00FF00] border border-[#00FF00]/40">
+                      Mi Expediente Digital
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-[#282829] mt-0.5">
                   <span className="font-semibold text-[#18235C]">{cargoNombre}</span> · Área: <span className="font-semibold">{areaNombre}</span> · Documento: <span className="font-mono font-semibold">{empleado.persona?.tipoDocumento || empleado.tipoDocumento || 'CC'} {empleado.documento}</span>
@@ -229,28 +239,33 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
 
           {/* Acciones principales */}
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => onEditar(empleado)}
-              className="px-3.5 py-1.5 rounded-lg bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-            >
-              <Edit className="w-3.5 h-3.5 text-[#8FA7D6]" />
-              <span>Editar Expediente</span>
-            </button>
+            {!esColaborador && onEditar && (
+              <button
+                onClick={() => onEditar(empleado)}
+                className="px-3.5 py-1.5 rounded-lg bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              >
+                <Edit className="w-3.5 h-3.5 text-[#8FA7D6]" />
+                <span>Editar Expediente</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => onGestionarEstado(empleado)}
-              className="px-3 py-1.5 rounded-lg border border-[#8FA7D6] bg-white hover:bg-slate-50 text-[#18235C] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-            >
-              <Power className="w-3.5 h-3.5 text-amber-600" />
-              <span>Gestionar Estado</span>
-            </button>
+            {!esColaborador && onGestionarEstado && (
+              <button
+                onClick={() => onGestionarEstado(empleado)}
+                className="px-3 py-1.5 rounded-lg border border-[#8FA7D6] bg-white hover:bg-slate-50 text-[#18235C] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              >
+                <Power className="w-3.5 h-3.5 text-amber-600" />
+                <span>Gestionar Estado</span>
+              </button>
+            )}
 
             <button
               onClick={() => window.print()}
-              className="p-1.5 rounded-lg border border-[#8FA7D6] bg-white hover:bg-slate-50 text-[#18235C] transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-[#8FA7D6] bg-white hover:bg-slate-50 text-[#18235C] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               title="Imprimir Expediente Digital"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className="w-4 h-4 text-[#18235C]" />
+              <span>Imprimir Expediente</span>
             </button>
           </div>
         </div>
@@ -474,20 +489,50 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
             <h3 className="font-bold text-base text-[#18235C] border-b border-slate-200 pb-2">
               Expediente Digital – Pestaña 4: Cargo y Estructura Organizacional
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Cargo Vigente:</span>
-                <span className="text-[#18235C] font-bold text-sm">{cargoNombre}</span>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Área / Dependencia:</span>
-                <span className="text-slate-800 font-bold">{areaNombre}</span>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Jefe Inmediato:</span>
-                <span className="text-slate-800 font-bold">{empleado.laboral?.jefeInmediatoNombre || 'Dirección de Operaciones'}</span>
-              </div>
-            </div>
+            {(() => {
+              const cargoObj = cargos.find(c => c.id === empleado.cargoId);
+              return (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Código Ficha Cargo:</span>
+                      <span className="text-[#18235C] font-mono font-bold text-sm">
+                        {cargoObj?.ficha?.identificacion?.codigo || 'CAR-001'} (v{cargoObj?.ficha?.identificacion?.version || '1.0'})
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Nivel Jerárquico:</span>
+                      <span className="text-[#18235C] font-bold text-sm">
+                        {empleado.laboral?.nivelJerarquico || 'Operativo / Técnico'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Subárea o Sección:</span>
+                      <span className="text-slate-800 font-bold">
+                        {empleado.laboral?.subarea || 'Operaciones de Red FTTH'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <span className="text-slate-500 block font-semibold">Jefe Inmediato:</span>
+                      <span className="text-slate-800 font-bold">
+                        {empleado.laboral?.jefeInmediatoNombre || 'Dirección de Operaciones'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {cargoObj?.ficha?.proposito && (
+                    <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs space-y-1">
+                      <span className="font-bold text-[#18235C] block text-[11px] uppercase tracking-wider">
+                        Propósito / Misión Oficial del Cargo (Manual Institucional):
+                      </span>
+                      <p className="text-slate-700 italic leading-relaxed">
+                        {cargoObj.ficha.proposito}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Historial de Cargos */}
             <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
@@ -805,11 +850,11 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
           </div>
         )}
 
-        {/* TAB 7: INFORMACIÓN ACADÉMICA */}
+        {/* TAB 8: INFORMACIÓN ACADÉMICA */}
         {activeTab === 'academica' && (
           <div className="space-y-4">
             <h3 className="font-bold text-base text-[#18235C] border-b border-slate-200 pb-2">
-              Expediente Digital – Pestaña 7: Formación Académica y Títulos
+              Expediente Digital – Pestaña 8: Formación Académica y Títulos
             </h3>
             {(empleado.estudios || []).length === 0 ? (
               <div className="p-4 bg-slate-50 rounded-lg text-center text-slate-500 text-xs">
@@ -853,11 +898,11 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
           </div>
         )}
 
-        {/* TAB 8: EXPERIENCIA LABORAL */}
+        {/* TAB 9: EXPERIENCIA LABORAL */}
         {activeTab === 'experiencia' && (
           <div className="space-y-4">
             <h3 className="font-bold text-base text-[#18235C] border-b border-slate-200 pb-2">
-              Expediente Digital – Pestaña 8: Experiencia Laboral y Trayectoria
+              Expediente Digital – Pestaña 9: Experiencia Laboral y Trayectoria
             </h3>
             {(empleado.experiencias || []).length === 0 ? (
               <div className="p-4 bg-slate-50 rounded-lg text-center text-slate-500 text-xs">
@@ -898,11 +943,11 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
           </div>
         )}
 
-        {/* TAB 9: INFORMACIÓN SST */}
+        {/* TAB 10: INFORMACIÓN SST */}
         {activeTab === 'sst' && (
           <div className="space-y-4">
             <h3 className="font-bold text-base text-[#18235C] border-b border-slate-200 pb-2 flex items-center justify-between">
-              <span>Expediente Digital – Pestaña 9: Seguridad y Salud en el Trabajo (SG-SST)</span>
+              <span>Expediente Digital – Pestaña 10: Seguridad y Salud en el Trabajo (SG-SST)</span>
               <span className="text-[11px] font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
                 Confidencialidad Médica (Res. 2346/2007)
               </span>
@@ -948,12 +993,12 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
           </div>
         )}
 
-        {/* TAB 10: DOCUMENTOS */}
+        {/* TAB 11: DOCUMENTOS */}
         {activeTab === 'documentos' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2">
               <h3 className="font-bold text-base text-[#18235C]">
-                Expediente Digital – Pestaña 10: Repositorio de Documentos
+                Expediente Digital – Pestaña 11: Repositorio de Documentos Digitales
               </h3>
               <button
                 type="button"
@@ -1051,11 +1096,11 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
           </div>
         )}
 
-        {/* TAB 11: HISTORIAL LABORAL */}
+        {/* TAB 12: HISTORIAL LABORAL */}
         {activeTab === 'historial' && (
           <div className="space-y-4">
             <h3 className="font-bold text-base text-[#18235C] border-b border-slate-200 pb-2 flex items-center justify-between">
-              <span>Expediente Digital – Historial Laboral y Bitácora de Eventos</span>
+              <span>Expediente Digital – Pestaña 12: Bitácora de Eventos e Historial Laboral</span>
               <span className="text-[11px] font-semibold text-slate-500">Inmutable · Auditoría Permanente</span>
             </h3>
 
@@ -1081,12 +1126,12 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
           </div>
         )}
 
-        {/* TAB 12: SOLICITUDES & EVALUACIONES */}
+        {/* TAB 13: SOLICITUDES & EVALUACIONES */}
         {activeTab === 'solicitudes' && (
           <div className="space-y-6">
             <div>
               <h3 className="font-bold text-base text-[#18235C] border-b border-slate-200 pb-2 mb-3">
-                Solicitudes y Novedades del Colaborador
+                Expediente Digital – Pestaña 13: Solicitudes y Novedades del Colaborador
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">

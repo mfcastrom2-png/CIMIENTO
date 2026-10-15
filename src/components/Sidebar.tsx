@@ -30,7 +30,8 @@ import {
   Database,
   QrCode,
   PenTool,
-  ArrowRight
+  ArrowRight,
+  ClipboardList
 } from 'lucide-react';
 import { Role, UsuarioSistema, RolSistema, ConfiguracionEmpresa } from '../types';
 import { CorporateLogo } from './CorporateLogo';
@@ -67,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const permisos = currentUser?.permisos || [];
 
   const tienePermiso = (modulo: string) => {
+    if (modulo === 'solicitudes' || modulo === 'incapacidades') return true;
     if (rolReal === 'empleado') {
       if (modulo === 'evaluaciones') return true;
       if (modulo === 'documentos') return false;
@@ -173,6 +175,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </>
         )}
 
+        {!esEmpleado && (
+          <>
+            <button
+              id="nav-solicitudes"
+              onClick={() => onNavigate('solicitudes')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'solicitudes'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <ClipboardList className={`w-4 h-4 shrink-0 ${currentView === 'solicitudes' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                <span className="truncate">Solicitudes & Permisos</span>
+              </div>
+              {pendingRequestsCount > 0 && (
+                <span
+                  id="badge-solicitudes-pendientes"
+                  className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-[#00FF00] text-[#18235C] shadow-2xs animate-pulse"
+                  title={`${pendingRequestsCount} solicitud(es) pendientes por aprobar`}
+                >
+                  {pendingRequestsCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              id="nav-incapacidades"
+              onClick={() => onNavigate('incapacidades')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'incapacidades' || currentView === 'control-incapacidades'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <Stethoscope className={`w-4 h-4 shrink-0 ${currentView === 'incapacidades' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                <span className="truncate">Control de Incapacidades</span>
+              </div>
+              <span
+                className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-400/20 text-[#FDE68A]"
+                title="Normatividad CST & Ausentismo Res. 0312"
+              >
+                CST
+              </span>
+            </button>
+          </>
+        )}
+
         {esEmpleado && (
           <>
             {(tienePermiso('nomina') || tienePermiso('epps') || tienePermiso('solicitudes') || tienePermiso('vacaciones')) && (
@@ -180,6 +231,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 Mis Servicios & Pagos
               </div>
             )}
+
+            <button
+              id="nav-solicitudes-empleado"
+              onClick={() => onNavigate('solicitudes')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'solicitudes'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <ClipboardList className={`w-4 h-4 shrink-0 ${currentView === 'solicitudes' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+                <span className="truncate">Mis Solicitudes</span>
+              </div>
+              {pendingRequestsCount > 0 && (
+                <span
+                  id="badge-solicitudes-pendientes-emp"
+                  className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-[#00FF00] text-[#18235C] shadow-2xs"
+                  title={`${pendingRequestsCount} en revisión`}
+                >
+                  {pendingRequestsCount}
+                </span>
+              )}
+            </button>
 
             {tienePermiso('nomina') && (
               <button
@@ -195,6 +270,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span>Mi Desprendible de Pago</span>
               </button>
             )}
+
+            <div className="text-[11px] font-bold text-[#8FA7D6] uppercase tracking-wider px-3 pt-3 pb-1">
+              Mi Gestión Humana
+            </div>
+
+            <button
+              id="nav-expediente-empleado"
+              onClick={() => onNavigate('empleados')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'empleados'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <Users className={`w-4 h-4 ${currentView === 'empleados' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+              <span>Mi Expediente Digital</span>
+            </button>
+
+            <button
+              id="nav-cargos-empleado"
+              onClick={() => onNavigate('cargos')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'cargos'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <BookOpen className={`w-4 h-4 ${currentView === 'cargos' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+              <span>Mi Manual de Cargo</span>
+            </button>
+
+            <button
+              id="nav-evaluaciones-empleado"
+              onClick={() => onNavigate('evaluaciones')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                currentView === 'evaluaciones'
+                  ? 'bg-[#8FA7D6] text-[#18235C] font-bold shadow-xs'
+                  : 'text-white/90 hover:bg-[#8FA7D6]/15 hover:text-white'
+              }`}
+            >
+              <Award className={`w-4 h-4 ${currentView === 'evaluaciones' ? 'text-[#18235C]' : 'text-[#8FA7D6]'}`} />
+              <span>Mi Evaluación de Desempeño</span>
+            </button>
 
             <button
               id="nav-firma-digital-empleado"

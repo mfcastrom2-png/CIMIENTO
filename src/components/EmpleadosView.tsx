@@ -411,7 +411,60 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
     );
   };
 
-  // Si hay un empleado seleccionado, mostramos su expediente digital completo
+  const esEmpleado = userRole === 'empleado' || currentUser?.rol === 'empleado';
+
+  const currentEmpleadoPersonal = useMemo(() => {
+    return (
+      empleados.find(e => currentUser?.empleadoId && e.id === currentUser.empleadoId) ||
+      empleados.find(e => currentUser?.documento && (e.documento === currentUser.documento || e.persona?.numeroDocumento === currentUser.documento)) ||
+      empleados.find(e => currentUser?.email && e.email && e.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+      empleados.find(e => currentUser?.email && e.contacto?.correoPersonal && e.contacto.correoPersonal.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+      empleados.find(e => currentUser?.email && e.contacto?.correoCorporativo && e.contacto.correoCorporativo.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+      (esEmpleado && empleados.length > 0 ? empleados[0] : null)
+    );
+  }, [empleados, currentUser, esEmpleado]);
+
+  // Si el usuario es colaborador/empleado, solo tiene acceso estricto a su información y expediente personal
+  if (esEmpleado) {
+    if (!currentEmpleadoPersonal) {
+      return (
+        <div className="max-w-2xl mx-auto my-12 p-8 bg-white rounded-2xl border border-[#8FA7D6]/40 shadow-sm text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-[#18235C]">
+            <Users className="w-8 h-8 text-[#8FA7D6]" />
+          </div>
+          <h2 className="text-xl font-bold text-[#18235C]">Expediente Digital No Vinculado</h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Tu usuario institucional no cuenta actualmente con un expediente digital vinculado en el censo laboral de la empresa. Por favor comunícate con la Dirección de Gestión Humana para vincular tu información laboral y contractual.
+          </p>
+        </div>
+      );
+    }
+
+    const usuarioVinculado = (usuarios || []).find(
+      u => u.empleadoId === currentEmpleadoPersonal.id ||
+           (u.email && currentEmpleadoPersonal.email && u.email.toLowerCase() === currentEmpleadoPersonal.email.toLowerCase()) ||
+           (u.documento && currentEmpleadoPersonal.documento && u.documento === currentEmpleadoPersonal.documento)
+    ) || currentUser;
+
+    return (
+      <ExpedienteDigitalView
+        empleado={currentEmpleadoPersonal}
+        cargos={cargosUnicos}
+        empresa={empresa}
+        centrosTrabajo={centrosTrabajo || empresa?.centrosTrabajo}
+        areas={areas}
+        currentUser={currentUser}
+        solicitudes={solicitudes.filter(s => s.empleadoId === currentEmpleadoPersonal.id)}
+        evaluaciones={evaluaciones.filter(ev => ev.empleadoId === currentEmpleadoPersonal.id)}
+        usuarioVinculado={usuarioVinculado}
+        initialTab={initialExpedienteTab}
+        esEmpleado={true}
+        onActualizarEmpleado={onUpdateEmpleado}
+      />
+    );
+  }
+
+  // Si hay un empleado seleccionado (vista administrador), mostramos su expediente digital completo
   const currentEmpleadoSeleccionado = empleados.find(e => e.id === selectedEmpleadoId);
   if (currentEmpleadoSeleccionado) {
     const usuarioVinculado = (usuarios || []).find(

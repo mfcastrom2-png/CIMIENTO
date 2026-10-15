@@ -48,8 +48,19 @@ import {
   AlertOctagon,
   Sparkles,
   ClipboardList,
-  Award
+  Award,
+  Stethoscope,
+  RefreshCw,
+  ArrowRight,
+  ExternalLink,
+  FileSpreadsheet,
+  TrendingDown
 } from 'lucide-react';
+import {
+  getStoredIncapacidades,
+  calcularAusentismoMes,
+  ResumenAusentismoMes
+} from '../data/incapacidadesData';
 
 interface IndicadoresSstViewProps {
   cargos?: Cargo[];
@@ -69,7 +80,8 @@ export function IndicadoresSstView({
   areas = [],
   procesos = [],
   empleados = [],
-  userRole = 'admin'
+  userRole = 'admin',
+  onNavigate
 }: IndicadoresSstViewProps) {
   const syncContext = useCompanySyncOptional();
   const empresa = syncContext?.empresa;
@@ -77,18 +89,45 @@ export function IndicadoresSstView({
   const nitCompleto = empresa?.nit ? `NIT ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : '';
 
   // Tab activo
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'catalogo' | 'mediciones' | 'acciones' | 'normativa'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'catalogo' | 'ausentismo' | 'mediciones' | 'acciones' | 'normativa'>('dashboard');
 
   // Listas de datos principales
   const [indicadores, setIndicadores] = useState<IndicadorSST[]>(() => {
+    let lista: IndicadorSST[] = [];
     try {
       const guardado = localStorage.getItem(STORAGE_KEY_INDICADORES);
       if (guardado) {
         const parsed = JSON.parse(guardado);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          lista = parsed;
+        }
       }
     } catch {}
-    return [];
+
+    if (lista.length === 0) {
+      lista = PLANTILLA_INDICADORES_NORMATIVOS_0312.map((p, idx) => ({
+        ...p,
+        id: `ind_norm_${idx + 1}`
+      }));
+    } else {
+      // Asegurar que IND-RES-04 (Ausentismo Laboral por Causa Médica) esté incluido
+      const tieneAusentismo = lista.some(
+        i => i.codigo === 'IND-RES-04' || i.nombre.toLowerCase().includes('ausentismo')
+      );
+      if (!tieneAusentismo) {
+        const plantAus = PLANTILLA_INDICADORES_NORMATIVOS_0312.find(p => p.codigo === 'IND-RES-04');
+        if (plantAus) {
+          lista = [
+            ...lista,
+            {
+              ...plantAus,
+              id: `ind_norm_ausentismo_${Date.now()}`
+            }
+          ];
+        }
+      }
+    }
+    return lista;
   });
 
   const [mediciones, setMediciones] = useState<MedicionIndicadorSST[]>(() => {
@@ -113,6 +152,56 @@ export function IndicadoresSstView({
     return [];
   });
 
+  // Integración de Ausentismo con Módulo de Control de Incapacidades
+  const [mesFiltroAusentismo, setMesFiltroAusentismo] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const [diasLaborablesMesConfig, setDiasLaborablesMesConfig] = useState<number>(24);
+
+  const [incapacidadesList, setIncapacidadesList] = useState(() => getStoredIncapacidades());
+
+  useEffect(() => {
+    const recargarIncap = () => setIncapacidadesList(getStoredIncapacidades());
+    window.addEventListener('incapacidades_updated', recargarIncap);
+    return () => window.removeEventListener('incapacidades_updated', recargarIncap);
+  }, []);
+
+  const numTrabajadoresActivos = useMemo(() => {
+    return empleados.filter(e => e.activo !== false).length || 6;
+  }, [empleados]);
+
+  const indicadorAusentismoCatalogo = useMemo(() => {
+    return indicadores.find(
+      i => i.codigo === 'IND-RES-04' || i.nombre.toLowerCase().includes('ausentismo')
+    );
+  }, [indicadores]);
+
+  const resumenAusentismoMesActual = useMemo(() => {
+    return calcularAusentismoMes(
+      incapacidadesList,
+      mesFiltroAusentismo,
+      numTrabajadoresActivos,
+      diasLaborablesMesConfig
+    );
+  }, [incapacidadesList, mesFiltroAusentismo, numTrabajadoresActivos, diasLaborablesMesConfig]);
+
+  const historialAusentismoReciente = useMemo(() => {
+    const periodos = ['2026-01', '2026-02', '2026-03', '2026-04'];
+    return periodos.map(per => {
+      const res = calcularAusentismoMes(incapacidadesList, per, numTrabajadoresActivos, diasLaborablesMesConfig);
+      const medOficial = mediciones.find(
+        m => m.indicadorId === indicadorAusentismoCatalogo?.id && m.periodo === per
+      );
+      return {
+        periodo: per,
+        resumen: res,
+        medicion: medOficial
+      };
+    });
+  }, [incapacidadesList, numTrabajadoresActivos, diasLaborablesMesConfig, mediciones, indicadorAusentismoCatalogo]);
+
   // Persistencia local
   useEffect(() => {
     try {
@@ -131,6 +220,54 @@ export function IndicadoresSstView({
       localStorage.setItem(STORAGE_KEY_ACCIONES, JSON.stringify(acciones));
     } catch {}
   }, [acciones]);
+
+  // Auto-precargar mediciones históricas de ausentismo para 2026-02 y 2026-03 si no existen
+  useEffect(() => {
+    if (!indicadorAusentismoCatalogo) return;
+    const tieneAlgunaMedicion = mediciones.some(m => m.indicadorId === indicadorAusentismoCatalogo.id);
+    if (tieneAlgunaMedicion) return;
+
+    const periodos = ['2026-02', '2026-03'];
+    const nuevasMed: MedicionIndicadorSST[] = [];
+
+    periodos.forEach((per, idx) => {
+      const resAus = calcularAusentismoMes(incapacidadesList, per, numTrabajadoresActivos, 24);
+      if (resAus.totalDiasIncapacidad > 0) {
+        const calc = calcularResultadoMedicion(
+          resAus.totalDiasIncapacidad,
+          resAus.diasTrabajoProgramados,
+          100,
+          indicadorAusentismoCatalogo.meta,
+          indicadorAusentismoCatalogo.limiteAmarillo,
+          indicadorAusentismoCatalogo.sentido,
+          indicadorAusentismoCatalogo.unidadMedida
+        );
+
+        nuevasMed.push({
+          id: `med_aus_auto_${per}_${idx}`,
+          indicadorId: indicadorAusentismoCatalogo.id,
+          periodo: per,
+          fechaMedicion: `${per}-28`,
+          numeradorValor: resAus.totalDiasIncapacidad,
+          denominadorValor: resAus.diasTrabajoProgramados,
+          resultadoNumerico: calc.resultadoNumerico,
+          resultadoFormateado: calc.resultadoFormateado,
+          metaEsperada: indicadorAusentismoCatalogo.meta,
+          semaforo: calc.semaforo,
+          cumpleMeta: calc.cumpleMeta,
+          fuenteDatos: 'Módulo de Control de Incapacidades (Validación EPS/ARL)',
+          responsableMedicion: 'Responsable SG-SST / Gestión Humana',
+          observaciones: `Ausentismo calculado desde Incapacidades: ${resAus.totalDiasIncapacidad} días (${resAus.diasIncapacidadComun}d común, ${resAus.diasIncapacidadLaboral}d laboral). Colaboradores: ${resAus.colaboradoresAfectados.join(', ')}.`,
+          fechaRegistro: new Date().toISOString().slice(0, 10),
+          usuarioRegistro: 'Sistema SG-SST Integrado'
+        });
+      }
+    });
+
+    if (nuevasMed.length > 0) {
+      setMediciones(prev => [...nuevasMed, ...prev]);
+    }
+  }, [indicadorAusentismoCatalogo, incapacidadesList, numTrabajadoresActivos]);
 
   // Mensaje Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -391,15 +528,117 @@ export function IndicadoresSstView({
   // Abrir Modal de Registro de Medición
   const handleAbrirRegistrarMedicion = (indId?: string) => {
     const idToUse = indId || indicadores[0]?.id || '';
+    const ind = indicadores.find(i => i.id === idToUse);
+    const per = new Date().toISOString().slice(0, 7);
     setMedIndicadorId(idToUse);
-    setMedPeriodo(new Date().toISOString().slice(0, 7));
+    setMedPeriodo(per);
     setMedFecha(new Date().toISOString().slice(0, 10));
-    setMedNum('');
-    setMedDen('');
-    setMedFuente('Plan de Trabajo / Matriz de Registros SST');
-    setMedResp('Responsable SG-SST');
-    setMedObs('');
+
+    const esAus = ind && (ind.codigo === 'IND-RES-04' || ind.nombre.toLowerCase().includes('ausentismo'));
+    if (esAus) {
+      const resAus = calcularAusentismoMes(incapacidadesList, per, numTrabajadoresActivos, 24);
+      setMedNum(resAus.totalDiasIncapacidad);
+      setMedDen(resAus.diasTrabajoProgramados);
+      setMedFuente('Módulo de Control de Incapacidades (Validación EPS/ARL)');
+      setMedResp('Responsable SG-SST / Gestión Humana');
+      setMedObs(
+        `Ausentismo médico Res. 0312: ${resAus.totalDiasIncapacidad} días (${resAus.diasIncapacidadComun}d común, ${resAus.diasIncapacidadLaboral}d laboral) sobre ${resAus.diasTrabajoProgramados} días programados. Colaboradores: ${resAus.colaboradoresAfectados.join(', ') || 'Sin ausencias'}.`
+      );
+    } else {
+      setMedNum('');
+      setMedDen('');
+      setMedFuente('Plan de Trabajo / Matriz de Registros SST');
+      setMedResp('Responsable SG-SST');
+      setMedObs('');
+    }
     setModalMedicionOpen(true);
+  };
+
+  // Sincronizar o registrar medición oficial de ausentismo médico para el período
+  const handleSincronizarMedicionAusentismo = (periodoTarget?: string) => {
+    const per = periodoTarget || mesFiltroAusentismo;
+    if (!indicadorAusentismoCatalogo) {
+      showToast('No se encontró el indicador de Ausentismo en el catálogo.');
+      return;
+    }
+
+    const resAus = calcularAusentismoMes(incapacidadesList, per, numTrabajadoresActivos, diasLaborablesMesConfig);
+    const calc = calcularResultadoMedicion(
+      resAus.totalDiasIncapacidad,
+      resAus.diasTrabajoProgramados,
+      100,
+      indicadorAusentismoCatalogo.meta,
+      indicadorAusentismoCatalogo.limiteAmarillo,
+      indicadorAusentismoCatalogo.sentido,
+      indicadorAusentismoCatalogo.unidadMedida
+    );
+
+    const medExistente = mediciones.find(
+      m => m.indicadorId === indicadorAusentismoCatalogo.id && m.periodo === per
+    );
+
+    if (medExistente) {
+      setMediciones(prev => prev.map(m => m.id === medExistente.id ? {
+        ...m,
+        fechaMedicion: new Date().toISOString().slice(0, 10),
+        numeradorValor: resAus.totalDiasIncapacidad,
+        denominadorValor: resAus.diasTrabajoProgramados,
+        resultadoNumerico: calc.resultadoNumerico,
+        resultadoFormateado: calc.resultadoFormateado,
+        metaEsperada: indicadorAusentismoCatalogo.meta,
+        semaforo: calc.semaforo,
+        cumpleMeta: calc.cumpleMeta,
+        fuenteDatos: 'Módulo de Control de Incapacidades (Validación EPS/ARL)',
+        responsableMedicion: 'Responsable SG-SST / Gestión Humana',
+        observaciones: `Ausentismo calculado desde Incapacidades: ${resAus.totalDiasIncapacidad} días (${resAus.diasIncapacidadComun}d común, ${resAus.diasIncapacidadLaboral}d laboral). Colaboradores: ${resAus.colaboradoresAfectados.join(', ') || 'Sin ausentismo'}.`
+      } : m));
+      showToast(`Medición de Ausentismo del período ${per} actualizada (${calc.resultadoFormateado}).`);
+    } else {
+      const nueva: MedicionIndicadorSST = {
+        id: `med_aus_${per}_${Date.now()}`,
+        indicadorId: indicadorAusentismoCatalogo.id,
+        periodo: per,
+        fechaMedicion: new Date().toISOString().slice(0, 10),
+        numeradorValor: resAus.totalDiasIncapacidad,
+        denominadorValor: resAus.diasTrabajoProgramados,
+        resultadoNumerico: calc.resultadoNumerico,
+        resultadoFormateado: calc.resultadoFormateado,
+        metaEsperada: indicadorAusentismoCatalogo.meta,
+        semaforo: calc.semaforo,
+        cumpleMeta: calc.cumpleMeta,
+        fuenteDatos: 'Módulo de Control de Incapacidades (Validación EPS/ARL)',
+        responsableMedicion: 'Responsable SG-SST / Gestión Humana',
+        observaciones: `Ausentismo calculado desde Incapacidades: ${resAus.totalDiasIncapacidad} días (${resAus.diasIncapacidadComun}d común, ${resAus.diasIncapacidadLaboral}d laboral). Colaboradores: ${resAus.colaboradoresAfectados.join(', ') || 'Sin ausentismo'}.`,
+        fechaRegistro: new Date().toISOString().slice(0, 10),
+        usuarioRegistro: 'Sistema SG-SST Integrado'
+      };
+      setMediciones(prev => [nueva, ...prev]);
+      showToast(`Medición de Ausentismo del período ${per} registrada exitosamente (${calc.resultadoFormateado}).`);
+    }
+  };
+
+  const handleCrearAccionParaAusentismo = () => {
+    if (!indicadorAusentismoCatalogo) return;
+    setAccIndicadorId(indicadorAusentismoCatalogo.id);
+    setAccPeriodo(mesFiltroAusentismo);
+    setAccTipo('Correctiva');
+    setAccPrioridad('Alta');
+    setAccHallazgo(
+      `Para el período ${mesFiltroAusentismo}, se presentaron ${resumenAusentismoMesActual.totalDiasIncapacidad} días de incapacidad médica (${resumenAusentismoMesActual.diasIncapacidadComun}d común, ${resumenAusentismoMesActual.diasIncapacidadLaboral}d laboral) sobre ${resumenAusentismoMesActual.diasTrabajoProgramados} días programados, generando una tasa de ausentismo del ${resumenAusentismoMesActual.tasaAusentismoPct}%. Diagnósticos: ${resumenAusentismoMesActual.eventosDetalle.map(e => e.diagnostico).join('; ') || 'N/A'}.`
+    );
+    setAccCausa(
+      resumenAusentismoMesActual.diasIncapacidadLaboral > 0
+        ? 'Ocurrencia de contingencias de origen laboral (AT/EL) que requirieron reposo médico. Revisar controles operacionales y condiciones ergonómicas.'
+        : 'Contingencias osteomusculares / respiratorias de origen común con tiempos de recuperación prolongados.'
+    );
+    setAccPropuesta(
+      '1. Seguimiento médico laboral y reintegro con recomendaciones.\n2. Fortalecimiento de pausas activas e inspección ergonómica de puestos de trabajo.\n3. Coordinación con EPS/ARL para soporte preventivo.'
+    );
+    setAccResp('Responsable SG-SST / Gestión Humana');
+    const dCompromiso = new Date();
+    dCompromiso.setDate(dCompromiso.getDate() + 30);
+    setAccFechaFin(dCompromiso.toISOString().slice(0, 10));
+    setModalAccionOpen(true);
   };
 
   // Cálculo en vivo para modal de medición
@@ -421,6 +660,16 @@ export function IndicadoresSstView({
       ind.formulaTexto
     );
   }, [medIndicadorId, medNum, medDen, indicadores]);
+
+  const esIndicadorAusentismoEnModal = useMemo(() => {
+    const ind = indicadores.find(i => i.id === medIndicadorId);
+    return !!ind && (ind.codigo === 'IND-RES-04' || ind.nombre.toLowerCase().includes('ausentismo'));
+  }, [indicadores, medIndicadorId]);
+
+  const datosAusentismoPeriodoEnModal = useMemo(() => {
+    if (!esIndicadorAusentismoEnModal) return null;
+    return calcularAusentismoMes(incapacidadesList, medPeriodo, numTrabajadoresActivos, 24);
+  }, [esIndicadorAusentismoEnModal, incapacidadesList, medPeriodo, numTrabajadoresActivos]);
 
   // Guardar Medición
   const handleGuardarMedicion = (e: React.FormEvent) => {
@@ -770,6 +1019,27 @@ export function IndicadoresSstView({
         </button>
 
         <button
+          onClick={() => setActiveTab('ausentismo')}
+          className={`pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 cursor-pointer ${
+            activeTab === 'ausentismo'
+              ? 'border-[#18235C] text-[#18235C] font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Stethoscope className="w-4 h-4 text-blue-600" />
+          <span>Ausentismo por Causa Médica</span>
+          <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+            resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0)
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+              : resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.limiteAmarillo || 3.5)
+              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+              : 'bg-rose-100 text-rose-800 border border-rose-300'
+          }`}>
+            {resumenAusentismoMesActual.tasaAusentismoPct}%
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('mediciones')}
           className={`pb-2.5 whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 cursor-pointer ${
             activeTab === 'mediciones'
@@ -904,6 +1174,157 @@ export function IndicadoresSstView({
             </div>
           )}
 
+          {/* WIDGET DESTACADO: INDICADOR DE AUSENTISMO LABORAL POR CAUSA MÉDICA (RES. 0312 / IND-RES-04) */}
+          <div className="bg-gradient-to-br from-white via-indigo-50/30 to-blue-50/40 rounded-2xl border-2 border-indigo-200/80 p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#18235C] text-white flex items-center justify-center shadow-xs shrink-0">
+                  <Stethoscope className="w-5 h-5 text-[#8FA7D6]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-sm text-[#18235C]">
+                      Indicador de Ausentismo por Causa Médica
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#18235C] text-white">
+                      IND-RES-04
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-200">
+                      Res. 0312 Estándar 6.1.1
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    Calculado automáticamente en tiempo real a partir del Módulo de Control de Incapacidades
+                  </p>
+                </div>
+              </div>
+
+              {/* Selector de Período Rápido */}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-600">Período:</span>
+                <input
+                  type="month"
+                  value={mesFiltroAusentismo}
+                  onChange={e => e.target.value && setMesFiltroAusentismo(e.target.value)}
+                  className="px-2.5 py-1 bg-white border border-[#8FA7D6] rounded-lg text-xs font-bold text-[#18235C] shadow-2xs"
+                />
+              </div>
+            </div>
+
+            {/* 4 Métricas del widget */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className={`p-3.5 rounded-xl border shadow-2xs ${
+                resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0)
+                  ? 'bg-emerald-50/80 border-emerald-300'
+                  : resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.limiteAmarillo || 3.5)
+                  ? 'bg-amber-50/80 border-amber-300'
+                  : 'bg-rose-50/80 border-rose-300'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">Tasa Ausentismo</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                    resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0)
+                      ? 'bg-emerald-600 text-white'
+                      : resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.limiteAmarillo || 3.5)
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-rose-600 text-white'
+                  }`}>
+                    {resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0) ? 'Cumple' : 'Alerta'}
+                  </span>
+                </div>
+                <div className="text-2xl font-black font-serif text-[#18235C] mt-1">
+                  {resumenAusentismoMesActual.tasaAusentismoPct}%
+                </div>
+                <div className="text-[10px] text-slate-600 mt-0.5">
+                  Meta oficial: ≤ {indicadorAusentismoCatalogo?.meta || 2.0}%
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Días Incapacidad</span>
+                <div className="text-2xl font-black font-serif text-[#18235C] mt-1">
+                  {resumenAusentismoMesActual.totalDiasIncapacidad} <span className="text-xs font-normal text-slate-500">días</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-600 mt-0.5">
+                  <span className="text-blue-700 font-semibold">{resumenAusentismoMesActual.diasIncapacidadComun}d común</span>
+                  <span>•</span>
+                  <span className="text-amber-700 font-semibold">{resumenAusentismoMesActual.diasIncapacidadLaboral}d laboral</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Días Programados</span>
+                <div className="text-2xl font-black font-serif text-slate-800 mt-1">
+                  {resumenAusentismoMesActual.diasTrabajoProgramados} <span className="text-xs font-normal text-slate-500">días-h</span>
+                </div>
+                <div className="text-[10px] text-slate-600 mt-0.5">
+                  {resumenAusentismoMesActual.trabajadoresCensados} trab. × {resumenAusentismoMesActual.diasLaborablesMes} días lab.
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Colaboradores Afectados</span>
+                <div className="text-2xl font-black font-serif text-slate-800 mt-1">
+                  {resumenAusentismoMesActual.colaboradoresAfectados.length} <span className="text-xs font-normal text-slate-500">personas</span>
+                </div>
+                <div className="text-[10px] text-slate-600 mt-0.5 truncate" title={resumenAusentismoMesActual.colaboradoresAfectados.join(', ') || 'Sin ausencias'}>
+                  {resumenAusentismoMesActual.colaboradoresAfectados.length > 0
+                    ? resumenAusentismoMesActual.colaboradoresAfectados.slice(0, 2).join(', ') + (resumenAusentismoMesActual.colaboradoresAfectados.length > 2 ? '...' : '')
+                    : 'Sin ausencias en el mes'}
+                </div>
+              </div>
+            </div>
+
+            {/* Acciones y enlace cruzado */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-indigo-100">
+              <div className="flex items-center gap-2">
+                {mediciones.some(m => m.indicadorId === indicadorAusentismoCatalogo?.id && m.periodo === mesFiltroAusentismo) ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                    Medición de {mesFiltroAusentismo} registrada en el histórico SST
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                    <Clock className="w-3.5 h-3.5 text-amber-700" />
+                    Medición de {mesFiltroAusentismo} pendiente de sincronizar en SST
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSincronizarMedicionAusentismo()}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  title="Guardar o actualizar la medición de ausentismo en la tabla histórica de SST"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Sincronizar Medición Oficial</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('ausentismo')}
+                  className="px-3 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <BarChart3 className="w-3.5 h-3.5 text-[#00FF00]" />
+                  <span>Ver Análisis Detallado</span>
+                </button>
+
+                {onNavigate && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('incapacidades')}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Ir a Incapacidades</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Desglose por Ciclo PHVA */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {(['Planear', 'Hacer', 'Verificar', 'Actuar'] as CicloPHVAIndicador[]).map(ciclo => {
@@ -1028,7 +1449,14 @@ export function IndicadoresSstView({
                         </td>
 
                         <td className="py-3 px-3 align-top max-w-xs">
-                          <div className="font-bold text-slate-900 text-xs">{ind.nombre}</div>
+                          <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5 flex-wrap">
+                            <span>{ind.nombre}</span>
+                            {(ind.codigo === 'IND-RES-04' || ind.nombre.toLowerCase().includes('ausentismo')) && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                ⚡ Conectado a Incapacidades
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{ind.objetivoMedicion}</div>
                         </td>
 
@@ -1068,6 +1496,16 @@ export function IndicadoresSstView({
 
                         <td className="py-3 px-3 align-top text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1">
+                            {(ind.codigo === 'IND-RES-04' || ind.nombre.toLowerCase().includes('ausentismo')) && (
+                              <button
+                                type="button"
+                                onClick={() => setActiveTab('ausentismo')}
+                                className="p-1.5 text-blue-700 hover:bg-blue-50 rounded-lg cursor-pointer"
+                                title="Ver Panel de Ausentismo por Causa Médica"
+                              >
+                                <Stethoscope className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleAbrirAnalisisHistorico(ind)}
@@ -1184,6 +1622,582 @@ export function IndicadoresSstView({
         </div>
       )}
 
+      {/* PESTAÑA: INDICADOR DE AUSENTISMO LABORAL POR CAUSA MÉDICA (RES. 0312 / IND-RES-04) */}
+      {activeTab === 'ausentismo' && (
+        <div className="space-y-6">
+          {/* BANNER DE IDENTIFICACIÓN NORMATIVA */}
+          <div className="bg-gradient-to-r from-[#18235C] via-[#101740] to-indigo-950 text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
+            <div className="relative z-10 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center border border-white/20">
+                    <Stethoscope className="w-6 h-6 text-[#00FF00]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#00FF00] text-[#18235C]">
+                        IND-RES-04
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/15 border border-white/20">
+                        Resolución 0312 de 2019 • Estándar 6.1.1
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-400/20 text-indigo-200 border border-indigo-300/30">
+                        Decreto 1072 de 2015 Art. 2.2.4.6.21
+                      </span>
+                    </div>
+                    <h2 className="text-xl font-black tracking-tight text-white mt-1">
+                      Indicador de Ausentismo Laboral por Causa Médica
+                    </h2>
+                    <p className="text-xs text-slate-300 max-w-2xl mt-0.5">
+                      Monitorea los días de trabajo programados perdidos por contingencias de salud (origen común, accidentes de trabajo y enfermedad laboral) registradas y consolidadas en el Módulo de Control de Incapacidades.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {onNavigate && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('incapacidades')}
+                      className="px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-[#00FF00]" />
+                      <span>Ir a Control de Incapacidades</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Ficha Resumida */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 pt-2 border-t border-white/15 text-xs">
+                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Ciclo PHVA</span>
+                  <span className="font-bold text-white">Verificar</span>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Tipo Indicador</span>
+                  <span className="font-bold text-white">Resultado</span>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Sentido</span>
+                  <span className="font-bold text-white">Menor es mejor</span>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Meta Oficial</span>
+                  <span className="font-bold text-[#00FF00]">≤ {indicadorAusentismoCatalogo?.meta || 2.0}%</span>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Límite Alerta</span>
+                  <span className="font-bold text-amber-300">≤ {indicadorAusentismoCatalogo?.limiteAmarillo || 3.5}%</span>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Periodicidad</span>
+                  <span className="font-bold text-white">Mensual</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* CONTROLES DE PARÁMETROS DEL PERÍODO Y FÓRMULA MATEMÁTICA */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Panel de Configuración de Período */}
+            <div className="p-4 bg-white rounded-2xl border border-[#8FA7D6] shadow-xs space-y-3 lg:col-span-1">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <span>Parámetros de Medición</span>
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIncapacidadesList(getStoredIncapacidades());
+                    showToast('Datos de incapacidades actualizados desde almacenamiento local.');
+                  }}
+                  className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                  title="Recargar incapacidades"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Mes a Evaluar (Período)
+                  </label>
+                  <input
+                    type="month"
+                    value={mesFiltroAusentismo}
+                    onChange={e => e.target.value && setMesFiltroAusentismo(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold text-[#18235C]"
+                  />
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {['2026-01', '2026-02', '2026-03'].map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setMesFiltroAusentismo(m)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                          mesFiltroAusentismo === m
+                            ? 'bg-[#18235C] text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Trabajadores (N)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={numTrabajadoresActivos}
+                      disabled
+                      className="w-full px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-mono font-bold text-slate-700"
+                      title="Calculado automáticamente desde la nómina activa de colaboradores"
+                    />
+                    <span className="text-[10px] text-slate-500">Activos en nómina</span>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Días Laborales (D)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={diasLaborablesMesConfig}
+                      onChange={e => setDiasLaborablesMesConfig(Math.max(1, parseInt(e.target.value, 10) || 24))}
+                      className="w-full px-3 py-1.5 bg-slate-50 border border-[#8FA7D6] rounded-lg font-mono font-bold text-[#18235C]"
+                    />
+                    <div className="flex items-center gap-1 mt-1">
+                      {[20, 22, 24, 26].map(d => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setDiasLaborablesMesConfig(d)}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold cursor-pointer ${
+                            diasLaborablesMesConfig === d
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {d}d
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-indigo-50/70 rounded-xl border border-indigo-100 text-[11px] text-indigo-950 space-y-1">
+                  <div className="flex justify-between font-bold">
+                    <span>Días Programados Totales:</span>
+                    <span className="font-mono text-indigo-700">{resumenAusentismoMesActual.diasTrabajoProgramados} d-h</span>
+                  </div>
+                  <p className="text-[10px] text-indigo-800">
+                    Fórmula base: {resumenAusentismoMesActual.trabajadoresCensados} colaboradores × {resumenAusentismoMesActual.diasLaborablesMes} días hábiles.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ficha Explicativa Matemática en Vivo */}
+            <div className="p-4 bg-white rounded-2xl border border-[#8FA7D6] shadow-xs space-y-3 lg:col-span-2">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-1.5">
+                  <BarChart3 className="w-4 h-4 text-emerald-600" />
+                  <span>Fórmula Matemática & Ejecución en Vivo ({mesFiltroAusentismo})</span>
+                </h4>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-200">
+                  K = 100 (%)
+                </span>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                {/* Desglose de la Fórmula */}
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="font-mono text-[11px] text-slate-800 text-center font-bold">
+                    Tasa de Ausentismo = ( Días de Incapacidad Médica en el Mes / Días Programados de Trabajo en el Mes ) × 100
+                  </div>
+
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-200 flex flex-col sm:flex-row items-center justify-around gap-3 text-center">
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-slate-500">Numerador (Días Incapacidad)</span>
+                      <span className="text-base font-black font-mono text-[#18235C]">{resumenAusentismoMesActual.totalDiasIncapacidad} días</span>
+                      <span className="block text-[9px] text-slate-500 font-semibold">
+                        Común: {resumenAusentismoMesActual.diasIncapacidadComun}d • Laboral: {resumenAusentismoMesActual.diasIncapacidadLaboral}d
+                      </span>
+                    </div>
+
+                    <span className="text-xl font-bold text-slate-400">÷</span>
+
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-slate-500">Denominador (Días Programados)</span>
+                      <span className="text-base font-black font-mono text-slate-800">{resumenAusentismoMesActual.diasTrabajoProgramados} días</span>
+                      <span className="block text-[9px] text-slate-500 font-semibold">
+                        {numTrabajadoresActivos} trab. × {diasLaborablesMesConfig} días
+                      </span>
+                    </div>
+
+                    <span className="text-xl font-bold text-slate-400">× 100 =</span>
+
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-slate-500">Resultado Calculado</span>
+                      <span className={`text-xl font-black font-serif ${
+                        resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0)
+                          ? 'text-emerald-700'
+                          : resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.limiteAmarillo || 3.5)
+                          ? 'text-amber-700'
+                          : 'text-rose-700'
+                      }`}>
+                        {resumenAusentismoMesActual.tasaAusentismoPct}%
+                      </span>
+                      <span className={`block text-[9px] font-bold uppercase ${
+                        resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0)
+                          ? 'text-emerald-800'
+                          : resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.limiteAmarillo || 3.5)
+                          ? 'text-amber-800'
+                          : 'text-rose-800'
+                      }`}>
+                        {resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0) ? 'Cumple Meta' : 'Supera Meta'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interpretación Objetiva */}
+                <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200 flex items-start gap-2.5">
+                  <ShieldCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-blue-950 space-y-0.5">
+                    <strong>Interpretación Técnica Oficial:</strong> En el período {mesFiltroAusentismo}, la organización perdió el <strong>{resumenAusentismoMesActual.tasaAusentismoPct}%</strong> de su capacidad laboral programada por concepto de incapacidades médicas ({resumenAusentismoMesActual.totalDiasIncapacidad} días acumulados).
+                    {resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0) ? (
+                      <span className="text-emerald-800 font-semibold block mt-0.5">
+                        El ausentismo se encuentra dentro del rango de tolerancia institucional (Meta: ≤ {indicadorAusentismoCatalogo?.meta || 2.0}%). Proceso bajo control.
+                      </span>
+                    ) : (
+                      <span className="text-rose-800 font-semibold block mt-0.5">
+                        El ausentismo supera la meta oficial de {indicadorAusentismoCatalogo?.meta || 2.0}%. Se sugiere formular una acción de mejora PHVA y verificar las condiciones ergonómicas y médicas de los puestos involucrados.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4 TARJETAS KPI DE IMPACTO */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className={`p-4 rounded-2xl border shadow-xs space-y-1.5 ${
+              resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0)
+                ? 'bg-emerald-50 border-emerald-300'
+                : resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.limiteAmarillo || 3.5)
+                ? 'bg-amber-50 border-amber-300'
+                : 'bg-rose-50 border-rose-300'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                  Tasa de Ausentismo
+                </span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                  resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0)
+                    ? 'bg-emerald-600 text-white'
+                    : resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.limiteAmarillo || 3.5)
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-rose-600 text-white'
+                }`}>
+                  {resumenAusentismoMesActual.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0) ? 'Cumple' : 'Alerta'}
+                </span>
+              </div>
+              <div className="text-3xl font-black font-serif text-[#18235C]">
+                {resumenAusentismoMesActual.tasaAusentismoPct}%
+              </div>
+              <div className="text-xs text-slate-600 font-medium">
+                Meta: ≤ {indicadorAusentismoCatalogo?.meta || 2.0}% (Límite: {indicadorAusentismoCatalogo?.limiteAmarillo || 3.5}%)
+              </div>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Días de Incapacidad Médica
+              </span>
+              <div className="text-3xl font-black font-serif text-[#18235C]">
+                {resumenAusentismoMesActual.totalDiasIncapacidad} <span className="text-xs font-normal text-slate-500">días</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                  {resumenAusentismoMesActual.diasIncapacidadComun}d común
+                </span>
+                <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded">
+                  {resumenAusentismoMesActual.diasIncapacidadLaboral}d laboral
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Días Programados Totales
+              </span>
+              <div className="text-3xl font-black font-serif text-slate-800">
+                {resumenAusentismoMesActual.diasTrabajoProgramados} <span className="text-xs font-normal text-slate-500">días-h</span>
+              </div>
+              <div className="text-xs text-slate-600">
+                {resumenAusentismoMesActual.trabajadoresCensados} colaboradores × {resumenAusentismoMesActual.diasLaborablesMes} días laborales
+              </div>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Colaboradores Afectados
+              </span>
+              <div className="text-3xl font-black font-serif text-slate-800">
+                {resumenAusentismoMesActual.colaboradoresAfectados.length} <span className="text-xs font-normal text-slate-500">personas</span>
+              </div>
+              <div className="text-xs text-slate-600 truncate" title={resumenAusentismoMesActual.colaboradoresAfectados.join(', ') || 'Sin ausencias'}>
+                {resumenAusentismoMesActual.colaboradoresAfectados.length > 0
+                  ? resumenAusentismoMesActual.colaboradoresAfectados.join(', ')
+                  : 'Sin ausentismo en este período'}
+              </div>
+            </div>
+          </div>
+
+          {/* BARRA DE ACCIONES OFICIALES */}
+          <div className="p-4 bg-white rounded-2xl border border-[#8FA7D6] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {mediciones.some(m => m.indicadorId === indicadorAusentismoCatalogo?.id && m.periodo === mesFiltroAusentismo) ? (
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-300">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Medición de {mesFiltroAusentismo} guardada en el Registro Oficial SG-SST</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-900 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-300">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  <span>Pendiente sincronizar medición en el histórico oficial de SG-SST</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleSincronizarMedicionAusentismo(mesFiltroAusentismo)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>
+                  {mediciones.some(m => m.indicadorId === indicadorAusentismoCatalogo?.id && m.periodo === mesFiltroAusentismo)
+                    ? 'Actualizar Medición Oficial en SG-SST'
+                    : 'Sincronizar Medición Oficial en SG-SST'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCrearAccionParaAusentismo}
+                className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+              >
+                <Award className="w-4 h-4 text-[#00FF00]" />
+                <span>Formular Acción de Mejora PHVA</span>
+              </button>
+
+              {onNavigate && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('incapacidades')}
+                  className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ExternalLink className="w-4 h-4 text-slate-500" />
+                  <span>Ir a Incapacidades</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* DESGLOSE DETALLADO DE INCAPACIDADES DEL PERÍODO */}
+          <div className="bg-white rounded-2xl border border-[#8FA7D6] shadow-xs overflow-hidden space-y-0">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-xs text-[#18235C]">
+                  Desglose de Contingencias Médicas que Afectaron el Período {mesFiltroAusentismo}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  {resumenAusentismoMesActual.eventosDetalle.length} evento(s) de incapacidad médica con días hábiles o continuos en este mes
+                </p>
+              </div>
+
+              <span className="text-[11px] font-mono font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                Total: {resumenAusentismoMesActual.totalDiasIncapacidad} días
+              </span>
+            </div>
+
+            {resumenAusentismoMesActual.eventosDetalle.length === 0 ? (
+              <div className="p-8 text-center space-y-2">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
+                <h4 className="font-bold text-sm text-[#18235C]">Excelente: Cero Ausentismo Médico en {mesFiltroAusentismo}</h4>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  No se registran certificados médicos de incapacidad en este período. La tasa de ausentismo es del 0.00%, cumpliendo plenamente con la meta del SG-SST.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-slate-100/70 text-slate-700 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold">
+                      <th className="py-2.5 px-3">Colaborador</th>
+                      <th className="py-2.5 px-3 text-center">Origen</th>
+                      <th className="py-2.5 px-3">Diagnóstico Médico (CIE-10)</th>
+                      <th className="py-2.5 px-3">Entidad Emisora</th>
+                      <th className="py-2.5 px-3 text-center">Días en este Mes</th>
+                      <th className="py-2.5 px-3 text-center">Días Totales</th>
+                      <th className="py-2.5 px-3 text-center">% Aporte al Ausentismo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {resumenAusentismoMesActual.eventosDetalle.map((evt, idx) => {
+                      const aportePct = resumenAusentismoMesActual.totalDiasIncapacidad > 0
+                        ? ((evt.diasEnMes / resumenAusentismoMesActual.totalDiasIncapacidad) * 100).toFixed(1)
+                        : '0';
+
+                      return (
+                        <tr key={`${evt.incapacidadId}_${idx}`} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2.5 px-3">
+                            <div className="font-bold text-slate-900">{evt.empleadoNombre}</div>
+                            {evt.empleadoNumeroDocumento && (
+                              <span className="text-[10px] text-slate-500 font-mono">CC {evt.empleadoNumeroDocumento}</span>
+                            )}
+                          </td>
+
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              evt.origen === 'Laboral'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                : 'bg-blue-100 text-blue-900 border border-blue-300'
+                            }`}>
+                              {evt.origen === 'Laboral' ? 'Origen Laboral (AT/EL)' : 'Origen Común'}
+                            </span>
+                          </td>
+
+                          <td className="py-2.5 px-3 max-w-xs">
+                            <div className="font-medium text-slate-800">{evt.diagnostico}</div>
+                          </td>
+
+                          <td className="py-2.5 px-3 text-slate-600">
+                            {evt.entidadEmisora || 'EPS / ARL'}
+                          </td>
+
+                          <td className="py-2.5 px-3 text-center font-black font-mono text-[#18235C]">
+                            {evt.diasEnMes} días
+                          </td>
+
+                          <td className="py-2.5 px-3 text-center font-mono text-slate-600">
+                            {evt.diasIncapacidadTotal ? `${evt.diasIncapacidadTotal} d` : '—'}
+                          </td>
+
+                          <td className="py-2.5 px-3 text-center font-bold text-indigo-700">
+                            {aportePct}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* HISTORIAL MULTI-MES Y COMPARATIVA DE TENDENCIA */}
+          <div className="bg-white rounded-2xl border border-[#8FA7D6] shadow-xs p-5 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-bold text-xs text-[#18235C] flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-indigo-600" />
+                  <span>Historial y Evolución del Ausentismo Médico (Comparativa Multi-Mes)</span>
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Consolidado histórico de los períodos del año en curso frente a la meta (≤ 2.0%)
+                </p>
+              </div>
+
+              <span className="text-[10px] font-bold text-slate-500 uppercase">
+                Base Normativa Res. 0312
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {historialAusentismoReciente.map(item => {
+                const esPeriodoSeleccionado = item.periodo === mesFiltroAusentismo;
+                const cumple = item.resumen.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.meta || 2.0);
+                const alerta = item.resumen.tasaAusentismoPct <= (indicadorAusentismoCatalogo?.limiteAmarillo || 3.5);
+
+                return (
+                  <div
+                    key={item.periodo}
+                    onClick={() => setMesFiltroAusentismo(item.periodo)}
+                    className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+                      esPeriodoSeleccionado
+                        ? 'border-[#18235C] bg-indigo-50/50 shadow-xs ring-1 ring-[#18235C]'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-[#18235C]">{item.periodo}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        cumple
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          : alerta
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                          : 'bg-rose-100 text-rose-900 border border-rose-300'
+                      }`}>
+                        {item.resumen.tasaAusentismoPct}%
+                      </span>
+                    </div>
+
+                    <div className="mt-2 text-xs text-slate-600 space-y-0.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Días Incapacidad:</span>
+                        <span className="font-bold text-[#18235C]">{item.resumen.totalDiasIncapacidad} d</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Días Programados:</span>
+                        <span className="font-mono">{item.resumen.diasTrabajoProgramados} d</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Registro SG-SST:</span>
+                        <span className={`font-bold ${item.medicion ? 'text-emerald-700' : 'text-slate-400'}`}>
+                          {item.medicion ? 'Registrado' : 'Pendiente'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                      <span className="text-[10px] text-slate-500 font-semibold">
+                        {cumple ? '✓ Cumple Meta' : '⚠ Desviación'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSincronizarMedicionAusentismo(item.periodo);
+                        }}
+                        className="text-[10px] font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer"
+                      >
+                        Sincronizar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* PESTAÑA 3: REGISTRO DE MEDICIONES */}
       {activeTab === 'mediciones' && (
         <div className="space-y-4">
@@ -1199,6 +2213,42 @@ export function IndicadoresSstView({
               <Plus className="w-3.5 h-3.5 text-[#00FF00]" />
               <span>Registrar Nueva Medición</span>
             </button>
+          </div>
+
+          {/* BANNER DE ACCESO DIRECTO AL CÁLCULO DE AUSENTISMO MÉDICO */}
+          <div className="p-3.5 bg-gradient-to-r from-indigo-50/90 to-blue-50/70 border border-indigo-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#18235C] text-white flex items-center justify-center shrink-0">
+                <Stethoscope className="w-4 h-4 text-[#8FA7D6]" />
+              </div>
+              <div>
+                <strong className="text-[#18235C] font-bold block">
+                  Indicador IND-RES-04: Ausentismo Laboral por Causa Médica
+                </strong>
+                <span className="text-slate-600 text-[11px]">
+                  Período {mesFiltroAusentismo}: {resumenAusentismoMesActual.totalDiasIncapacidad} días de incapacidad médica ({resumenAusentismoMesActual.diasIncapacidadComun}d común, {resumenAusentismoMesActual.diasIncapacidadLaboral}d laboral) sobre {resumenAusentismoMesActual.diasTrabajoProgramados} días programados = <strong>{resumenAusentismoMesActual.tasaAusentismoPct}%</strong>.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleSincronizarMedicionAusentismo(mesFiltroAusentismo)}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                title="Sincronizar medición automáticamente desde Incapacidades"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Sincronizar {mesFiltroAusentismo}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('ausentismo')}
+                className="px-3 py-1.5 bg-white hover:bg-slate-50 text-[#18235C] border border-[#8FA7D6] rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Ver Análisis</span>
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-[#8FA7D6] shadow-xs overflow-hidden">
@@ -1771,6 +2821,38 @@ export function IndicadoresSstView({
                   />
                 </div>
               </div>
+
+              {/* Sugerencia automática desde Módulo de Incapacidades */}
+              {esIndicadorAusentismoEnModal && datosAusentismoPeriodoEnModal && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[#18235C] flex items-center gap-1.5 text-xs">
+                      <Stethoscope className="w-4 h-4 text-indigo-700" />
+                      Datos en vivo del Módulo de Incapacidades ({medPeriodo}):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMedNum(datosAusentismoPeriodoEnModal.totalDiasIncapacidad);
+                        setMedDen(datosAusentismoPeriodoEnModal.diasTrabajoProgramados);
+                        setMedFuente('Módulo de Control de Incapacidades (Validación EPS/ARL)');
+                        setMedResp('Responsable SG-SST / Gestión Humana');
+                        setMedObs(
+                          `Ausentismo médico Res. 0312: ${datosAusentismoPeriodoEnModal.totalDiasIncapacidad} días (${datosAusentismoPeriodoEnModal.diasIncapacidadComun}d común, ${datosAusentismoPeriodoEnModal.diasIncapacidadLaboral}d laboral) sobre ${datosAusentismoPeriodoEnModal.diasTrabajoProgramados} días programados. Colaboradores: ${datosAusentismoPeriodoEnModal.colaboradoresAfectados.join(', ') || 'Sin ausencias'}.`
+                        );
+                      }}
+                      className="px-2.5 py-1 bg-[#18235C] hover:bg-[#101740] text-white rounded text-[10px] font-bold cursor-pointer transition-colors"
+                    >
+                      Autocompletar Valores
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-800">
+                    <div><strong>Días Incapacidad:</strong> {datosAusentismoPeriodoEnModal.totalDiasIncapacidad} d</div>
+                    <div><strong>Días Programados:</strong> {datosAusentismoPeriodoEnModal.diasTrabajoProgramados} d</div>
+                    <div><strong>Tasa Estimada:</strong> {datosAusentismoPeriodoEnModal.tasaAusentismoPct}%</div>
+                  </div>
+                </div>
+              )}
 
               {/* Variables del cálculo */}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-3">

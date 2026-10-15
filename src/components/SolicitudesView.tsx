@@ -27,7 +27,9 @@ import {
   Eye,
   FileCheck,
   Award,
-  MapPin
+  MapPin,
+  Layers,
+  RotateCcw
 } from 'lucide-react';
 import { uid, initialEmpresa } from '../data/initialData';
 import { DriveLinkField } from './common/DriveLinkField';
@@ -53,6 +55,7 @@ interface SolicitudesViewProps {
   currentUser?: UsuarioSistema | null;
   isSuperAdmin?: boolean;
   cargos?: any[];
+  onNavigate?: (view: string) => void;
 }
 
 export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
@@ -64,7 +67,8 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
   userRole,
   currentUser,
   isSuperAdmin = false,
-  cargos = []
+  cargos = [],
+  onNavigate
 }) => {
   // Configuración de la Empresa activa (prioriza props, luego caché localStorage, luego initialEmpresa)
   const empresaActiva = useMemo<ConfiguracionEmpresa>(() => {
@@ -127,10 +131,63 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       currentUser?.permisos?.includes('solicitudes')
     );
 
-  // Filtros de tabla
-  const [filterEstado, setFilterEstado] = useState<string>('TODOS');
-  const [filterTipo, setFilterTipo] = useState<string>('TODOS');
+  // Filtros de tabla con persistencia de estado cruzada (LocalStorage y URL query params)
+  const [filterEstado, setFilterEstado] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlEstado = params.get('estado') || params.get('filtro');
+        if (urlEstado && ['TODOS', 'Pendiente', 'Aprobada', 'Autogenerada', 'Requiere Corrección', 'Rechazada'].includes(urlEstado)) {
+          return urlEstado;
+        }
+        const guardado = localStorage.getItem('bgroup_solicitudes_filtro_estado');
+        if (guardado && ['TODOS', 'Pendiente', 'Aprobada', 'Autogenerada', 'Requiere Corrección', 'Rechazada'].includes(guardado)) {
+          return guardado;
+        }
+      } catch (e) {}
+    }
+    return 'TODOS';
+  });
+
+  const [filterTipo, setFilterTipo] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlTipo = params.get('tipo');
+        if (urlTipo) return urlTipo;
+        const guardado = localStorage.getItem('bgroup_solicitudes_filtro_tipo');
+        if (guardado) return guardado;
+      } catch (e) {}
+    }
+    return 'TODOS';
+  });
+
   const [search, setSearch] = useState('');
+
+  // Persistir filtro de estado en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('bgroup_solicitudes_filtro_estado', filterEstado);
+    } catch (e) {}
+  }, [filterEstado]);
+
+  // Persistir filtro de tipo en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('bgroup_solicitudes_filtro_tipo', filterTipo);
+    } catch (e) {}
+  }, [filterTipo]);
+
+  // Sincronizar si cambia el parámetro de URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlEstado = params.get('estado') || params.get('filtro');
+      if (urlEstado && ['TODOS', 'Pendiente', 'Aprobada', 'Autogenerada', 'Requiere Corrección', 'Rechazada'].includes(urlEstado)) {
+        setFilterEstado(urlEstado);
+      }
+    }
+  }, []);
 
   // ESTADOS DEL FORMULARIO DE SOLICITUDES
   const [tipoSolicitud, setTipoSolicitud] = useState<TipoSolicitud>('Permiso');
@@ -270,19 +327,38 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
     setDecisionComentario('');
   };
 
-  // Filtrado de solicitudes para la tabla
-  const solicitudesFiltradas = useMemo(() => {
+  // Solicitudes base accesibles para el usuario según su rol (sin filtros de interfaz)
+  const solicitudesBase = useMemo(() => {
     return solicitudes.filter(s => {
-      // Si está en modo empleado, mostrar solo las solicitudes del colaborador activo
       if (isEmployeeMode) {
         if (s.empleadoId !== effectiveEmpleado?.id && s.empleadoEmail?.toLowerCase() !== effectiveEmpleado?.email?.toLowerCase()) {
           return false;
         }
       }
+      return true;
+    });
+  }, [solicitudes, isEmployeeMode, effectiveEmpleado]);
 
+  // Conteos base para métricas KPI y botones de acceso rápido
+  const countTotal = solicitudesBase.length;
+  const countPendientes = useMemo(() => {
+    return solicitudesBase.filter(s => s.estado === 'Radicada' || s.estado === 'En Revisión' || s.estado === 'Pendiente').length;
+  }, [solicitudesBase]);
+  const countAprobadas = useMemo(() => {
+    return solicitudesBase.filter(s => s.estado === 'Aprobada' || s.estado === 'Autogenerada').length;
+  }, [solicitudesBase]);
+  const countRechazos = useMemo(() => {
+    return solicitudesBase.filter(s => s.estado === 'Requiere Corrección' || s.estado === 'Rechazada').length;
+  }, [solicitudesBase]);
+
+  // Filtrado de solicitudes para la tabla aplicando estado, tipo y búsqueda
+  const solicitudesFiltradas = useMemo(() => {
+    return solicitudesBase.filter(s => {
       if (filterEstado !== 'TODOS') {
-        if (filterEstado === 'Pendiente' && (s.estado === 'Radicada' || s.estado === 'En Revisión' || s.estado === 'Pendiente')) {
-          // OK
+        if (filterEstado === 'Pendiente') {
+          if (s.estado !== 'Radicada' && s.estado !== 'En Revisión' && s.estado !== 'Pendiente') {
+            return false;
+          }
         } else if (s.estado !== filterEstado) {
           return false;
         }
@@ -302,7 +378,7 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
 
       return true;
     });
-  }, [solicitudes, isEmployeeMode, effectiveEmpleado, filterEstado, filterTipo, search]);
+  }, [solicitudesBase, filterEstado, filterTipo, search]);
 
   // Lista de solicitudes con mensajes o certificados para el Buzón
   const solicitudesBuzon = useMemo(() => {
@@ -398,6 +474,18 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
 
         {/* Acciones e Indicadores */}
         <div className="flex items-center gap-2 shrink-0">
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('portal')}
+              className="px-3 py-2 bg-white hover:bg-slate-50 text-[#18235C] border border-[#8FA7D6] rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+              title="Volver al Portal de Módulos"
+            >
+              <Layers className="w-3.5 h-3.5 text-[#18235C]" />
+              <span className="hidden sm:inline">Portal de Módulos</span>
+            </button>
+          )}
+
           {/* Selector de colaborador simulado para administradores */}
           {!isEmployeeMode && (
             <div className="px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-xl text-xs flex items-center gap-2">
@@ -499,76 +587,216 @@ export const SolicitudesView: React.FC<SolicitudesViewProps> = ({
       {/* VISTA 1: CENTRO DE ESTADOS Y CONSOLA DE REGISTROS */}
       {(tabPortal === 'centro' || !isEmployeeMode) && (
         <div className="space-y-4">
-          {/* Tarjetas KPI de Resumen */}
+          {/* Tarjetas KPI de Resumen Interactivas con Verificación Cruzada */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 bg-white border border-[#8FA7D6] rounded-xl shadow-2xs space-y-1">
-              <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Solicitudes</span>
-              <span className="text-xl font-bold text-[#18235C]">{solicitudesFiltradas.length}</span>
-            </div>
-            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl shadow-2xs space-y-1">
-              <span className="text-[10px] font-bold text-blue-700 uppercase block">Radicadas / En Revisión</span>
-              <span className="text-xl font-bold text-blue-900">
-                {solicitudesFiltradas.filter(s => s.estado === 'Radicada' || s.estado === 'En Revisión' || s.estado === 'Pendiente').length}
-              </span>
-            </div>
-            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl shadow-2xs space-y-1">
-              <span className="text-[10px] font-bold text-emerald-800 uppercase block">Aprobadas / Emitidas</span>
-              <span className="text-xl font-bold text-emerald-900">
-                {solicitudesFiltradas.filter(s => s.estado === 'Aprobada' || s.estado === 'Autogenerada').length}
-              </span>
-            </div>
-            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl shadow-2xs space-y-1">
-              <span className="text-[10px] font-bold text-amber-800 uppercase block">Correcciones / Rechazos</span>
-              <span className="text-xl font-bold text-amber-900">
-                {solicitudesFiltradas.filter(s => s.estado === 'Requiere Corrección' || s.estado === 'Rechazada').length}
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setFilterEstado('TODOS')}
+              className={`p-3.5 rounded-xl shadow-2xs space-y-1 text-left transition-all cursor-pointer border ${
+                filterEstado === 'TODOS'
+                  ? 'bg-slate-100 border-[#18235C] ring-2 ring-[#18235C]/30 shadow-xs'
+                  : 'bg-white border-[#8FA7D6]/60 hover:border-[#18235C] hover:bg-slate-50/80'
+              }`}
+              title="Mostrar todas las solicitudes"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Solicitudes</span>
+                {filterEstado === 'TODOS' && (
+                  <span className="w-2 h-2 rounded-full bg-[#18235C]" />
+                )}
+              </div>
+              <span className="text-xl font-bold text-[#18235C]">{countTotal}</span>
+              <span className="text-[10px] text-slate-400 block">Clic para ver todas</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterEstado('Pendiente')}
+              className={`p-3.5 rounded-xl shadow-2xs space-y-1 text-left transition-all cursor-pointer border ${
+                filterEstado === 'Pendiente'
+                  ? 'bg-blue-100/80 border-blue-600 ring-2 ring-blue-500/40 shadow-xs'
+                  : 'bg-blue-50/70 border-blue-200 hover:border-blue-400 hover:bg-blue-50'
+              }`}
+              title="Filtrar por solicitudes pendientes / radicadas"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-blue-700 uppercase block">Radicadas / En Revisión</span>
+                {filterEstado === 'Pendiente' && (
+                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                )}
+              </div>
+              <span className="text-xl font-bold text-blue-900">{countPendientes}</span>
+              <span className="text-[10px] text-blue-600 block">Clic para ver pendientes</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterEstado('Aprobada')}
+              className={`p-3.5 rounded-xl shadow-2xs space-y-1 text-left transition-all cursor-pointer border ${
+                filterEstado === 'Aprobada'
+                  ? 'bg-emerald-100/80 border-emerald-600 ring-2 ring-emerald-500/40 shadow-xs'
+                  : 'bg-emerald-50/70 border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50'
+              }`}
+              title="Filtrar por solicitudes aprobadas"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-emerald-800 uppercase block">Aprobadas / Emitidas</span>
+                {filterEstado === 'Aprobada' && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                )}
+              </div>
+              <span className="text-xl font-bold text-emerald-900">{countAprobadas}</span>
+              <span className="text-[10px] text-emerald-600 block">Clic para ver aprobadas</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterEstado(filterEstado === 'Requiere Corrección' ? 'Rechazada' : 'Requiere Corrección')}
+              className={`p-3.5 rounded-xl shadow-2xs space-y-1 text-left transition-all cursor-pointer border ${
+                (filterEstado === 'Requiere Corrección' || filterEstado === 'Rechazada')
+                  ? 'bg-amber-100/80 border-amber-600 ring-2 ring-amber-500/40 shadow-xs'
+                  : 'bg-amber-50/70 border-amber-200 hover:border-amber-400 hover:bg-amber-50'
+              }`}
+              title="Filtrar por solicitudes con novedades"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-amber-800 uppercase block">Correcciones / Rechazos</span>
+                {(filterEstado === 'Requiere Corrección' || filterEstado === 'Rechazada') && (
+                  <span className="w-2 h-2 rounded-full bg-amber-600" />
+                )}
+              </div>
+              <span className="text-xl font-bold text-amber-900">{countRechazos}</span>
+              <span className="text-[10px] text-amber-600 block">Clic para filtrar</span>
+            </button>
           </div>
 
-          {/* Barra de Filtros y Búsqueda */}
-          <div className="bg-white p-3 rounded-xl border border-[#8FA7D6] flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-bold text-[#18235C] flex items-center gap-1 mr-1">
-                <Filter className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Filtrar por:</span>
-              </span>
+          {/* Barra de Filtros, Acceso Rápido y Búsqueda */}
+          <div className="bg-white p-3.5 rounded-xl border border-[#8FA7D6] space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-bold text-[#18235C] flex items-center gap-1 mr-1">
+                  <Filter className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Estado:</span>
+                </span>
 
-              <select
-                value={filterEstado}
-                onChange={e => setFilterEstado(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold text-[#18235C]"
-              >
-                <option value="TODOS">Todos los Estados</option>
-                <option value="Pendiente">Radicadas / En Revisión</option>
-                <option value="Aprobada">Aprobadas</option>
-                <option value="Autogenerada">Autogeneradas</option>
-                <option value="Requiere Corrección">Requieren Corrección</option>
-                <option value="Rechazada">Rechazadas</option>
-              </select>
+                <select
+                  id="select-filtro-estado"
+                  value={filterEstado}
+                  onChange={e => setFilterEstado(e.target.value)}
+                  className="px-2.5 py-1.5 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold text-[#18235C]"
+                >
+                  <option value="TODOS">Todos los Estados ({countTotal})</option>
+                  <option value="Pendiente">Radicadas / En Revisión ({countPendientes})</option>
+                  <option value="Aprobada">Aprobadas ({countAprobadas})</option>
+                  <option value="Autogenerada">Autogeneradas</option>
+                  <option value="Requiere Corrección">Requieren Corrección</option>
+                  <option value="Rechazada">Rechazadas</option>
+                </select>
 
-              <select
-                value={filterTipo}
-                onChange={e => setFilterTipo(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold text-[#18235C]"
-              >
-                <option value="TODOS">Todos los Tipos</option>
-                <option value="Cesantías">Cesantías</option>
-                <option value="Licencia">Licencias de Ley</option>
-                <option value="Permiso">Permisos Remunerados</option>
-                <option value="Certificado">Certificados Laborales</option>
-                <option value="Vacaciones">Vacaciones</option>
-              </select>
+                <select
+                  id="select-filtro-tipo"
+                  value={filterTipo}
+                  onChange={e => setFilterTipo(e.target.value)}
+                  className="px-2.5 py-1.5 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold text-[#18235C]"
+                >
+                  <option value="TODOS">Todos los Tipos</option>
+                  <option value="Cesantías">Cesantías</option>
+                  <option value="Licencia">Licencias de Ley</option>
+                  <option value="Permiso">Permisos Remunerados</option>
+                  <option value="Certificado">Certificados Laborales</option>
+                  <option value="Vacaciones">Vacaciones</option>
+                </select>
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o motivo..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-[#8FA7D6] rounded-lg text-xs font-medium"
+                />
+              </div>
             </div>
 
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Buscar por nombre o motivo..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-[#8FA7D6] rounded-lg text-xs font-medium"
-              />
+            {/* Accesos rápidos a estados con persistencia */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100 text-xs">
+              <span className="text-[11px] font-semibold text-slate-500 mr-1">Filtro rápido:</span>
+              <button
+                type="button"
+                id="btn-filtro-todos"
+                onClick={() => setFilterEstado('TODOS')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+                  filterEstado === 'TODOS'
+                    ? 'bg-[#18235C] text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Todos ({countTotal})
+              </button>
+              <button
+                type="button"
+                id="btn-filtro-pendientes"
+                onClick={() => setFilterEstado('Pendiente')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  filterEstado === 'Pendiente'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'bg-blue-50 text-blue-800 hover:bg-blue-100'
+                }`}
+              >
+                <span>Pendientes</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${filterEstado === 'Pendiente' ? 'bg-white text-blue-700' : 'bg-blue-200 text-blue-900'}`}>
+                  {countPendientes}
+                </span>
+              </button>
+              <button
+                type="button"
+                id="btn-filtro-aprobadas"
+                onClick={() => setFilterEstado('Aprobada')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  filterEstado === 'Aprobada'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                }`}
+              >
+                <span>Aprobadas</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${filterEstado === 'Aprobada' ? 'bg-white text-emerald-800' : 'bg-emerald-200 text-emerald-900'}`}>
+                  {countAprobadas}
+                </span>
+              </button>
+              <button
+                type="button"
+                id="btn-filtro-correcciones"
+                onClick={() => setFilterEstado(filterEstado === 'Requiere Corrección' ? 'Rechazada' : 'Requiere Corrección')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  (filterEstado === 'Requiere Corrección' || filterEstado === 'Rechazada')
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                }`}
+              >
+                <span>Corrección / Rechazo</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${(filterEstado === 'Requiere Corrección' || filterEstado === 'Rechazada') ? 'bg-white text-amber-800' : 'bg-amber-200 text-amber-900'}`}>
+                  {countRechazos}
+                </span>
+              </button>
+
+              {(filterEstado !== 'TODOS' || filterTipo !== 'TODOS' || search.trim() !== '') && (
+                <button
+                  type="button"
+                  id="btn-limpiar-filtros"
+                  onClick={() => {
+                    setFilterEstado('TODOS');
+                    setFilterTipo('TODOS');
+                    setSearch('');
+                  }}
+                  className="ml-auto px-2 py-1 rounded-md text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Restablecer filtros a valores por defecto"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Limpiar</span>
+                </button>
+              )}
             </div>
           </div>
 

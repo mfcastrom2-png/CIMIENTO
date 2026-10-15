@@ -355,5 +355,30 @@ export const PLANTILLA_INDICADORES_NORMATIVOS_0312: Omit<IndicadorSST, 'id'>[] =
     responsableAnalisisCargo: 'Gerencia General',
     estado: 'Activo',
     fechaCreacion: '2026-01-15'
+  },
+  {
+    codigo: 'IND-RES-04',
+    nombre: 'Ausentismo Laboral por Causa Médica',
+    descripcion: 'Mide la proporción de tiempo de trabajo programado que se pierde debido a incapacidades médicas (origen común, accidentes de trabajo y enfermedad laboral) registradas en el sistema.',
+    tipo: 'Resultado',
+    cicloPHVA: 'Verificar',
+    procesoRelacionado: 'Gestión Humana y SG-SST',
+    estandar0312Relacionado: '6.1.1',
+    referenciaNormativa: 'Res. 0312/2019 Art. 30 (Estándar 6.1.1) / Dec. 1072/2015 Art. 2.2.4.6.21',
+    objetivoMedicion: 'Monitorear el ausentismo laboral derivado de contingencias de salud y controlar el impacto en la operación y salud del talento humano.',
+    interpretacion: 'Porcentaje de días laborales programados perdidos por incapacidades médicas en el mes.',
+    unidadMedida: '%',
+    sentido: 'Menor es mejor',
+    formulaTexto: '(Días de incapacidad médica en el mes / Total días de trabajo programados en el mes) × 100',
+    nombreVariableNumerador: 'Días de incapacidad médica acumulados en el mes',
+    nombreVariableDenominador: 'Días de trabajo programados en el mes (N° Trabajadores × Días laborales)',
+    factorMultiplicador: 100,
+    meta: 2.0,
+    limiteAmarillo: 3.5,
+    periodicidad: 'Mensual',
+    responsableMedicionCargo: 'Responsable SG-SST / Gestión Humana',
+    responsableAnalisisCargo: 'COPASST y Gerencia General',
+    estado: 'Activo',
+    fechaCreacion: '2026-01-15'
   }
 ];

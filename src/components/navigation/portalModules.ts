@@ -21,6 +21,7 @@ import {
   HardHat,
   Award,
   GraduationCap,
+  Stethoscope,
   LucideIcon
 } from 'lucide-react';
 import type { RolSistema } from '../../types';
@@ -64,7 +65,8 @@ export const MODULOS_GESTION_HUMANA: PortalModule[] = [
     icono: Briefcase,
     enlace: 'estructura',
     color: 'secondary',
-    requierePermiso: 'estructura'
+    requierePermiso: 'estructura',
+    rolesAutorizados: ['superadmin', 'admin_gh', 'lider_area', 'responsable_sst']
   },
   {
     id: 'evaluaciones',
@@ -136,6 +138,16 @@ export const MODULOS_SST: PortalModule[] = [
     color: 'primary',
     requierePermiso: 'votaciones-sst',
     badge: 'COPASST'
+  },
+  {
+    id: 'incapacidades-sst',
+    titulo: 'Control de Incapacidades',
+    descripcion: 'Ausentismo laboral, días acumulados y reintegro.',
+    icono: Stethoscope,
+    enlace: 'incapacidades',
+    color: 'warning',
+    requierePermiso: 'incapacidades',
+    badge: 'SST'
   }
 ];
 
@@ -149,6 +161,16 @@ export const MODULOS_FINANZAS_COMPENSACION: PortalModule[] = [
     color: 'primary',
     requierePermiso: 'nomina',
     esAdmin: true
+  },
+  {
+    id: 'incapacidades',
+    titulo: 'Control de Incapacidades',
+    descripcion: 'Días acumulados, recobros EPS/ARL y reporte.',
+    icono: Stethoscope,
+    enlace: 'incapacidades',
+    color: 'warning',
+    requierePermiso: 'incapacidades',
+    badge: 'CST'
   },
   {
     id: 'parametros-nomina',
@@ -321,6 +343,9 @@ export function getVisiblePortalModules(
       // Si tiene roles autorizados específicos
       if (mod.rolesAutorizados && !mod.rolesAutorizados.includes(safeRole as RolSistema)) return false;
 
+      // El empleado no requiere ni tiene acceso a estructura orgánica
+      if (esEmpleado && mod.id === 'estructura') return false;
+
       // Si requiere permiso específico
       if (mod.requierePermiso && !esAdmin) {
         if (['empleado', 'responsable_sst', 'lider_area'].includes(safeRole)) {
@@ -330,6 +355,31 @@ export function getVisiblePortalModules(
       }
 
       return true;
+    }).map((mod) => {
+      if (esEmpleado) {
+        if (mod.id === 'expedientes') {
+          return {
+            ...mod,
+            titulo: 'Mi Expediente Digital',
+            descripcion: 'Consulta tu expediente digital personal, contratos, historial y documentos laborales.'
+          };
+        }
+        if (mod.id === 'manual-cargos') {
+          return {
+            ...mod,
+            titulo: 'Mi Manual de Cargo',
+            descripcion: 'Consulta las funciones críticas, responsabilidades y competencias oficiales de tu cargo.'
+          };
+        }
+        if (mod.id === 'evaluaciones') {
+          return {
+            ...mod,
+            titulo: 'Mi Evaluación de Desempeño',
+            descripcion: 'Consulta tus calificaciones técnicas de desempeño, metas y plan de desarrollo concertado.'
+          };
+        }
+      }
+      return mod;
     });
   };
 

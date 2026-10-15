@@ -252,6 +252,8 @@ export interface DatosLaboralesEmpleado {
   jornadaLaboral: string;
   modalidadTrabajo: 'Presencial' | 'Híbrida' | 'Trabajo remoto' | 'Teletrabajo';
   lugarTrabajo: string;
+  nivelJerarquico?: string;
+  subarea?: string;
   estado: EstadoColaborador;
 }
 
@@ -1784,5 +1786,96 @@ export interface ContratoCliente {
   urlCarpetaDrive?: string;
   estado: 'Borrador' | 'Firmado' | 'Activo' | 'Cancelado';
   archivoContratoDriveUrl?: string;
+}
+
+// ==========================================
+// MÓDULO DE CONTROL DE INCAPACIDADES
+// Normatividad: CST, Ley 100 de 1993, Decreto 19 de 2012, Res. 0312/2019
+// ==========================================
+
+export type OrigenIncapacidad = 'Comun' | 'Laboral';
+
+export type SubtipoIncapacidad =
+  | 'Enfermedad General'
+  | 'Licencia de Maternidad'
+  | 'Licencia de Paternidad'
+  | 'Accidente de Trabajo'
+  | 'Enfermedad Laboral';
+
+export type TipoContingenciaIncapacidad = 'Inicial' | 'Prorroga';
+
+export type EstadoIncapacidad =
+  | 'Activa'
+  | 'Finalizada'
+  | 'Por Vencer'
+  | 'Vencida'
+  | 'Pendiente Cobro'
+  | 'Cobrada';
+
+export type EstadoCobroIncapacidad =
+  | 'Pendiente Radicación'
+  | 'Radicado ante Entidad'
+  | 'Reconocido'
+  | 'Pagado'
+  | 'Glosado / Objetado';
+
+export interface Incapacidad {
+  id: string;
+  empleadoId: string;
+  empleadoNombre: string;
+  empleadoNumeroDocumento: string;
+  cargoId?: string;
+  cargoNombre?: string;
+  areaNombre?: string;
+  origen: OrigenIncapacidad;
+  subtipo: SubtipoIncapacidad;
+  tipoContingencia: TipoContingenciaIncapacidad;
+  incapacidadAnteriorId?: string;
+  fechaInicio: string; // YYYY-MM-DD
+  fechaFin: string; // YYYY-MM-DD
+  fechaExpedicion: string; // YYYY-MM-DD
+  diasIncapacidad: number; // total días calendario inclusive
+  diasEmpresa: number; // días a cargo del empleador (días 1 y 2 en origen común)
+  diasEntidad: number; // días asumidos por EPS / ARL
+  salarioBase: number; // salario base para cálculos de auxilio e impacto
+  valorEstimadoEmpresa: number; // costo estimado que asume la empresa
+  valorEstimadoEntidad: number; // auxilio económico por cobrar/recobrar a EPS/ARL
+  codigoCIE10: string; // ej. M54.5, J00, etc.
+  diagnostico: string; // descripción del diagnóstico
+  entidadEmisora: string; // EPS, ARL o IPS
+  numeroRadicado: string; // certificado o radicado oficial
+  medicoTratante?: string;
+  registroMedico?: string;
+  ipsAtencion?: string;
+  estado: EstadoIncapacidad;
+  estadoCobro: EstadoCobroIncapacidad;
+  observaciones?: string;
+  documentoSoporteUrl?: string; // enlace a soporte digital
+  requiereExamenReintegro?: boolean;
+  examenReintegroAgendado?: boolean;
+  fechaRegistro: string;
+  registradoPor?: string;
+}
+
+export interface CalculoAcumuladoIncapacidadEmpleado {
+  empleadoId: string;
+  empleadoNombre: string;
+  empleadoNumeroDocumento: string;
+  cargoNombre?: string;
+  areaNombre?: string;
+  salarioBase: number;
+  totalIncapacidades: number;
+  diasAcumuladosAno: number;
+  diasAcumuladosHistorico: number;
+  diasOrigenComun: number;
+  diasOrigenLaboral: number;
+  diasEpisodioContinuoActual: number;
+  tieneIncapacidadActiva: boolean;
+  incapacidadActivaId?: string;
+  fechaProximoVencimiento?: string;
+  diasParaVencer?: number;
+  alertaNivel: 'normal' | 'preventiva_90' | 'alerta_120' | 'critica_180' | 'fuero_salud';
+  mensajeAlerta?: string;
+  diagnosticosFrecuentes: string[];
 }
 

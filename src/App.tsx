@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   HashRouter as Router,
   Routes,
@@ -44,6 +44,7 @@ import { CimientoComercialDashboard } from './components/comercial/CimientoComer
 import { LogoCimientoComercial } from './components/logos/LogosModulos';
 import { ModuloSistema } from './types';
 import { ModulosPortalView } from './components/navigation/ModulosPortalView';
+import { IncapacidadesView } from './components/IncapacidadesView';
 
 import {
   Bell,
@@ -59,7 +60,8 @@ import {
   Building2,
   QrCode,
   PenTool,
-  Layers
+  Layers,
+  Briefcase
 } from 'lucide-react';
 
 function AppLayout() {
@@ -140,6 +142,20 @@ function AppLayout() {
   const queryParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const paramVerificar = queryParams.get('verificar') || queryParams.get('codigo');
   const isPublicVerificationRoute = location.pathname.startsWith('/verificar') || Boolean(paramVerificar);
+
+  const esEmpleado = userRole === 'empleado' || currentUser?.rol === 'empleado';
+
+  const currentEmpleadoLogueado = useMemo(() => {
+    if (!currentUser) return null;
+    return (
+      empleados.find(e => currentUser.empleadoId && e.id === currentUser.empleadoId) ||
+      empleados.find(e => currentUser.documento && (e.documento === currentUser.documento || e.persona?.numeroDocumento === currentUser.documento)) ||
+      empleados.find(e => currentUser.email && e.email?.toLowerCase().trim() === currentUser.email?.toLowerCase().trim()) ||
+      empleados.find(e => currentUser.email && e.contacto?.correoPersonal?.toLowerCase().trim() === currentUser.email?.toLowerCase().trim()) ||
+      empleados.find(e => currentUser.email && e.contacto?.correoCorporativo?.toLowerCase().trim() === currentUser.email?.toLowerCase().trim()) ||
+      (esEmpleado && empleados.length > 0 ? empleados[0] : null)
+    );
+  }, [empleados, currentUser, esEmpleado]);
 
   if (!currentUser) {
     if (isPublicVerificationRoute) {
@@ -444,7 +460,9 @@ function AppLayout() {
                 element={
                   <ModulosPortalView
                     userRole={userRole}
+                    currentUser={currentUser}
                     onNavigate={(view) => navigate('/' + view)}
+                    pendingRequestsCount={pendientesCount}
                   />
                 }
               />
@@ -496,24 +514,59 @@ function AppLayout() {
               <Route
                 path="/estructura"
                 element={
-                  <EstructuraView
-                    cargos={cargos}
-                    empleados={empleados}
-                    areas={areas}
-                    procesos={procesos}
-                    onAddCargo={handleAddCargo}
-                    onUpdateCargo={handleUpdateCargo}
-                    onDeleteCargo={handleDeleteCargo}
-                    onAddArea={handleAddArea}
-                    onUpdateArea={handleUpdateArea}
-                    onDeleteArea={handleDeleteArea}
-                    onAddProceso={handleAddProceso}
-                    onUpdateProceso={handleUpdateProceso}
-                    onDeleteProceso={handleDeleteProceso}
-                    onSelectCargoForManual={(_cargoId) => navigate('/cargos')}
-                    isSuperAdmin={isSuperAdmin}
-                    onDepurarEstructura={isSuperAdmin ? handleLimpiarEstructura : undefined}
-                  />
+                  esEmpleado ? (
+                    <div className="max-w-2xl mx-auto my-12 p-8 bg-white rounded-2xl border border-[#8FA7D6]/40 shadow-sm text-center space-y-4">
+                      <div className="w-16 h-16 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-[#18235C]">
+                        <Briefcase className="w-8 h-8 text-[#8FA7D6]" />
+                      </div>
+                      <h2 className="text-xl font-bold text-[#18235C]">Acceso Exclusivo de Gestión Humana</h2>
+                      <p className="text-sm text-slate-600 leading-relaxed">
+                        El módulo de estructura orgánica, organigramas y mapa de procesos es de administración exclusiva para la dirección y gestión humana de la organización.
+                      </p>
+                      <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => navigate('/empleados')}
+                          className="px-4 py-2 rounded-lg bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Ir a Mi Expediente Digital
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/cargos')}
+                          className="px-4 py-2 rounded-lg border border-[#8FA7D6] bg-white hover:bg-slate-50 text-[#18235C] text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Ir a Mi Manual de Cargo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/portal')}
+                          className="px-4 py-2 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Ir a Mi Portal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <EstructuraView
+                      cargos={cargos}
+                      empleados={empleados}
+                      areas={areas}
+                      procesos={procesos}
+                      onAddCargo={handleAddCargo}
+                      onUpdateCargo={handleUpdateCargo}
+                      onDeleteCargo={handleDeleteCargo}
+                      onAddArea={handleAddArea}
+                      onUpdateArea={handleUpdateArea}
+                      onDeleteArea={handleDeleteArea}
+                      onAddProceso={handleAddProceso}
+                      onUpdateProceso={handleUpdateProceso}
+                      onDeleteProceso={handleDeleteProceso}
+                      onSelectCargoForManual={(_cargoId) => navigate('/cargos')}
+                      isSuperAdmin={isSuperAdmin}
+                      onDepurarEstructura={isSuperAdmin ? handleLimpiarEstructura : undefined}
+                    />
+                  )
                 }
               />
               <Route
@@ -522,6 +575,9 @@ function AppLayout() {
                   <ManualCargosView
                     cargos={cargos}
                     empresa={empresa}
+                    userRole={userRole}
+                    currentUser={currentUser}
+                    empleado={currentEmpleadoLogueado}
                     onUpdateCargo={handleUpdateCargo}
                     onUpdateCargoFicha={(cargoId, updatedFicha) => {
                       const cargoActual = cargos.find(c => c.id === cargoId);
@@ -573,7 +629,7 @@ function AppLayout() {
                     empleados={empleados}
                     cargos={cargos}
                     userRole={userRole}
-                    currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
+                    currentEmpleadoId={currentEmpleadoLogueado?.id || currentUser?.empleadoId || currentUser?.id || 'e1'}
                     currentUser={currentUser}
                     onSaveEvaluacion={handleSaveEvaluacion}
                     onDeleteEvaluacion={handleDeleteEvaluacion}
@@ -593,6 +649,7 @@ function AppLayout() {
                     userRole={userRole}
                     currentUser={currentUser}
                     isSuperAdmin={isSuperAdmin}
+                    onNavigate={(view) => navigate('/' + view)}
                   />
                 }
               />
@@ -825,6 +882,20 @@ function AppLayout() {
                   />
                 }
               />
+              <Route
+                path="/incapacidades"
+                element={
+                  <IncapacidadesView
+                    empleados={empleados}
+                    cargos={cargos}
+                    empresa={empresa}
+                    userRole={userRole}
+                    currentUser={currentUser}
+                    onNavigate={(view) => navigate('/' + view)}
+                  />
+                }
+              />
+              <Route path="/control-incapacidades" element={<Navigate to="/incapacidades" replace />} />
               <Route
                 path="/usuarios"
                 element={

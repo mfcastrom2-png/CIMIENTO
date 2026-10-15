@@ -36,4 +36,19 @@ describe('getVisiblePortalModules', () => {
     expect(resultEmpleado.gestionHumana.length).toBeGreaterThan(0);
     expect(resultAdmin.gestionHumana.length).toBeGreaterThan(0);
   });
+
+  it('módulo de solicitudes es accesible tanto para empleados como administradores', () => {
+    const resultEmpleado = getVisiblePortalModules('empleado', []);
+    const resultAdmin = getVisiblePortalModules('superadmin', []);
+    const resultLider = getVisiblePortalModules('lider_area', []);
+
+    expect(resultEmpleado.solicitudes.length).toBe(1);
+    expect(resultEmpleado.solicitudes[0].enlace).toBe('solicitudes');
+
+    expect(resultAdmin.solicitudes.length).toBe(1);
+    expect(resultAdmin.solicitudes[0].enlace).toBe('solicitudes');
+
+    expect(resultLider.solicitudes.length).toBe(1);
+    expect(resultLider.solicitudes[0].enlace).toBe('solicitudes');
+  });
 });

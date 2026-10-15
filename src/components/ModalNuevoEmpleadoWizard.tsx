@@ -1846,7 +1846,14 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                   <label className="block font-bold text-[#18235C] mb-1">Centro de Trabajo / Lugar Asignado *</label>
                   <select
                     value={lugarTrabajo}
-                    onChange={e => setLugarTrabajo(e.target.value)}
+                    onChange={e => {
+                      const nuevoLugar = e.target.value;
+                      setLugarTrabajo(nuevoLugar);
+                      const ctEncontrado = centrosTrabajoDisponibles.find(ct => ct.nombre === nuevoLugar);
+                      if (ctEncontrado?.claseRiesgoARL) {
+                        setNivelRiesgoArl(ctEncontrado.claseRiesgoARL as any);
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-semibold text-[#18235C]"
                   >
                     {centrosTrabajoDisponibles.map(ct => (
@@ -1858,6 +1865,18 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                       <option value={lugarTrabajo}>{lugarTrabajo}</option>
                     )}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#18235C] mb-1">Centro de Costos Imputado *</label>
+                  <input
+                    type="text"
+                    placeholder="CC-OPERACIONES"
+                    value={centroCostos}
+                    onChange={e => setCentroCostos(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-mono text-xs font-semibold"
+                  />
+                  <span className="text-[10px] text-[#282829] block mt-0.5">Imputación presupuestal de nómina</span>
                 </div>
 
                 {esContratoSinNominaLaboral(tipoContrato) && (
@@ -2041,13 +2060,11 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#18235C] mb-1">Centro de Costos Imputado</label>
-                  <input
-                    type="text"
-                    value={centroCostos}
-                    onChange={e => setCentroCostos(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-mono"
-                  />
+                  <label className="block font-bold text-[#18235C] mb-1">Centro de Costos Asignado</label>
+                  <div className="w-full px-3 py-2 bg-slate-100 border border-[#8FA7D6] rounded-lg font-mono text-xs font-bold text-[#18235C]">
+                    {centroCostos || 'CC-OPERACIONES'}
+                  </div>
+                  <span className="text-[10px] text-[#282829] block mt-0.5">Definido en Información Laboral (Paso 3)</span>
                 </div>
 
                 <div>
