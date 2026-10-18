@@ -1664,10 +1664,10 @@ export type ModuloSistema = 'humano' | 'comercial';
 
 export interface ClienteComercial {
   id: string;
-  codigo: string; // ej. "CLI-0012"
+  codigo: string; // Igual al documento de identidad / NIT del usuario
   nombre: string;
   identificacion: string;
-  tipoIdentificacion: 'CC' | 'NIT' | 'CE' | 'Pasaporte';
+  tipoIdentificacion: 'CC' | 'NIT' | 'CE' | 'Pasaporte' | 'PPT';
   direccion: string;
   ciudad: string;
   telefono: string;
@@ -1768,24 +1768,53 @@ export interface ContratoCliente {
   id: string;
   codigoContrato: string; // ej. "CTR-TELCO-2026-089"
   clienteId: string;
+  clienteCodigo?: string; // Igual al documento de identidad / NIT del usuario
   clienteNombre: string;
   clienteIdentificacion: string;
+  clienteTipoIdentificacion?: 'CC' | 'NIT' | 'CE' | 'Pasaporte' | 'PPT';
+  clienteTelefono?: string;
+  clienteEmail?: string;
+  ciudadInstalacion?: string;
+  barrioVereda?: string;
+  estrato?: '1' | '2' | '3' | '4' | '5' | '6' | 'Comercial' | 'Industrial';
   fechaContrato: string;
+  fechaInicioFacturacion?: string;
+  diaCorteMensual?: number;
+  tipoServicio?: 'Internet Fijo FTTH' | 'Dúo Internet + TV Digital' | 'Trío Internet + TV + Voz IP' | 'Canal Dedicado Empresarial' | 'Radioenlace Microondas';
+  tecnologiaAcceso?: 'Fibra Óptica GPON (FTTH)' | 'Radioenlace Punto a Punto' | 'Fibra Dedicada MetroEthernet';
   planServicio: string;
   velocidadMbps: number;
+  velocidadSubidaMbps?: number;
   tarifaMensual: number;
+  aplicaIva?: boolean;
+  valorIva?: number;
+  totalMensualPagar?: number;
   permanenciaMeses: number;
+  cargoConexionTotal?: number;
+  cargoConexionDescuento?: number;
   direccionInstalacion: string;
   ipAsignada?: string;
+  nodoCajaNap?: string;
+  equipoComodato?: {
+    marcaModelo: string;
+    serialOnt: string;
+    macAddress: string;
+    valorReposicion: number;
+  };
+  autorizaHabeasData?: boolean;
+  autorizaCentralesRiesgo?: boolean;
+  aceptaFacturaElectronica?: boolean;
   firmaDigitalUrl?: string; // Data URL de la firma en canvas
   firmaNombre: string;
   firmaCedula: string;
   firmaFecha: string;
+  asesorComercialNombre?: string;
   hashIntegridadSha256: string;
   carpetaDriveId?: string;
   urlCarpetaDrive?: string;
-  estado: 'Borrador' | 'Firmado' | 'Activo' | 'Cancelado';
+  estado: 'Borrador' | 'Firmado' | 'Activo' | 'Suspendido' | 'En Instalación' | 'Cancelado';
   archivoContratoDriveUrl?: string;
+  observaciones?: string;
 }
 
 // ==========================================

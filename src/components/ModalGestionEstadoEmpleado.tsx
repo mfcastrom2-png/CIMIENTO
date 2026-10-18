@@ -170,7 +170,7 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
                 Gestión de Estado Laboral y Novedades
               </h3>
               <p className="text-[11px] text-[#8FA7D6] leading-tight">
-                {empleado.nombre} · {cargoNombre} (Actual: {estadoActualInicial})
+                {empleado.nombre} · Cód/CC: {empleado.documento || empleado.codigo} · {cargoNombre} (Actual: {estadoActualInicial})
               </p>
             </div>
           </div>

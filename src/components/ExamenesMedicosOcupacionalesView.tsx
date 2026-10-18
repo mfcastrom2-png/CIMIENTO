@@ -1152,7 +1152,7 @@ export const ExamenesMedicosOcupacionalesView: React.FC<ExamenesMedicosOcupacion
                       const cNombre = cargos.find(c => c.id === emp.cargoId)?.nombre || 'Cargo';
                       return (
                         <option key={emp.id} value={emp.id}>
-                          {emp.nombre} — CC {emp.documento} ({cNombre})
+                          {emp.nombre} — Cód/CC {emp.documento || emp.codigo} ({cNombre})
                         </option>
                       );
                     })}

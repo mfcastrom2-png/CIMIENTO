@@ -162,7 +162,8 @@ export function GestionNovedadesView({
     return empleados.filter(emp => {
       const matchSearch =
         emp.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.documento.includes(searchTerm);
+        emp.documento.includes(searchTerm) ||
+        (emp.codigo && emp.codigo.includes(searchTerm));
       const matchCargo = cargoFilter === 'TODOS' || emp.cargoId === cargoFilter;
       return matchSearch && matchCargo;
     });
@@ -462,7 +463,11 @@ export function GestionNovedadesView({
                   <tr key={emp.id} className="hover:bg-[#FFFFFF]/60 transition-colors">
                     <td className="p-3.5">
                       <div className="font-semibold text-[#18235C]">{emp.nombre}</div>
-                      <div className="text-[11px] text-[#282829]">{cargo?.nombre}</div>
+                      <div className="text-[11px] text-[#282829] flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[#18235C] font-semibold">Cód/CC: {emp.codigo || emp.documento}</span>
+                        <span>•</span>
+                        <span>{cargo?.nombre}</span>
+                      </div>
                       <div className="text-[10px] text-[#8DA096]">
                         Salario: {formatCOP(emp.salarioBase)}
                       </div>
@@ -597,7 +602,7 @@ export function GestionNovedadesView({
                   Novedades de Nómina: {empleadoEnEdicion.nombre}
                 </h3>
                 <div className="text-xs text-[#282829]">
-                  CC: {empleadoEnEdicion.documento} • Salario Base: {formatCOP(empleadoEnEdicion.salarioBase)}
+                  Cód / C.C.: {empleadoEnEdicion.documento || empleadoEnEdicion.codigo} • Salario Base: {formatCOP(empleadoEnEdicion.salarioBase)}
                 </div>
               </div>
               <button

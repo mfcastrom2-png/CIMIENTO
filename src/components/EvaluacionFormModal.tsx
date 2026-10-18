@@ -338,7 +338,7 @@ export const EvaluacionFormModal: React.FC<EvaluacionFormModalProps> = ({
                       const c = cargos.find(cg => cg.id === emp.cargoId);
                       return (
                         <option key={emp.id} value={emp.id}>
-                          {emp.nombre} — {c?.nombre || 'Sin cargo'}
+                          {emp.nombre} — Cód/CC: {emp.documento || emp.codigo} ({c?.nombre || 'Sin cargo'})
                         </option>
                       );
                     })}

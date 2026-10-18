@@ -359,7 +359,7 @@ export function VotacionesSstView({
                   const yaVoto = procesoActual.votantesRegistrados.some(v => v.empleadoId === emp.id);
                   return (
                     <option key={emp.id} value={emp.id}>
-                      {emp.nombre} ({yaVoto ? 'Ya Votó' : 'Pendiente de Votar'})
+                      {emp.nombre} — Cód/CC: {emp.documento || emp.codigo} ({yaVoto ? 'Ya Votó' : 'Pendiente de Votar'})
                     </option>
                   );
                 })}

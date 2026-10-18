@@ -517,7 +517,7 @@ export function NominaView({
                 <span className="font-bold text-[#18235C]">{miLiquidacion.empleadoNombre}</span>
               </div>
               <div>
-                <span className="text-[#282829]/70 block text-[10px] uppercase font-bold">Identificación</span>
+                <span className="text-[#282829]/70 block text-[10px] uppercase font-bold">Código / Identificación</span>
                 <span className="font-medium text-[#282829]">C.C. {miLiquidacion.empleadoDocumento}</span>
               </div>
               <div>
@@ -1201,7 +1201,7 @@ export function NominaView({
                           )}
                         </div>
                         <div className="text-[10px] text-[#282829] flex items-center gap-1.5 flex-wrap">
-                          <span>CC: {liq.empleadoDocumento}</span>
+                          <span>Cód / CC: {liq.empleadoDocumento}</span>
                           <span>•</span>
                           <span className="text-[#18235C] font-semibold">{liq.cargoNombre}</span>
                           {fechaIngresoStr && !esMesIngreso && (
@@ -1680,7 +1680,7 @@ export function NominaView({
                   <span className="font-bold text-[#282829]">{liquidacionDesprendible.empleadoNombre}</span>
                 </div>
                 <div>
-                  <span className="text-[#18235C] block text-[10px] uppercase font-bold">Identificación</span>
+                  <span className="text-[#18235C] block text-[10px] uppercase font-bold">Código / Identificación</span>
                   <span className="font-medium text-[#282829]">C.C. {liquidacionDesprendible.empleadoDocumento}</span>
                 </div>
                 <div>

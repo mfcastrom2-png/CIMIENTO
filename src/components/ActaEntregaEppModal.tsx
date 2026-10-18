@@ -20,6 +20,7 @@ import { CodigoQRVerificacion } from './CodigoQRVerificacion';
 import { FirmaDigitalStamp } from './FirmaDigitalStamp';
 import { HerramientaFirmaDigitalModal, DatosFirmaDigital } from './HerramientaFirmaDigitalModal';
 import { registrarCertificadoEmitido, generarHashIntegridadDocumento } from '../services/verificacionCertificadosService';
+import { useCompanySyncOptional } from '../context/SyncContext';
 
 interface ActaEntregaEppModalProps {
   solicitud: SolicitudEntregaEPP;
@@ -28,6 +29,11 @@ interface ActaEntregaEppModalProps {
 }
 
 export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solicitud, empresa = initialEmpresa, onClose }) => {
+  const sync = useCompanySyncOptional();
+  const empleados = sync?.empleados || [];
+  const emp = empleados.find(e => e.id === solicitud.empleadoId);
+  const docOCod = emp?.documento || emp?.codigo || emp?.codigoInterno || '—';
+
   const [descargandoPdf, setDescargandoPdf] = useState(false);
   const [modalFirmaOpen, setModalFirmaOpen] = useState(false);
   const [firmanteActualTipo, setFirmanteActualTipo] = useState<'colaborador' | 'responsable'>('colaborador');
@@ -44,7 +50,7 @@ export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solici
         codigoVerificacion,
         tipoDocumento: 'Acta de Entrega de EPP',
         titularNombre: solicitud.empleadoNombre,
-        titularDocumento: 'Documento Registrado',
+        titularDocumento: docOCod !== '—' ? docOCod : 'Documento Registrado',
         titularCargo: solicitud.eppNombre,
         fechaEmision: solicitud.fechaEntrega || new Date().toLocaleDateString('es-CO'),
         fechaRegistroISO: new Date().toISOString(),
@@ -171,10 +177,14 @@ export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solici
             <div className="text-xs font-bold uppercase tracking-wider text-[#18235C] border-b border-[#8FA7D6] pb-1 mb-2">
               1. Identificación del Colaborador Receptor
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#FFFFFF] p-3 rounded-lg border border-[#8FA7D6]">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-[#FFFFFF] p-3 rounded-lg border border-[#8FA7D6]">
               <div>
                 <span className="text-[10px] text-[#282829] block">Nombre Completo</span>
                 <span className="font-bold text-xs">{solicitud.empleadoNombre}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-[#282829] block">Código / C.C.</span>
+                <span className="font-mono font-bold text-xs text-[#18235C]">{docOCod}</span>
               </div>
               <div>
                 <span className="text-[10px] text-[#282829] block">Cargo Desempeñado</span>
@@ -262,7 +272,7 @@ export const ActaEntregaEppModal: React.FC<ActaEntregaEppModalProps> = ({ solici
                   firmanteDefault={{
                     nombre: solicitud.empleadoNombre,
                     cargo: 'Colaborador (Recibí Conforme EPP)',
-                    documento: 'C.C. Registrada'
+                    documento: docOCod !== '—' ? `C.C. / Cód: ${docOCod}` : 'C.C. Registrada'
                   }}
                   labelCargo="Firma de Constancia de Entrega y Recibo"
                   onOpenFirmarModal={() => abrirModalFirmar('colaborador')}

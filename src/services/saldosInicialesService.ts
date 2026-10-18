@@ -757,6 +757,8 @@ export function sincronizarOSincronizarYCrearEmpleadosDesdeSaldos(
       actualizadosContador++;
       const empActualizado: Empleado = {
         ...empExistente,
+        codigo: empExistente.documento || s.documento,
+        codigoInterno: empExistente.documento || s.documento,
         salarioBase: salarioUsar,
         saldoInicial: s,
         contrato: {
@@ -767,7 +769,7 @@ export function sincronizarOSincronizarYCrearEmpleadosDesdeSaldos(
         },
         laboral: {
           ...(empExistente.laboral || {
-            codigoInterno: `EMP-${s.documento.slice(-4)}`,
+            codigoInterno: empExistente.documento || s.documento,
             fechaIngreso: s.fechaIngreso || '2024-01-01',
             fechaInicioLaboral: s.fechaIngreso || '2024-01-01',
             areaId: 'area-op',
@@ -826,6 +828,8 @@ export function sincronizarOSincronizarYCrearEmpleadosDesdeSaldos(
 
       const nuevoEmp: Empleado = {
         id: `emp-${docLimpio}`,
+        codigo: s.documento,
+        codigoInterno: s.documento,
         nombre: s.nombreCompleto,
         documento: s.documento,
         tipoDocumento: 'CC',
@@ -868,7 +872,7 @@ export function sincronizarOSincronizarYCrearEmpleadosDesdeSaldos(
           contactoEmergenciaTelefono: '3000000000'
         },
         laboral: {
-          codigoInterno: `EMP-${s.documento.slice(-4)}`,
+          codigoInterno: s.documento,
           fechaIngreso: s.fechaIngreso || '2024-01-01',
           fechaInicioLaboral: s.fechaIngreso || '2024-01-01',
           areaId: 'area-op',

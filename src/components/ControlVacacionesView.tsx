@@ -712,7 +712,7 @@ export function ControlVacacionesView({
                   const ctrl = controles.find(c => c.empleadoId === emp.id);
                   return (
                     <option key={emp.id} value={emp.id}>
-                      {emp.nombre} ({ctrl?.diasPendientesDisfrute ?? 0} d disponibles)
+                      {emp.nombre} — Cód/CC: {emp.documento || emp.codigo} ({ctrl?.diasPendientesDisfrute ?? 0} d disponibles)
                     </option>
                   );
                 })}
@@ -1772,7 +1772,7 @@ export function ControlVacacionesView({
                       const ctrl = controles.find(c => c.empleadoId === emp.id);
                       return (
                         <option key={emp.id} value={emp.id}>
-                          {emp.nombre} — Saldo: {ctrl?.diasPendientesDisfrute || 15} días hábiles
+                          {emp.nombre} — Cód/CC: {emp.documento || emp.codigo} (Saldo: {ctrl?.diasPendientesDisfrute || 15} d)
                         </option>
                       );
                     })}

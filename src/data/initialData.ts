@@ -545,6 +545,8 @@ export const INITIAL_CARGOS: Cargo[] = [
 export const INITIAL_EMPLEADOS: Empleado[] = [
   {
     id: 'e1',
+    codigo: '52.331.902',
+    codigoInterno: '52.331.902',
     nombre: 'Marcela Rueda',
     documento: '52.331.902',
     email: 'marcela.rueda@empresa.com',
@@ -558,7 +560,7 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     familia: [{ nombre: 'Diego Rueda', parentesco: 'Hijo', nacimiento: '2012-05-14' }],
     activo: true,
     laboral: {
-      codigoInterno: 'EMP-001',
+      codigoInterno: '52.331.902',
       fechaIngreso: '2019-03-01',
       fechaInicioLaboral: '2019-03-01',
       areaId: 'ar_1',
@@ -603,6 +605,8 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
   },
   {
     id: 'e2',
+    codigo: '80.114.552',
+    codigoInterno: '80.114.552',
     nombre: 'Andrés Pinilla',
     documento: '80.114.552',
     email: 'andres.pinilla@empresa.com',
@@ -616,7 +620,7 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     familia: [],
     activo: true,
     laboral: {
-      codigoInterno: 'EMP-002',
+      codigoInterno: '80.114.552',
       fechaIngreso: '2022-01-10',
       fechaInicioLaboral: '2022-01-10',
       areaId: 'ar_4',
@@ -652,6 +656,8 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
   },
   {
     id: 'e3',
+    codigo: '1.032.556.881',
+    codigoInterno: '1.032.556.881',
     nombre: 'Laura Beltrán',
     documento: '1.032.556.881',
     email: 'laura.beltran@empresa.com',
@@ -665,7 +671,7 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     familia: [{ nombre: 'Camilo Beltrán', parentesco: 'Cónyuge', nacimiento: '1990-02-20' }],
     activo: true,
     laboral: {
-      codigoInterno: 'EMP-003',
+      codigoInterno: '1.032.556.881',
       fechaIngreso: '2023-06-01',
       fechaInicioLaboral: '2023-06-01',
       areaId: 'ar_5',
@@ -700,6 +706,8 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
   },
   {
     id: 'e4',
+    codigo: '1.020.445.117',
+    codigoInterno: '1.020.445.117',
     nombre: 'Julián Torres',
     documento: '1.020.445.117',
     email: 'julian.torres@empresa.com',
@@ -713,7 +721,7 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     familia: [],
     activo: true,
     laboral: {
-      codigoInterno: 'EMP-004',
+      codigoInterno: '1.020.445.117',
       fechaIngreso: '2024-02-15',
       fechaInicioLaboral: '2024-02-15',
       areaId: 'ar_6',
@@ -748,6 +756,8 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
   },
   {
     id: 'e5',
+    codigo: '1.015.223.660',
+    codigoInterno: '1.015.223.660',
     nombre: 'Camila Ospina',
     documento: '1.015.223.660',
     email: 'camila.ospina@empresa.com',
@@ -761,7 +771,7 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     familia: [{ nombre: 'Sofía Ospina', parentesco: 'Hija', nacimiento: '2018-11-02' }],
     activo: true,
     laboral: {
-      codigoInterno: 'EMP-005',
+      codigoInterno: '1.015.223.660',
       fechaIngreso: '2021-09-01',
       fechaInicioLaboral: '2021-09-01',
       areaId: 'ar_7',
@@ -796,6 +806,8 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
   },
   {
     id: 'e6',
+    codigo: '1.019.034.789',
+    codigoInterno: '1.019.034.789',
     nombre: 'Carlos Mendivelso',
     documento: '1.019.034.789',
     email: 'carlos.mendivelso@empresa.com',
@@ -812,7 +824,7 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     ],
     activo: true,
     laboral: {
-      codigoInterno: 'EMP-006',
+      codigoInterno: '1.019.034.789',
       fechaIngreso: '2022-04-15',
       fechaInicioLaboral: '2022-04-15',
       areaId: 'ar_2',
@@ -858,6 +870,8 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
   },
   {
     id: 'e7',
+    codigo: '1.014.288.932',
+    codigoInterno: '1.014.288.932',
     nombre: 'Mateo Cárdenas Silva',
     documento: '1.014.288.932',
     email: 'mateo.cardenas@empresa.com',
@@ -872,7 +886,7 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     activo: true,
     estadoLaboral: 'Preingreso',
     laboral: {
-      codigoInterno: 'EMP-007',
+      codigoInterno: '1.014.288.932',
       fechaIngreso: '2026-10-01',
       fechaInicioLaboral: '2026-10-01',
       areaId: 'ar_2',
@@ -906,6 +920,8 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
   },
   {
     id: 'e-carlos-restrepo',
+    codigo: '1.020.892.411',
+    codigoInterno: '1.020.892.411',
     nombre: 'Carlos Restrepo',
     documento: '1.020.892.411',
     email: 'carlos.restrepo@empresa-ejemplo.co',
@@ -919,7 +935,7 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
     familia: [],
     activo: true,
     laboral: {
-      codigoInterno: 'EMP-008',
+      codigoInterno: '1.020.892.411',
       fechaIngreso: '2024-01-15',
       fechaInicioLaboral: '2024-01-15',
       areaId: 'ar_2',

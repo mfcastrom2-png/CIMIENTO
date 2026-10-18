@@ -1332,7 +1332,7 @@ export const IncapacidadesView: React.FC<IncapacidadesViewProps> = ({
                   <option value="">-- Seleccionar colaborador --</option>
                   {empleados.map(emp => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.nombre} — C.C. {emp.documento} ({emp.laboral?.cargoNombre || 'Colaborador'})
+                      {emp.nombre} — Cód/CC: {emp.documento || emp.codigo} ({emp.laboral?.cargoNombre || 'Colaborador'})
                     </option>
                   ))}
                 </select>

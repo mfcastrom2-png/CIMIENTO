@@ -66,7 +66,7 @@ export const SimuladorLiquidacionContratoView: React.FC<SimuladorLiquidacionCont
             >
               {empleados.map(e => (
                 <option key={e.id} value={e.id}>
-                  {e.nombre} ({e.contrato.tipo})
+                  {e.nombre} — Cód/CC: {e.documento || e.codigo} ({e.contrato.tipo})
                 </option>
               ))}
             </select>
@@ -116,7 +116,10 @@ export const SimuladorLiquidacionContratoView: React.FC<SimuladorLiquidacionCont
             <div className="p-4 bg-[#18235C] text-white flex justify-between items-center flex-wrap gap-2">
               <div>
                 <h4 className="font-bold text-sm text-white">
-                  Liquidación de Prestaciones e Indemnización — {empleados.find(e => e.id === simulacionParams.empleadoId)?.nombre || empleados[0]?.nombre}
+                  Liquidación de Prestaciones e Indemnización — {(() => {
+                    const sel = empleados.find(e => e.id === simulacionParams.empleadoId) || empleados[0];
+                    return `${sel?.nombre || ''} (Cód/CC: ${sel?.documento || sel?.codigo || ''})`;
+                  })()}
                 </h4>
                 <div className="text-[11px] text-[#8FA7D6] font-medium">
                   Ingreso: {simulacionLiquidacion.fechaIngreso} • Retiro: {simulacionLiquidacion.fechaRetiro} • Días totales laborados: {simulacionLiquidacion.diasTotalesLaborados}

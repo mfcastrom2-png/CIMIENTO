@@ -220,8 +220,8 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                   <h1 className="text-2xl font-extrabold text-[#18235C] tracking-tight">
                     {empleado.nombre}
                   </h1>
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-[#18235C] border border-[#8FA7D6]/40">
-                    {empleado.codigo || empleado.codigoInterno || 'S/C'}
+                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-[#18235C] border border-[#8FA7D6]/40" title="Código de Empleado (Documento de Identidad)">
+                    Cód: {empleado.codigo || empleado.documento || empleado.codigoInterno || 'S/C'}
                   </span>
                   {estadoBadge()}
                   {esColaborador && (
@@ -341,8 +341,8 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                 <span className="text-slate-800 font-semibold">{empleado.persona?.estadoCivil || 'Soltero(a)'}</span>
               </div>
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Código Interno:</span>
-                <span className="text-[#18235C] font-bold font-mono">{empleado.codigo || empleado.codigoInterno || '—'}</span>
+                <span className="text-slate-500 block font-semibold">Código de Empleado (Doc. Identidad):</span>
+                <span className="text-[#18235C] font-bold font-mono">{empleado.codigo || empleado.documento || empleado.codigoInterno || '—'}</span>
               </div>
             </div>
           </div>
@@ -416,6 +416,10 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
               Expediente Digital – Pestaña 3: Información Laboral y Contractual
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <span className="text-slate-500 block font-semibold">Código de Empleado (Doc. Identidad):</span>
+                <span className="text-[#18235C] font-mono font-bold">{empleado.codigo || empleado.documento || empleado.laboral?.codigoInterno || '—'}</span>
+              </div>
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                 <span className="text-slate-500 block font-semibold">Tipo de Contrato:</span>
                 <span className="text-[#18235C] font-bold">{empleado.laboral?.tipoContrato || empleado.contrato?.tipo || 'Término indefinido'}</span>

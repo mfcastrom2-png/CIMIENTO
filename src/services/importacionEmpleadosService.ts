@@ -108,7 +108,7 @@ export function generarPlantillaCsvEmpleados(): string {
       'Gloria Morales',
       'Madre',
       '3101234567',
-      'EMP-012',
+      '1019034789',
       '2024-03-15',
       'Técnico de Redes y Telecomunicaciones',
       'Operaciones FTTH',
@@ -152,7 +152,7 @@ export function generarPlantillaCsvEmpleados(): string {
       'Jorge Gómez',
       'Esposo',
       '3159876543',
-      'EMP-013',
+      '52987456',
       '2023-01-10',
       'Coordinadora de Gestión Humana',
       'Gestión Humana',
@@ -326,7 +326,7 @@ export function parsearTextoCsvEmpleados(
     const contactoEmergenciaParentesco = (columnas[16] || 'Familiar').trim();
     const contactoEmergenciaTelefono = (columnas[17] || celular).trim();
 
-    const codigoInterno = (columnas[18] || `EMP-${Math.floor(100 + Math.random() * 900)}`).trim();
+    const codigoInterno = (documentoLimpio || columnas[18] || '').trim();
     const fechaIngreso = (columnas[19] || new Date().toISOString().slice(0, 10)).trim();
     const cargoNombre = (columnas[20] || 'Colaborador').trim();
     const areaNombre = (columnas[21] || 'Operaciones').trim();
@@ -376,8 +376,8 @@ export function parsearTextoCsvEmpleados(
 
     const empleadoObj: Empleado = {
       id: targetId,
-      codigo: codigoInterno,
-      codigoInterno,
+      codigo: documentoLimpio || codigoInterno,
+      codigoInterno: documentoLimpio || codigoInterno,
       nombre: nombreCompleto,
       documento: documentoLimpio,
       tipoDocumento,
@@ -427,7 +427,7 @@ export function parsearTextoCsvEmpleados(
         contactoEmergenciaTelefono
       },
       laboral: {
-        codigoInterno,
+        codigoInterno: documentoLimpio || codigoInterno,
         fechaIngreso,
         fechaInicioLaboral: fechaIngreso,
         areaId: areaMatch?.id || 'a1',

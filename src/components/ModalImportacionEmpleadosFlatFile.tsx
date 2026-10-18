@@ -342,7 +342,7 @@ export const ModalImportacionEmpleadosFlatFile: React.FC<ModalImportacionEmplead
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-[#18235C] text-white text-[11px] sticky top-0">
                   <tr>
-                    <th className="py-2 px-3">Documento DIAN</th>
+                    <th className="py-2 px-3">Código / Documento</th>
                     <th className="py-2 px-3">Colaborador</th>
                     <th className="py-2 px-3">Cargo / Área</th>
                     <th className="py-2 px-3 text-right">Salario Básico</th>
@@ -355,11 +355,11 @@ export const ModalImportacionEmpleadosFlatFile: React.FC<ModalImportacionEmplead
                     .filter(item => {
                       if (!filtroBusqueda.trim()) return true;
                       const q = filtroBusqueda.toLowerCase();
-                      return item.nombre.toLowerCase().includes(q) || item.documento.includes(q);
+                      return item.nombre.toLowerCase().includes(q) || item.documento.includes(q) || (item.codigo && item.codigo.includes(q));
                     })
                     .map((item, idx) => (
                       <tr key={idx} className="hover:bg-slate-50">
-                        <td className="py-2 px-3 font-bold text-slate-800">C.C. {item.documento}</td>
+                        <td className="py-2 px-3 font-bold text-[#18235C]">Cód/CC: {item.documento || item.codigo}</td>
                         <td className="py-2 px-3 font-sans font-bold text-slate-900">{item.nombre}</td>
                         <td className="py-2 px-3 font-sans text-slate-600">
                           {item.laboral?.cargoNombre} ({item.laboral?.areaNombre})

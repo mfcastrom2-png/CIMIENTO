@@ -88,7 +88,7 @@ export const CimientoComercialDashboard: React.FC<CimientoComercialDashboardProp
     { id: 'cobros' as TabComercial, label: 'Cobro & Recaudo', icon: CreditCard, color: 'text-emerald-600' },
     { id: 'cajero' as TabComercial, label: 'Terminal de Cajero', icon: Wallet, color: 'text-blue-600' },
     { id: 'saldos' as TabComercial, label: 'Subida Masiva de Saldos', icon: FileSpreadsheet, color: 'text-amber-600' },
-    { id: 'contratos' as TabComercial, label: 'Contratos & Firma Drive', icon: PenTool, color: 'text-indigo-600' },
+    { id: 'contratos' as TabComercial, label: 'Contratos de Usuarios (CRC)', icon: PenTool, color: 'text-indigo-600' },
     { id: 'arqueos' as TabComercial, label: 'Arqueos Inmutables', icon: Lock, color: 'text-rose-600' },
   ];
 
@@ -116,7 +116,7 @@ export const CimientoComercialDashboard: React.FC<CimientoComercialDashboardProp
               <LogoCimientoComercial size={36} className="shrink-0" />
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#F59E0B] block leading-tight">
-                  MÓDULO DE RECAUDO & CARTERA
+                  MÓDULO DE RECAUDO, CARTERA & CONTRATOS
                 </span>
                 <span className="text-sm font-black text-white tracking-tight block leading-tight">
                   CIMIENTO COMERCIAL
@@ -183,8 +183,8 @@ export const CimientoComercialDashboard: React.FC<CimientoComercialDashboardProp
                 <PenTool className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Contratos Firmados</span>
-                <span className="font-black text-indigo-600 text-sm">{metricas.contratosActivos} expedientes</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Contratos de Usuarios</span>
+                <span className="font-black text-indigo-600 text-sm">{metricas.contratosActivos} contratos CRC</span>
               </div>
             </div>
 

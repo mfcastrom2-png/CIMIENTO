@@ -63,8 +63,8 @@ export const ModalEliminarEmpleado: React.FC<ModalEliminarEmpleadoProps> = ({
 
           <div className="p-3 bg-slate-50 rounded border border-slate-200">
             <div className="font-bold text-slate-800 text-sm">{empleado.nombre}</div>
-            <div className="text-slate-600 text-xs">Documento: {empleado.documento}</div>
-            <div className="text-slate-500 text-[11px]">ID: {empleado.id}</div>
+            <div className="text-slate-600 text-xs">Código / Documento: {empleado.documento || empleado.codigo}</div>
+            <div className="text-slate-500 text-[11px]">ID Interno: {empleado.id}</div>
           </div>
 
           <div>

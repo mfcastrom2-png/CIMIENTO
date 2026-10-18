@@ -86,7 +86,7 @@ export const SolicitarEppModal: React.FC<SolicitarEppModalProps> = ({
                 Solicitar Elemento de Protección Personal (EPP)
               </h3>
               <p className="text-[10px] text-[#282829]">
-                Colaborador: {empleado.nombre} • C.C. {empleado.documento}
+                Colaborador: {empleado.nombre} • Cód/CC: {empleado.documento || empleado.codigo}
               </p>
             </div>
           </div>

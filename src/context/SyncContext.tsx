@@ -49,6 +49,30 @@ import {
 import { useAuth } from './AuthContext';
 import { doc, getDoc, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 
+/**
+ * Normaliza el código de empleado para que sea de forma inmutable
+ * y unívoca el mismo número de documento de identidad del trabajador.
+ */
+export const normalizarCodigoEmpleado = (e: Empleado): Empleado => {
+  const docIdentidad = (e.documento || e.persona?.numeroDocumento || e.codigo || e.codigoInterno || e.id || '').trim();
+  return {
+    ...e,
+    documento: e.documento || docIdentidad,
+    codigo: docIdentidad,
+    codigoInterno: docIdentidad,
+    laboral: e.laboral
+      ? {
+          ...e.laboral,
+          codigoInterno: docIdentidad
+        }
+      : undefined
+  };
+};
+
+export const normalizarListaEmpleados = (lista: Empleado[]): Empleado[] => {
+  return (lista || []).map(normalizarCodigoEmpleado);
+};
+
 interface SyncContextType {
   areas: AreaOrganizacion[];
   procesos: ProcesoOrganizacion[];
@@ -160,10 +184,10 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cached = localStorage.getItem('bgroup_empleados_cache');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return normalizarListaEmpleados(parsed);
       }
     } catch {}
-    return shouldOmitMocks ? [] : initialEmpleados;
+    return shouldOmitMocks ? [] : normalizarListaEmpleados(initialEmpleados);
   });
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>(() => {
     return shouldOmitMocks ? [] : initialSolicitudes;
@@ -224,9 +248,10 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ]);
 
       if (resEmp.items && resEmp.items.length > 0) {
-        setEmpleados(resEmp.items);
+        const norm = normalizarListaEmpleados(resEmp.items);
+        setEmpleados(norm);
         try {
-          localStorage.setItem('bgroup_empleados_cache', JSON.stringify(resEmp.items));
+          localStorage.setItem('bgroup_empleados_cache', JSON.stringify(norm));
         } catch {}
       } else {
         try {
@@ -234,7 +259,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (cached) {
             const parsed = JSON.parse(cached);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              setEmpleados(parsed);
+              setEmpleados(normalizarListaEmpleados(parsed));
             }
           }
         } catch {}
@@ -468,9 +493,10 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Handlers con Trazabilidad Inmutable
   const handleAddEmpleado = async (
-    empleado: Empleado,
+    empleadoRaw: Empleado,
     opciones?: { crearUsuario?: boolean; passwordTemporal?: string }
   ) => {
+    const empleado = normalizarCodigoEmpleado(empleadoRaw);
     setEmpleados(prev => {
       const updated = [...prev.filter(e => e.id !== empleado.id), empleado];
       try {
@@ -488,7 +514,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let resultadoEnvio: any;
 
     if (opciones?.crearUsuario && (empleado.email || empleado.persona?.numeroDocumento)) {
-      const emailFinal = (empleado.email || `${empleado.codigo || empleado.documento}@bgroup.com.co`).trim().toLowerCase();
+      const emailFinal = (empleado.email || `${empleado.documento || empleado.codigo}@bgroup.com.co`).trim().toLowerCase();
       const pass = opciones.passwordTemporal || 'BGroup2026*';
       const nuevoUsuario: UsuarioSistema = {
         id: `usr-${empleado.id}`,
@@ -528,7 +554,8 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  const handleUpdateEmpleado = async (empleado: Empleado) => {
+  const handleUpdateEmpleado = async (empleadoRaw: Empleado) => {
+    const empleado = normalizarCodigoEmpleado(empleadoRaw);
     setEmpleados(prev => {
       const updated = prev.map(e => e.id === empleado.id ? empleado : e);
       try {

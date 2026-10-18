@@ -2011,7 +2011,7 @@ const ModalNuevoSaldoManual: React.FC<ModalNuevoSaldoManualProps> = ({
               <option value="">-- Seleccionar o escribir manualmente abajo --</option>
               {empleados.map(emp => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.nombre} (C.C. {emp.documento})
+                  {emp.nombre} — Cód/CC: {emp.documento || emp.codigo}
                 </option>
               ))}
             </select>

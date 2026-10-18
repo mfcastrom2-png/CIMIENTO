@@ -1273,7 +1273,7 @@ export function CapacitacionesView({
                     const c = cargos.find(cg => cg.id === emp.cargoId);
                     return (
                       <option key={emp.id} value={emp.id}>
-                        {emp.nombre} — {c?.nombre || 'Cargo'}
+                        {emp.nombre} — Cód/CC: {emp.documento || emp.codigo} ({c?.nombre || 'Cargo'})
                       </option>
                     );
                   })}

@@ -1494,7 +1494,7 @@ export function UsuariosView({
                     <option value="">-- Seleccionar colaborador existente --</option>
                     {empleados.map(emp => (
                       <option key={emp.id} value={emp.id}>
-                        {emp.nombre} — CC: {emp.documento}
+                        {emp.nombre} — Cód/CC: {emp.documento || emp.codigo}
                       </option>
                     ))}
                   </select>

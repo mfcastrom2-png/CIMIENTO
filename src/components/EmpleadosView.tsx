@@ -236,7 +236,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
       if (filtroBusqueda.trim()) {
         const t = filtroBusqueda.toLowerCase();
         const numDoc = (e.documento || '').toLowerCase();
-        const cod = (e.codigo || e.codigoInterno || '').toLowerCase();
+        const cod = (e.codigo || e.documento || e.codigoInterno || '').toLowerCase();
         const nom = (e.nombre || '').toLowerCase();
         const pNom = (e.persona?.primerNombre || '').toLowerCase();
         const sNom = (e.persona?.segundoNombre || '').toLowerCase();
@@ -282,8 +282,8 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
         vA = a.nombre.toLowerCase();
         vB = b.nombre.toLowerCase();
       } else if (campoOrden === 'codigo') {
-        vA = (a.codigo || a.codigoInterno || '').toLowerCase();
-        vB = (b.codigo || b.codigoInterno || '').toLowerCase();
+        vA = (a.codigo || a.documento || a.codigoInterno || '').toLowerCase();
+        vB = (b.codigo || b.documento || b.codigoInterno || '').toLowerCase();
       } else if (campoOrden === 'documento') {
         vA = (a.documento || '').toLowerCase();
         vB = (b.documento || '').toLowerCase();
@@ -346,7 +346,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
     ];
 
     const rows = empleadosOrdenados.map(e => [
-      e.codigo || e.codigoInterno || '',
+      e.codigo || e.documento || e.codigoInterno || '',
       e.persona?.tipoDocumento || e.tipoDocumento || 'CC',
       e.documento || '',
       e.persona?.primerNombre || '',
@@ -747,7 +747,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
                   className="py-3 px-3 font-bold cursor-pointer hover:bg-slate-100 transition-colors"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Código</span>
+                    <span>Código (Doc.)</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400" />
                   </div>
                 </th>
@@ -832,7 +832,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
 
                     {/* Código */}
                     <td className="py-2.5 px-3 font-mono font-bold text-[#18235C]">
-                      {emp.codigo || emp.codigoInterno || '—'}
+                      {emp.codigo || emp.documento || emp.codigoInterno || '—'}
                     </td>
 
                     {/* Nombre completo */}

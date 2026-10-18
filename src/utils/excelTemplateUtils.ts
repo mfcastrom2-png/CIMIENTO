@@ -21,7 +21,7 @@ export const descargarPlantillaExcelSaldos = (): void => {
 
   const filasEjemplo = [
     [
-      'CLI-2026-101',
+      '901558231-1',
       '901558231-1',
       'NIT',
       'Soluciones Tecnológicas Alfa S.A.S.',
@@ -34,7 +34,7 @@ export const descargarPlantillaExcelSaldos = (): void => {
       '2026-10-25'
     ],
     [
-      'CLI-2026-102',
+      '1018456789',
       '1018456789',
       'CC',
       'María Paula Gómez Martínez',
@@ -47,7 +47,7 @@ export const descargarPlantillaExcelSaldos = (): void => {
       '2026-10-18'
     ],
     [
-      'CLI-2026-103',
+      '800123999-5',
       '800123999-5',
       'NIT',
       'Inversiones del Centro Ltda.',
@@ -146,9 +146,9 @@ export const procesarFilasMatrizSaldos = (
   filasAProcesar.forEach((fila, idx) => {
     const numFila = esEncabezado ? idx + 2 : idx + 1;
 
-    // Obtener valores limpios
-    const codigo = String(fila[0] || '').trim() || `CLI-${Date.now()}-${idx}`;
-    const identificacion = String(fila[1] || '').trim();
+    // Obtener valores limpios (el código del usuario es unívocamente su documento de identidad)
+    const identificacion = String(fila[1] || fila[0] || '').trim();
+    const codigo = identificacion || String(fila[0] || '').trim() || `CLI-${Date.now()}-${idx}`;
     const tipoDocRaw = String(fila[2] || '').trim().toUpperCase();
     const tipoIdentificacion: 'CC' | 'NIT' = tipoDocRaw === 'NIT' ? 'NIT' : 'CC';
     const nombre = String(fila[3] || '').trim();
@@ -232,7 +232,7 @@ export const descargarPlantillaExcelEmpleados = (): void => {
     'CC', '1019034789', 'Carlos', 'Andres', 'Restrepo', 'Morales',
     '1992-05-14', 'Masculino', 'Soltero(a)', 'Calle 127 # 45 - 20 Apto 402', 'Bogotá D.C.', 'Bogotá D.C.',
     '3184567890', 'carlos.restrepo@gmail.com', 'carlos.restrepo@bgroup.com.co', 'Gloria Morales', 'Madre',
-    '3101234567', 'EMP-012', '2024-03-15', 'Técnico de Redes y Telecomunicaciones', 'Operaciones FTTH', 'Término indefinido', 'Presencial',
+    '3101234567', '1019034789', '2024-03-15', 'Técnico de Redes y Telecomunicaciones', 'Operaciones FTTH', 'Término indefinido', 'Presencial',
     'Tiempo completo (42 hrs)', 'Sede Principal Bogotá', 2850000, 'Ordinario', 'Quincenal', 'Bancolombia', 'Ahorros', '10234567890',
     'SURA EPS', 'Porvenir', 'Positiva ARL', 'V (6.960%)', 'Compensar', 'Protección', 'Tecnólogo en Telecomunicaciones',
     'SENA', 'Apto', 'Ingreso formal por expansión de red operacional'

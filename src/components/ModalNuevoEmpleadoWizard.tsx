@@ -165,19 +165,9 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
   }, [departamento]);
 
   // --- PESTAÑA 3: INFORMACIÓN LABORAL ---
-  const generarCodigoSiguiente = () => {
-    const numeros = empleados
-      .map(e => {
-        const m = (e.codigo || e.codigoInterno || '').match(/(\d+)$/);
-        return m ? parseInt(m[1], 10) : 0;
-      })
-      .filter(n => !isNaN(n));
-    const max = numeros.length > 0 ? Math.max(...numeros) : 0;
-    return `EMP-${String(max + 1).padStart(3, '0')}`;
-  };
-
+  // El código de empleado corresponde de forma unívoca a su número de documento de identidad
   const [codigoInterno, setCodigoInterno] = useState(
-    empleadoAEditar?.codigo || empleadoAEditar?.codigoInterno || generarCodigoSiguiente()
+    empleadoAEditar?.documento || empleadoAEditar?.codigo || empleadoAEditar?.codigoInterno || ''
   );
   const [fechaIngreso, setFechaIngreso] = useState(empleadoAEditar?.laboral?.fechaIngreso || empleadoAEditar?.contrato?.inicio || new Date().toISOString().slice(0, 10));
   const [fechaInicioLaboral, setFechaInicioLaboral] = useState(empleadoAEditar?.laboral?.fechaInicioLaboral || fechaIngreso);
@@ -569,22 +559,18 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
       .replace(/\s+/g, ' ');
   }, [primerNombre, segundoNombre, primerApellido, segundoApellido]);
 
-  // Validación de unicidad de documento y código interno
+  // Validación de unicidad de documento y código de empleado (el código es el mismo número de documento)
   const validacionUnicidad = useMemo(() => {
-    const docLimpio = (numeroDocumento || '').trim().replace(/\D/g, '');
+    const docLimpio = (numeroDocumento || codigoInterno || '').trim().replace(/\D/g, '');
     const existeDoc = empleados.find(
-      e => e.id !== empleadoAEditar?.id && (e.documento || '').replace(/\D/g, '') === docLimpio && docLimpio.length > 0
-    );
-    const codLimpio = (codigoInterno || '').trim().toUpperCase();
-    const existeCod = empleados.find(
-      e => e.id !== empleadoAEditar?.id && (e.codigo || e.codigoInterno || '').toUpperCase() === codLimpio && codLimpio.length > 0
+      e => e.id !== empleadoAEditar?.id && (e.documento || e.codigo || e.codigoInterno || '').replace(/\D/g, '') === docLimpio && docLimpio.length > 0
     );
 
     return {
       docDuplicado: Boolean(existeDoc),
       empleadoDocDuplicado: existeDoc,
-      codDuplicado: Boolean(existeCod),
-      empleadoCodDuplicado: existeCod
+      codDuplicado: Boolean(existeDoc),
+      empleadoCodDuplicado: existeDoc
     };
   }, [numeroDocumento, codigoInterno, empleados, empleadoAEditar]);
 
@@ -652,11 +638,12 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
     }
 
     if (paso === 3) {
-      if (!codigoInterno.trim()) {
-        return { valido: false, error: 'Paso 3 (Información Laboral): Debe asignar un Código Interno al colaborador.' };
+      const docOCod = (numeroDocumento || codigoInterno || '').trim();
+      if (!docOCod) {
+        return { valido: false, error: 'Paso 3 (Información Laboral): Debe ingresar el Documento de Identidad en el Paso 1 para establecer el Código de Empleado.' };
       }
-      if (validacionUnicidad.codDuplicado && !isEditing) {
-        return { valido: false, error: `Paso 3 (Información Laboral): El código interno ${codigoInterno} ya existe en el sistema.` };
+      if (validacionUnicidad.docDuplicado && !isEditing) {
+        return { valido: false, error: `Paso 3 (Información Laboral): El documento/código ${docOCod} ya existe en el sistema.` };
       }
       if (!fechaIngreso) {
         return { valido: false, error: 'Paso 3 (Información Laboral): Debe registrar la Fecha de Ingreso oficial.' };
@@ -834,16 +821,12 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
       return;
     }
 
-    // Auto-completar valores obligatorios con valores sensatos si faltan
-    let codFinal = (codigoInterno || '').trim().toUpperCase();
+    // El código de empleado corresponde de forma unívoca a su número de documento de identidad
+    let codFinal = (numeroDocumento || codigoInterno || '').trim();
     if (!codFinal) {
-      codFinal = generarCodigoSiguiente();
-      setCodigoInterno(codFinal);
+      codFinal = 'SIN-DOC';
     }
-    if (validacionUnicidad.codDuplicado && !isEditing) {
-      codFinal = `${codFinal}-${Math.floor(100 + Math.random() * 900)}`;
-      setCodigoInterno(codFinal);
-    }
+    setCodigoInterno(codFinal);
 
     let fIngresoFinal = fechaIngreso || new Date().toISOString().slice(0, 10);
     if (!fechaIngreso) setFechaIngreso(fIngresoFinal);
@@ -1278,7 +1261,11 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     type="text"
                     placeholder="Ej: 1019034789"
                     value={numeroDocumento}
-                    onChange={e => setNumeroDocumento(e.target.value)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setNumeroDocumento(val);
+                      setCodigoInterno(val);
+                    }}
                     className={`w-full px-3 py-2 rounded-lg font-mono font-bold ${
                       !validacionDian.documento.esValido
                         ? 'border-2 border-rose-500 bg-rose-50 text-rose-900'
@@ -1300,6 +1287,9 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                       )}
                     </div>
                   )}
+                  <span className="text-[10px] text-slate-500 block mt-1">
+                    ℹ️ El documento de identidad se asigna de manera unívoca como el <strong>Código de Empleado</strong> en todos los módulos de la organización.
+                  </span>
                 </div>
 
                 <div>
@@ -1695,21 +1685,28 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="block font-bold text-[#18235C] mb-1">Código Interno de Empleado *</label>
+                  <label className="block font-bold text-[#18235C] mb-1">
+                    Código de Empleado (Mismo Documento de Identidad) *
+                  </label>
                   <input
                     type="text"
-                    placeholder="EMP-001"
-                    value={codigoInterno}
-                    onChange={e => setCodigoInterno(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg font-mono font-bold ${
-                      validacionUnicidad.codDuplicado
+                    placeholder="Ej: 1019034789"
+                    value={numeroDocumento || codigoInterno}
+                    readOnly
+                    className={`w-full px-3 py-2 rounded-lg font-mono font-bold bg-slate-100 cursor-not-allowed ${
+                      validacionUnicidad.codDuplicado || validacionUnicidad.docDuplicado
                         ? 'border-2 border-rose-500 bg-rose-50 text-rose-900'
-                        : 'border border-[#8FA7D6] bg-slate-50 text-[#18235C]'
+                        : 'border border-[#8FA7D6] text-[#18235C]'
                     }`}
                   />
-                  {validacionUnicidad.codDuplicado && (
+                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                    {numeroDocumento
+                      ? `Asignado unívocamente con el Documento de Identidad: ${numeroDocumento}`
+                      : 'Se completará automáticamente al ingresar el Documento de Identidad en el Paso 1.'}
+                  </span>
+                  {(validacionUnicidad.codDuplicado || validacionUnicidad.docDuplicado) && (
                     <span className="text-[10px] text-rose-600 font-bold block mt-0.5">
-                      ⚠️ Código ya asignado a {validacionUnicidad.empleadoCodDuplicado?.nombre}
+                      ⚠️ Ya existe un colaborador con este documento/código en la organización.
                     </span>
                   )}
                 </div>
@@ -1823,7 +1820,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     <option value="">— Sin jefe asignado / Gerencia —</option>
                     {empleados.map(emp => (
                       <option key={emp.id} value={emp.id}>
-                        {emp.nombre} — {cargosUnicos.find(c => c.id === emp.cargoId)?.nombre || 'Cargo'}
+                        {emp.nombre} — Cód/CC: {emp.documento || emp.codigo} ({cargosUnicos.find(c => c.id === emp.cargoId)?.nombre || 'Cargo'})
                       </option>
                     ))}
                   </select>
