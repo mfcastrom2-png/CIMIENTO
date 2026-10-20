@@ -45,7 +45,9 @@ Sentry.init({
     'ResizeObserver loop completed with undelivered notifications',
     'ResizeObserver loop limit exceeded',
     'NetworkError when attempting to fetch resource',
-    'failed to connect to websocket'
+    'failed to connect to websocket',
+    'WebSocket closed without opened',
+    'WebSocket connection to'
   ],
 });
 
