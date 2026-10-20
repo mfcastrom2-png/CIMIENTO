@@ -176,6 +176,9 @@ export interface Cargo {
   nombre: string;
   reportaA: string | null;
   ficha: FichaCargo;
+  areaId?: string;
+  salarioReferencia?: number;
+  nivel?: string;
 }
 
 export interface Familiar {
@@ -227,6 +230,7 @@ export interface ContactoResidenciaEmpleado {
 }
 
 export type EstadoColaborador =
+  | 'Pre-selección'
   | 'Preingreso'
   | 'Activo'
   | 'Vacaciones'
@@ -234,6 +238,88 @@ export type EstadoColaborador =
   | 'Suspensión'
   | 'Inactivo'
   | 'Retirado';
+
+export type EtapaVinculacion =
+  | 'pre_seleccion'
+  | 'hoja_vida_completada'
+  | 'pendiente_firma_contrato'
+  | 'contrato_firmado'
+  | 'vinculado_activo';
+
+export interface NotificacionVinculacion {
+  id: string;
+  fecha: string;
+  destinatario: 'candidato' | 'administrador_gh';
+  destinatarioNombre: string;
+  destinatarioEmail: string;
+  destinatarioTelefono?: string;
+  tipo:
+    | 'invitacion_hoja_vida'
+    | 'hoja_vida_enviada'
+    | 'contrato_listo_firma'
+    | 'contrato_firmado'
+    | 'bienvenida_activa';
+  asunto: string;
+  mensaje: string;
+  leido: boolean;
+  canal: 'Correo' | 'WhatsApp' | 'Portal';
+  enlaceAccion?: string;
+}
+
+export interface ContratoLaboralDigital {
+  id: string;
+  codigoContrato: string;
+  tipoContrato: string;
+  cargoId?: string;
+  cargoNombre: string;
+  areaId?: string;
+  areaNombre: string;
+  procesoId?: string;
+  procesoNombre?: string;
+  centroTrabajoId?: string;
+  centroTrabajoNombre?: string;
+  jefeInmediatoId?: string;
+  jefeInmediatoNombre?: string;
+  salarioBasico: number;
+  tipoSalario: string;
+  aplicaAuxilioTransporte: boolean;
+  fechaInicio: string;
+  fechaFin?: string;
+  duracionMeses?: number;
+  periodoPruebaDias: number;
+  jornadaLaboral: string;
+  modalidadTrabajo: string;
+  lugarTrabajo: string;
+  clausulaConfidencialidad?: boolean;
+  clausulaExclusividad?: boolean;
+  firmaCandidatoUrl?: string;
+  firmaCandidatoNombre?: string;
+  firmaCandidatoDocumento?: string;
+  firmaFechaHora?: string;
+  hashSha256?: string;
+  estado: 'Pendiente Firma' | 'Firmado' | 'Formalizado';
+  observaciones?: string;
+}
+
+export interface FlujoVinculacionEmpleado {
+  etapaActual: EtapaVinculacion;
+  fechaRegistroCandidato: string;
+  fechaHojaVidaCompletada?: string;
+  fechaContratoGenerado?: string;
+  fechaContratoFirmado?: string;
+  fechaVinculacionFinalizada?: string;
+  contratoDigital?: ContratoLaboralDigital;
+  notificaciones: NotificacionVinculacion[];
+  elementosExpedientePendientes?: {
+    afiliacionEps: boolean;
+    afiliacionPension: boolean;
+    afiliacionArl: boolean;
+    afiliacionCaja: boolean;
+    examenIngresoSst: boolean;
+    dotacionEpp: boolean;
+    creacionUsuario: boolean;
+  };
+}
 
 export interface DatosLaboralesEmpleado {
   codigoInterno: string;
@@ -449,6 +535,7 @@ export interface Empleado {
   documentos?: DocumentoExpedienteEmpleado[];
   historialLaboral?: EventoHistorialLaboral[];
   saldoInicial?: SaldoInicialEmpleadoNomina;
+  vinculacion?: FlujoVinculacionEmpleado;
 }
 
 export interface Solicitud {
@@ -1551,7 +1638,18 @@ export interface RegistroEnvioCorreo {
   destinatario: string;
   destinatarioNombre?: string;
   asunto: string;
-  tipoNotificacion: 'bienvenida_cuenta' | 'entrega_epp' | 'vacaciones' | 'nomina' | 'evaluacion' | 'prueba_sistema';
+  tipoNotificacion:
+    | 'bienvenida_cuenta'
+    | 'entrega_epp'
+    | 'vacaciones'
+    | 'nomina'
+    | 'evaluacion'
+    | 'prueba_sistema'
+    | 'invitacion_hoja_vida'
+    | 'hoja_vida_enviada'
+    | 'contrato_listo_firma'
+    | 'contrato_firmado'
+    | 'bienvenida_activa';
   estado: 'Enviado' | 'Entregado' | 'Fallido';
   remitenteUtilizado: string;
   mensajeRespuesta?: string;

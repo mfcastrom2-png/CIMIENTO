@@ -68,7 +68,8 @@ import {
   Stethoscope,
   Edit3,
   HardDrive,
-  ExternalLink
+  ExternalLink,
+  Mail
 } from 'lucide-react';
 import { uid } from '../data/initialData';
 import { DriveLinkField } from './common/DriveLinkField';
@@ -79,6 +80,10 @@ import {
   validarSalarioDianCst,
   validarFormularioEmpleadoDian
 } from '../utils/validadorDianEmpleado';
+import {
+  inicializarFlujoVinculacion,
+  despacharNotificacionVinculacion
+} from '../services/vinculacionService';
 
 interface ModalNuevoEmpleadoWizardProps {
   cargos: Cargo[];
@@ -1013,6 +1018,39 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
         documentos,
         historialLaboral: historialActualizado
       };
+
+      // Si el trabajador se registra o actualiza en estado 'Pre-selección', activar el flujo y despachar invitación por correo
+      if (estadoEmpleado === 'Pre-selección') {
+        empleadoCompleto.activo = false;
+        empleadoCompleto.estadoLaboral = 'Pre-selección';
+        if (empleadoCompleto.laboral) {
+          empleadoCompleto.laboral.estado = 'Pre-selección';
+        }
+        if (!empleadoCompleto.vinculacion || empleadoCompleto.vinculacion.etapaActual === 'pre_seleccion') {
+          const flujoVinculacion = inicializarFlujoVinculacion({
+            candidato: empleadoCompleto,
+            cargoPropuestoNombre: cargoSeleccionado?.nombre,
+            empresa
+          });
+          empleadoCompleto.vinculacion = flujoVinculacion;
+
+          // Disparar automáticamente el correo institucional al candidato con el enlace para diligenciar su Hoja de Vida
+          const notif = flujoVinculacion.notificaciones[0];
+          if (notif && notif.destinatarioEmail) {
+            try {
+              await despacharNotificacionVinculacion({
+                destinatarioEmail: notif.destinatarioEmail,
+                destinatarioNombre: notif.destinatarioNombre,
+                asunto: notif.asunto,
+                cuerpo: notif.mensaje,
+                tipo: 'invitacion_hoja_vida'
+              });
+            } catch (errNotif) {
+              console.warn('Error al despachar notificación de invitación por correo:', errNotif);
+            }
+          }
+        }
+      }
 
       await onGuardar(empleadoCompleto, {
         crearUsuario: crearUsuarioSistema && !isEditing,
@@ -1969,6 +2007,7 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     }}
                     className="w-full px-3 py-2 bg-slate-50 border border-[#8FA7D6] rounded-lg font-bold text-[#18235C]"
                   >
+                    <option value="Pre-selección">Pre-selección (Aspirante / Diligenciamiento de Hoja de Vida)</option>
                     <option value="Preingreso">Preingreso (Trámite de contratación)</option>
                     <option value="Activo">Activo (En funciones operativas)</option>
                     <option value="Vacaciones">Vacaciones (Disfrute de descanso legal)</option>
@@ -1978,6 +2017,20 @@ export const ModalNuevoEmpleadoWizard: React.FC<ModalNuevoEmpleadoWizardProps> =
                     <option value="Retirado">Retirado (Contrato finalizado / Liquidado)</option>
                   </select>
                 </div>
+
+                {estadoEmpleado === 'Pre-selección' && (
+                  <div className="sm:col-span-2 md:col-span-3 p-3.5 bg-purple-50 border-2 border-purple-300 rounded-xl flex items-start gap-2.5 text-xs text-purple-900 animate-fade-in shadow-xs">
+                    <Mail className="w-5 h-5 text-purple-600 mt-0.5 shrink-0" />
+                    <div className="space-y-1">
+                      <span className="font-bold text-sm text-purple-950 block">
+                        Flujo de Pre-selección & Invitación Automática por Correo Electrónico:
+                      </span>
+                      <p className="text-[11px] text-purple-900 leading-relaxed">
+                        Al guardar este registro en estado <strong>Pre-selección</strong>, el sistema <strong>despachará automáticamente un correo electrónico institucional al candidato</strong> ({correoPersonal || correoCorporativo || 'su correo'}) con el enlace directo y seguro para que diligencie su <strong>Hoja de Vida Digital</strong>. Una vez completada, el administrador de Gestión Humana podrá continuar con la asignación salarial, estructura organizativa y firma digital de contrato.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {estadoEmpleado === 'Preingreso' && (
                   <div className="sm:col-span-2 md:col-span-3 p-3.5 bg-amber-50 border-2 border-amber-300 rounded-xl flex items-start gap-2.5 text-xs text-amber-900 animate-fade-in shadow-xs">

@@ -39,12 +39,14 @@ import { ConfiguracionBuzonCorreoView } from './components/ConfiguracionBuzonCor
 import { SaldosInicialesView } from './components/SaldosInicialesView';
 import { FirmaDigitalStudioView } from './components/FirmaDigitalStudioView';
 import { VerificadorCertificadosView } from './components/VerificadorCertificadosView';
+import { PortalCandidatoPublicoView } from './components/vinculacion/PortalCandidatoPublicoView';
 import { ModuloSelectorView } from './components/ModuloSelectorView';
 import { CimientoComercialDashboard } from './components/comercial/CimientoComercialDashboard';
 import { LogoCimientoComercial } from './components/logos/LogosModulos';
 import { ModuloSistema } from './types';
 import { ModulosPortalView } from './components/navigation/ModulosPortalView';
 import { IncapacidadesView } from './components/IncapacidadesView';
+import { PWAInstallButton } from './components/pwa/PWAInstallButton';
 
 import {
   Bell,
@@ -143,6 +145,14 @@ function AppLayout() {
   const paramVerificar = queryParams.get('verificar') || queryParams.get('codigo');
   const isPublicVerificationRoute = location.pathname.startsWith('/verificar') || Boolean(paramVerificar);
 
+  const paramDocCandidato = queryParams.get('doc') || queryParams.get('documento');
+  const paramEtapa = queryParams.get('etapa');
+  const isPublicCandidateRoute =
+    location.pathname.startsWith('/hoja-vida') ||
+    location.pathname.startsWith('/candidato') ||
+    location.pathname.startsWith('/diligenciar-hoja-vida') ||
+    Boolean(paramDocCandidato && (paramEtapa === 'hoja_vida' || location.pathname.includes('expediente')));
+
   const esEmpleado = userRole === 'empleado' || currentUser?.rol === 'empleado';
 
   const currentEmpleadoLogueado = useMemo(() => {
@@ -170,6 +180,20 @@ function AppLayout() {
       );
     }
 
+    if (isPublicCandidateRoute) {
+      return (
+        <PortalCandidatoPublicoView
+          empleados={empleados}
+          documentoInicial={paramDocCandidato || ''}
+          empresa={empresa}
+          onActualizarEmpleado={handleUpdateEmpleado}
+          onIrALogin={() => {
+            navigate('/', { replace: true });
+          }}
+        />
+      );
+    }
+
     return (
       <LoginView
         empresa={empresa}
@@ -181,6 +205,9 @@ function AppLayout() {
         }}
         onIrAVerificacion={() => {
           navigate('/verificar');
+        }}
+        onIrACandidato={() => {
+          navigate('/hoja-vida');
         }}
       />
     );
@@ -408,6 +435,9 @@ function AppLayout() {
                 <span>{pendientesCount} por aprobar</span>
               </button>
             )}
+
+            {/* Botón PWA para instalar la App en Móvil / PC */}
+            <PWAInstallButton variant="header" />
 
             <div className="flex items-center gap-2 pl-3 border-l border-[#8FA7D6]/30">
               <div className="w-8 h-8 rounded-lg bg-[#8FA7D6] text-[#18235C] flex items-center justify-center font-bold text-xs shadow-2xs border border-[#8FA7D6]">
@@ -1061,6 +1091,30 @@ function AppLayout() {
                   />
                 }
               />
+              <Route
+                path="/hoja-vida"
+                element={
+                  <PortalCandidatoPublicoView
+                    empleados={empleados}
+                    documentoInicial={paramDocCandidato || ''}
+                    empresa={empresa}
+                    onActualizarEmpleado={handleUpdateEmpleado}
+                    onIrALogin={() => navigate('/dashboard')}
+                  />
+                }
+              />
+              <Route
+                path="/diligenciar-hoja-vida"
+                element={
+                  <PortalCandidatoPublicoView
+                    empleados={empleados}
+                    documentoInicial={paramDocCandidato || ''}
+                    empresa={empresa}
+                    onActualizarEmpleado={handleUpdateEmpleado}
+                    onIrALogin={() => navigate('/dashboard')}
+                  />
+                }
+              />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>
@@ -1092,6 +1146,9 @@ function AppLayout() {
           isSuperAdmin={isSuperAdmin}
         />
       )}
+
+      {/* Sugerencia flotante para instalación en dispositivos móviles */}
+      <PWAInstallButton variant="floating" />
     </div>
   );
 }

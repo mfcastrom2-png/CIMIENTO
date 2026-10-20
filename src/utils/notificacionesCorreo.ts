@@ -69,7 +69,18 @@ export async function despacharNotificacionInstitucional(params: {
   destinatarioNombre?: string;
   asunto: string;
   cuerpo: string;
-  tipo: 'bienvenida_cuenta' | 'entrega_epp' | 'vacaciones' | 'nomina' | 'evaluacion' | 'prueba_sistema';
+  tipo:
+    | 'bienvenida_cuenta'
+    | 'entrega_epp'
+    | 'vacaciones'
+    | 'nomina'
+    | 'evaluacion'
+    | 'prueba_sistema'
+    | 'invitacion_hoja_vida'
+    | 'hoja_vida_enviada'
+    | 'contrato_listo_firma'
+    | 'contrato_firmado'
+    | 'bienvenida_activa';
 }): Promise<{ success: boolean; message: string }> {
   try {
     const buzon = await obtenerConfiguracionBuzon();

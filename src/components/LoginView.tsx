@@ -11,10 +11,12 @@ import {
   ShieldCheck,
   CheckCircle2,
   QrCode,
-  Sparkles
+  Sparkles,
+  FileText
 } from 'lucide-react';
 import { UsuarioSistema, ConfiguracionEmpresa } from '../types';
 import { CorporateLogo } from './CorporateLogo';
+import { PWAInstallButton } from './pwa/PWAInstallButton';
 import {
   loginConEmail,
   loginConGoogle,
@@ -27,12 +29,14 @@ interface LoginViewProps {
   usuarios?: UsuarioSistema[];
   onLoginSuccess: (usuario: UsuarioSistema) => void;
   onIrAVerificacion?: () => void;
+  onIrACandidato?: () => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
   empresa,
   onLoginSuccess,
-  onIrAVerificacion
+  onIrAVerificacion,
+  onIrACandidato
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -185,7 +189,20 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {onIrACandidato && (
+              <button
+                type="button"
+                onClick={onIrACandidato}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-xs font-semibold border border-purple-500/40 transition-all cursor-pointer shadow-xs"
+                title="Acceso para candidatos postulados: Diligenciar Hoja de Vida Digital"
+              >
+                <FileText className="w-3.5 h-3.5 text-purple-300" />
+                <span className="hidden sm:inline">Diligenciar Hoja de Vida</span>
+                <span className="sm:hidden">Candidatos</span>
+              </button>
+            )}
+
             {onIrAVerificacion && (
               <button
                 type="button"
@@ -198,6 +215,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 <span className="sm:hidden">Verificar QR</span>
               </button>
             )}
+
+            <PWAInstallButton variant="header" />
           </div>
         </div>
       </header>

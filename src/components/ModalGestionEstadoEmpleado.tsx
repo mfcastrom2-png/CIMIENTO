@@ -11,9 +11,11 @@ import {
   CheckCircle2,
   Clock,
   Palmtree,
-  FileText
+  FileText,
+  Mail
 } from 'lucide-react';
 import { uid } from '../data/initialData';
+import { inicializarFlujoVinculacion, despacharNotificacionVinculacion } from '../services/vinculacionService';
 
 interface ModalGestionEstadoEmpleadoProps {
   empleado: Empleado;
@@ -79,6 +81,7 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
       : MOTIVOS_INACTIVACION[0]
   );
   const [observaciones, setObservaciones] = useState(empleado.observacionesRetiro || '');
+  const [enviarInvitacionCorreo, setEnviarInvitacionCorreo] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,10 +122,37 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
         valorNuevo: `Estado: ${nuevoEstado}${nuevoEstado === 'Retirado' ? ` (Fecha: ${fechaRetiro})` : ''}`
       };
 
+      let flujoVinculacion = empleado.vinculacion;
+      if (nuevoEstado === 'Pre-selección') {
+        if (!flujoVinculacion || flujoVinculacion.etapaActual === 'pre_seleccion') {
+          flujoVinculacion = inicializarFlujoVinculacion({
+            candidato: empleado,
+            cargoPropuestoNombre: cargoNombre
+          });
+        }
+        if (enviarInvitacionCorreo) {
+          const notif = flujoVinculacion?.notificaciones?.[0];
+          const destEmail = notif?.destinatarioEmail || empleado.contacto?.correoPersonal || empleado.email;
+          if (destEmail && notif) {
+            try {
+              await despacharNotificacionVinculacion({
+                destinatarioEmail: destEmail,
+                destinatarioNombre: notif.destinatarioNombre || empleado.nombre,
+                asunto: notif.asunto,
+                cuerpo: notif.mensaje,
+                tipo: 'invitacion_hoja_vida'
+              });
+            } catch (errNotif) {
+              console.warn('Error al despachar notificación de invitación por correo:', errNotif);
+            }
+          }
+        }
+      }
+
       const empleadoActualizado: Empleado = {
         ...empleado,
         activo: nuevoEstado === 'Activo' || nuevoEstado === 'Vacaciones' || nuevoEstado === 'Licencia',
-        estadoLaboral: (nuevoEstado === 'Activo' ? 'activo' : nuevoEstado === 'Retirado' ? 'retirado' : 'inactivo') as any,
+        estadoLaboral: nuevoEstado,
         fechaRetiro: nuevoEstado === 'Retirado' ? fechaRetiro : undefined,
         motivoRetiro: nuevoEstado === 'Retirado' ? motivoRetiro : (nuevoEstado === 'Inactivo' || nuevoEstado === 'Suspensión' ? motivoInactivacion : undefined),
         observacionesRetiro: observaciones.trim() || undefined,
@@ -132,6 +162,7 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
               estado: nuevoEstado
             }
           : undefined,
+        vinculacion: nuevoEstado === 'Pre-selección' ? flujoVinculacion : empleado.vinculacion,
         historialLaboral: [...(empleado.historialLaboral || []), nuevoEvento]
       };
 
@@ -145,6 +176,7 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
   };
 
   const estadosDisponibles: { valor: EstadoColaborador; label: string; desc: string; icon: any; color: string }[] = [
+    { valor: 'Pre-selección', label: 'Pre-selección', desc: 'Aspirante en vinculación / Diligenciamiento de Hoja de Vida.', icon: Clock, color: 'purple' },
     { valor: 'Activo', label: 'Activo', desc: 'En funciones ordinarias de su cargo.', icon: UserCheck, color: 'emerald' },
     { valor: 'Preingreso', label: 'Preingreso', desc: 'En trámites de contratación o examen médico.', icon: Clock, color: 'blue' },
     { valor: 'Vacaciones', label: 'Vacaciones', desc: 'Disfrutando período legal de descanso.', icon: Palmtree, color: 'indigo' },
@@ -227,6 +259,29 @@ export const ModalGestionEstadoEmpleado: React.FC<ModalGestionEstadoEmpleadoProp
           </div>
 
           {/* Formulario condicional según el estado seleccionado */}
+          {nuevoEstado === 'Pre-selección' && (
+            <div className="p-3.5 bg-purple-50/80 rounded-lg border border-purple-200 space-y-3 animate-in fade-in">
+              <div className="flex items-center gap-1.5 text-purple-900 font-bold text-xs">
+                <Mail className="w-4 h-4 text-purple-600" />
+                <span>Etapa de Pre-selección e Invitación Digital</span>
+              </div>
+              <p className="text-[11px] text-purple-900 leading-relaxed">
+                El colaborador quedará registrado en estado <strong>Pre-selección</strong> para el flujo de vinculación y contratación.
+              </p>
+              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded border border-purple-200 text-xs text-purple-950 font-semibold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enviarInvitacionCorreo}
+                  onChange={e => setEnviarInvitacionCorreo(e.target.checked)}
+                  className="mt-0.5 rounded text-purple-600 focus:ring-purple-500"
+                />
+                <span className="leading-tight">
+                  Disparar automáticamente correo electrónico con enlace directo para que el candidato diligencie su Hoja de Vida Digital ({empleado.contacto?.correoPersonal || empleado.email || 'correo personal'}).
+                </span>
+              </label>
+            </div>
+          )}
+
           {nuevoEstado === 'Retirado' && (
             <div className="p-3.5 bg-rose-50/70 rounded-lg border border-rose-200 space-y-3 animate-in fade-in">
               <div className="flex items-center gap-1.5 text-rose-900 font-bold text-xs">

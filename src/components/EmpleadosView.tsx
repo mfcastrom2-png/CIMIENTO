@@ -38,9 +38,11 @@ import {
   UserCheck,
   UserX,
   AlertTriangle,
-  Database
+  Database,
+  UserPlus
 } from 'lucide-react';
 import { ModalNuevoEmpleadoWizard } from './ModalNuevoEmpleadoWizard';
+import { ModalNuevoCandidatoVinculacion } from './vinculacion/ModalNuevoCandidatoVinculacion';
 import { ModalGestionEstadoEmpleado } from './ModalGestionEstadoEmpleado';
 import { ModalEliminarEmpleado } from './ModalEliminarEmpleado';
 import { ExpedienteDigitalView } from './ExpedienteDigitalView';
@@ -117,6 +119,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
   const [selectedEmpleadoId, setSelectedEmpleadoId] = useState<string | null>(null);
   const [initialExpedienteTab, setInitialExpedienteTab] = useState<string>('general');
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [modalCandidatoOpen, setModalCandidatoOpen] = useState(false);
   const [empleadoAEditar, setEmpleadoAEditar] = useState<Empleado | null>(null);
   const [empleadoParaGestionarEstado, setEmpleadoParaGestionarEstado] = useState<Empleado | null>(null);
   const [empleadoParaEliminar, setEmpleadoParaEliminar] = useState<Empleado | null>(null);
@@ -163,6 +166,9 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
   };
 
   const getEstadoNormalizado = (emp: Empleado): EstadoColaborador => {
+    if (emp.laboral?.estado === 'Pre-selección' || emp.estadoLaboral === 'Pre-selección' || (emp.vinculacion && emp.vinculacion.etapaActual && emp.vinculacion.etapaActual !== 'vinculado_activo')) {
+      return 'Pre-selección';
+    }
     if (emp.laboral?.estado) return emp.laboral.estado;
     if (emp.estadoLaboral === 'retirado' || emp.estadoLaboral === 'Retirado') return 'Retirado';
     if (emp.estadoLaboral === 'inactivo' || emp.estadoLaboral === 'Inactivo') return 'Inactivo';
@@ -173,6 +179,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
   // Conteos para KPI cards
   const metricas = useMemo(() => {
     let activos = 0;
+    let preSeleccion = 0;
     let preingreso = 0;
     let novedades = 0;
     let inactivosRetirados = 0;
@@ -180,12 +187,13 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
     empleados.forEach(e => {
       const st = getEstadoNormalizado(e);
       if (st === 'Activo') activos++;
+      else if (st === 'Pre-selección') preSeleccion++;
       else if (st === 'Preingreso') preingreso++;
       else if (st === 'Vacaciones' || st === 'Licencia' || st === 'Suspensión') novedades++;
       else if (st === 'Inactivo' || st === 'Retirado') inactivosRetirados++;
     });
 
-    return { total: empleados.length, activos, preingreso, novedades, inactivosRetirados };
+    return { total: empleados.length, activos, preSeleccion, preingreso, novedades, inactivosRetirados };
   }, [empleados]);
 
   // Lista única de ciudades para el filtro
@@ -393,9 +401,10 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
     setLimiteVisible(25);
   };
 
-  const renderBadgeEstado = (st: EstadoColaborador) => {
+  const renderBadgeEstado = (st: EstadoColaborador, emp?: Empleado) => {
     const colorMap: Record<string, string> = {
       Activo: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+      'Pre-selección': 'bg-purple-50 text-purple-800 border-purple-300',
       Preingreso: 'bg-blue-50 text-blue-800 border-blue-300',
       Vacaciones: 'bg-indigo-50 text-indigo-800 border-indigo-300',
       Licencia: 'bg-purple-50 text-purple-800 border-purple-300',
@@ -403,11 +412,26 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
       Inactivo: 'bg-yellow-50 text-yellow-800 border-yellow-300',
       Retirado: 'bg-rose-50 text-rose-800 border-rose-300'
     };
+    const etapa = emp?.vinculacion?.etapaActual;
+    const etapaNombre: Record<string, string> = {
+      pre_seleccion: 'Paso 1: Hoja de Vida',
+      hoja_vida_completada: 'Paso 2: Contrato y Salario',
+      pendiente_firma_contrato: 'Paso 3: Firma Digital',
+      contrato_firmado: 'Paso 4: Expediente Final',
+      vinculado_activo: 'Activo'
+    };
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold border ${colorMap[st] || 'bg-slate-100 text-slate-800 border-slate-300'}`}>
-        <span className="w-1.5 h-1.5 rounded-full bg-current" />
-        {st}
-      </span>
+      <div className="inline-flex flex-col items-start gap-1">
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold border ${colorMap[st] || 'bg-slate-100 text-slate-800 border-slate-300'}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-current" />
+          {st}
+        </span>
+        {etapa && etapa !== 'vinculado_activo' && (
+          <span className="text-[10px] font-extrabold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
+            {etapaNombre[etapa] || etapa}
+          </span>
+        )}
+      </div>
     );
   };
 
@@ -549,11 +573,24 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
           {canManageEmployees && (
             <button
               type="button"
+              onClick={() => setModalCandidatoOpen(true)}
+              className="px-3.5 py-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white text-xs font-black rounded-lg flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+              title="Iniciar flujo de contratación y vinculación (Etapa 1: Pre-selección e invitación digital a diligenciar HV)"
+            >
+              <UserPlus className="w-4 h-4 text-purple-200" />
+              <span>Vincular Candidato (Pre-selección)</span>
+            </button>
+          )}
+
+          {canManageEmployees && (
+            <button
+              type="button"
               onClick={() => {
                 setEmpleadoAEditar(null);
                 setWizardOpen(true);
               }}
-              className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-extrabold rounded-lg flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+              className="px-3.5 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-extrabold rounded-lg flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+              title="Crear empleado con wizard completo de 10 pestañas"
             >
               <Plus className="w-4 h-4 text-[#8FA7D6]" />
               <span>Nuevo empleado</span>
@@ -563,7 +600,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
       </div>
 
       {/* KPI Cards de Resumen */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white p-3.5 rounded-xl border border-[#8FA7D6] shadow-2xs">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
             <span className="font-semibold">Total Registros</span>
@@ -571,6 +608,15 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
           </div>
           <div className="text-2xl font-black text-[#18235C]">{metricas.total}</div>
           <span className="text-[10px] text-slate-400">Expedientes creados</span>
+        </div>
+
+        <div className="bg-white p-3.5 rounded-xl border border-[#8FA7D6] shadow-2xs">
+          <div className="flex items-center justify-between text-xs text-purple-700 mb-1">
+            <span className="font-semibold">Pre-selección</span>
+            <UserPlus className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="text-2xl font-black text-purple-700">{metricas.preSeleccion}</div>
+          <span className="text-[10px] text-purple-600/80">En vinculación activa</span>
         </div>
 
         <div className="bg-white p-3.5 rounded-xl border border-[#8FA7D6] shadow-2xs">
@@ -647,6 +693,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
               className="w-full p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800"
             >
               <option value="TODOS">Todos los estados</option>
+              <option value="Pre-selección">Pre-selección (En Vinculación)</option>
               <option value="Activo">Activo</option>
               <option value="Preingreso">Preingreso</option>
               <option value="Vacaciones">Vacaciones</option>
@@ -879,12 +926,27 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
 
                     {/* Estado */}
                     <td className="py-2.5 px-3">
-                      {renderBadgeEstado(st)}
+                      {renderBadgeEstado(st, emp)}
                     </td>
 
                     {/* Acciones: Ver | Editar | Historial | Documentos | Inactivar */}
                     <td className="py-2.5 px-3 text-right">
                       <div className="flex items-center justify-end gap-1 flex-wrap">
+                        {/* Gestionar Vinculación (si está en proceso) */}
+                        {emp.vinculacion && emp.vinculacion.etapaActual !== 'vinculado_activo' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedEmpleadoId(emp.id);
+                              setInitialExpedienteTab('general');
+                            }}
+                            className="px-2 py-1 text-[11px] font-extrabold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded border border-purple-300 transition-colors cursor-pointer shadow-2xs"
+                            title="Gestionar Flujo de Vinculación y Contratación"
+                          >
+                            Vinculación
+                          </button>
+                        )}
+
                         {/* Ver */}
                         <button
                           type="button"
@@ -1065,6 +1127,24 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
                 });
               }
             }
+          }}
+        />
+      )}
+
+      {/* Modal: Registrar Nuevo Candidato (Flujo de Vinculación y Pre-selección) */}
+      {modalCandidatoOpen && (
+        <ModalNuevoCandidatoVinculacion
+          cargos={cargosUnicos}
+          empresa={empresa}
+          onClose={() => setModalCandidatoOpen(false)}
+          onCandidatoCreado={async (nuevoCandidato) => {
+            if (onAddEmpleado) {
+              await onAddEmpleado(nuevoCandidato, { crearUsuario: false });
+            }
+            setModalCandidatoOpen(false);
+            // Abrir directamente el expediente del candidato para continuar el flujo de vinculación
+            setSelectedEmpleadoId(nuevoCandidato.id);
+            setInitialExpedienteTab('general');
           }}
         />
       )}

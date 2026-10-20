@@ -969,6 +969,98 @@ export const INITIAL_EMPLEADOS: Empleado[] = [
         }
       ]
     }
+  },
+  {
+    id: 'cand-001',
+    codigo: '1.014.288.940',
+    codigoInterno: '1.014.288.940',
+    nombre: 'Juan Camilo Salcedo Parra',
+    documento: '1.014.288.940',
+    tipoDocumento: 'CC',
+    email: 'candidato.juan.salcedo@gmail.com',
+    telefono: '312 450 8821',
+    cargoId: 'c7',
+    areaId: 'ar_2',
+    salarioBase: 2200000,
+    formacion: 'Técnico en Redes de Telecomunicaciones - SENA',
+    experiencia: '3 años en instalación de fibra óptica y cableado estructurado.',
+    contrato: {
+      tipo: 'Contrato a Término Fijo (1 año)',
+      inicio: '2026-10-19',
+      fin: '2027-10-18',
+      salario: '$2.200.000'
+    },
+    familia: [{ nombre: 'Martha Parra', parentesco: 'Madre', nacimiento: '1970-03-12' }],
+    activo: false,
+    estadoLaboral: 'Pre-selección',
+    persona: {
+      tipoDocumento: 'CC',
+      numeroDocumento: '1.014.288.940',
+      primerNombre: 'Juan',
+      segundoNombre: 'Camilo',
+      primerApellido: 'Salcedo',
+      segundoApellido: 'Parra',
+      fechaNacimiento: '1996-08-14',
+      lugarNacimiento: 'Bogotá D.C.',
+      nacionalidad: 'Colombiana',
+      genero: 'Masculino',
+      estadoCivil: 'Soltero(a)'
+    },
+    contacto: {
+      direccion: 'Carrera 72 # 53-20',
+      departamento: 'Bogotá D.C.',
+      ciudad: 'Bogotá D.C.',
+      barrio: 'Normandía',
+      celular: '312 450 8821',
+      correoPersonal: 'candidato.juan.salcedo@gmail.com',
+      contactoEmergenciaNombre: 'Martha Parra',
+      contactoEmergenciaParentesco: 'Madre',
+      contactoEmergenciaTelefono: '311 200 4567'
+    },
+    laboral: {
+      codigoInterno: '1.014.288.940',
+      fechaIngreso: '2026-10-19',
+      fechaInicioLaboral: '2026-10-19',
+      areaId: 'ar_2',
+      areaNombre: 'Operaciones',
+      cargoId: 'c7',
+      cargoNombre: 'Técnico de Instalaciones y Fibra Óptica',
+      tipoContrato: 'Contrato a Término Fijo (1 año)',
+      fechaInicioContrato: '2026-10-19',
+      jornadaLaboral: 'Tiempo completo',
+      modalidadTrabajo: 'Presencial',
+      lugarTrabajo: 'Bogotá D.C.',
+      estado: 'Preingreso'
+    },
+    vinculacion: {
+      etapaActual: 'pre_seleccion',
+      fechaRegistroCandidato: '2026-10-19T08:00:00.000Z',
+      notificaciones: [
+        {
+          id: 'notif-cand-001',
+          fecha: '2026-10-19T08:00:00.000Z',
+          destinatario: 'candidato',
+          destinatarioNombre: 'Juan Camilo Salcedo Parra',
+          destinatarioEmail: 'candidato.juan.salcedo@gmail.com',
+          destinatarioTelefono: '312 450 8821',
+          tipo: 'invitacion_hoja_vida',
+          asunto: 'Invitación al Proceso de Vinculación y Diligenciamiento de Hoja de Vida — B GROUP INGENIERIA S.A.S.',
+          mensaje: 'Apreciado(a) Juan Camilo Salcedo Parra,\n\nNos complace informarle que ha sido postulado(a) y admitido(a) a la etapa de Pre-selección e inicio del proceso de vinculación laboral en B GROUP INGENIERIA S.A.S. para el perfil de "Técnico de Instalaciones y Fibra Óptica".\n\nPor favor ingrese al siguiente enlace seguro para diligenciar su Hoja de Vida Digital institucional conforme a los requisitos del Decreto 1072 de 2015.',
+          leido: false,
+          canal: 'Correo',
+          enlaceAccion: 'https://bgroup-gh.web.app/expediente?doc=1.014.288.940&etapa=hoja_vida'
+        }
+      ],
+      elementosExpedientePendientes: {
+        afiliacionEps: false,
+        afiliacionPension: false,
+        afiliacionArl: false,
+        afiliacionCaja: false,
+        examenIngresoSst: false,
+        dotacionEpp: false,
+        creacionUsuario: false
+      }
+    }
   }
 ];
 

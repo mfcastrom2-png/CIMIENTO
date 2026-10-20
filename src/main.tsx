@@ -56,3 +56,22 @@ createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </StrictMode>,
 );
+
+// Registro de Service Worker PWA para capacidades offline y aceleración móvil
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  import('virtual:pwa-register')
+    .then(({ registerSW }) => {
+      registerSW({
+        immediate: true,
+        onNeedRefresh() {
+          console.info('PWA: Nueva versión disponible.');
+        },
+        onOfflineReady() {
+          console.info('PWA: La aplicación está lista para funcionar sin conexión.');
+        },
+      });
+    })
+    .catch((err) => {
+      console.debug('Service Worker no inicializado en entorno de desarrollo:', err);
+    });
+}

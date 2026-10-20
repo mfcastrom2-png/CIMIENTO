@@ -8,7 +8,9 @@ import {
   EvaluacionDesempeno,
   DocumentoExpedienteEmpleado,
   ConfiguracionEmpresa,
-  CentroTrabajo
+  CentroTrabajo,
+  ProcesoOrganizacion,
+  NotificacionVinculacion
 } from '../types';
 import {
   ArrowLeft,
@@ -40,11 +42,18 @@ import {
   Clock,
   Award,
   HardDrive,
-  Database
+  Database,
+  PenTool,
+  Bell
 } from 'lucide-react';
 import { uid, initialEmpresa } from '../data/initialData';
 import { DriveLinkField } from './common/DriveLinkField';
 import { formatDriveViewUrl, isGoogleDriveUrl } from '../utils/driveUtils';
+import { BannerFlujoVinculacionExpediente } from './vinculacion/BannerFlujoVinculacionExpediente';
+import { ModalDiligenciarHojaVida } from './vinculacion/ModalDiligenciarHojaVida';
+import { ModalDefinirContratoVinculacion } from './vinculacion/ModalDefinirContratoVinculacion';
+import { ModalFirmaContratoLaboral } from './vinculacion/ModalFirmaContratoLaboral';
+import { ModalVerNotificacionesVinculacion } from './vinculacion/ModalVerNotificacionesVinculacion';
 
 interface ExpedienteDigitalViewProps {
   empleado: Empleado;
@@ -52,6 +61,8 @@ interface ExpedienteDigitalViewProps {
   empresa?: ConfiguracionEmpresa;
   centrosTrabajo?: CentroTrabajo[];
   areas?: AreaOrganizacion[];
+  procesos?: ProcesoOrganizacion[];
+  empleados?: Empleado[];
   currentUser?: UsuarioSistema | null;
   solicitudes?: Solicitud[];
   evaluaciones?: EvaluacionDesempeno[];
@@ -72,6 +83,8 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
   empresa,
   centrosTrabajo,
   areas = [],
+  procesos = [],
+  empleados = [],
   currentUser,
   solicitudes = [],
   evaluaciones = [],
@@ -93,6 +106,81 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
   const [nuevoDocNombre, setNuevoDocNombre] = useState('');
   const [nuevoDocUrlDrive, setNuevoDocUrlDrive] = useState('');
   const [nuevoDocObs, setNuevoDocObs] = useState('');
+
+  // Modales del Flujo de Vinculación y Contratación Laboral
+  const [modalDiligenciarHv, setModalDiligenciarHv] = useState(false);
+  const [modalDefinirContrato, setModalDefinirContrato] = useState(false);
+  const [modalFirmaContrato, setModalFirmaContrato] = useState(false);
+  const [modalNotificacionesVinculacion, setModalNotificacionesVinculacion] = useState(false);
+
+  // Finalizar Vinculación y Activar Colaborador
+  const handleFinalizarVinculacion = async () => {
+    const fechaHoy = new Date().toISOString();
+    const fechaCorta = fechaHoy.slice(0, 10);
+    const nombreOrg = empresa?.razonSocial || empresa?.nombreComercial || 'B GROUP INGENIERIA S.A.S.';
+
+    const notifBienvenida: NotificacionVinculacion = {
+      id: uid(),
+      fecha: fechaHoy,
+      destinatario: 'candidato',
+      destinatarioNombre: empleado.nombre,
+      destinatarioEmail: empleado.email,
+      destinatarioTelefono: empleado.telefono,
+      tipo: 'bienvenida_activa',
+      asunto: `¡Bienvenido(a) a ${nombreOrg}! — Vinculación Laboral Formalizada`,
+      mensaje: `Apreciado(a) ${empleado.nombre},\n\nNos complace informarle que su proceso de vinculación laboral ha concluido exitosamente y su expediente digital ha quedado en estado ACTIVO en ${nombreOrg}.\n\n• Cargo: ${empleado.laboral?.cargoNombre || 'Colaborador'}\n• Área: ${empleado.laboral?.areaNombre || 'Área Asignada'}\n• Fecha de Ingreso: ${empleado.laboral?.fechaInicioLaboral || fechaCorta}\n• Salario Básico: $${(empleado.salarioBase || 0).toLocaleString('es-CO')} COP\n\n¡Le deseamos los mayores éxitos en sus labores profesionales!`,
+      leido: false,
+      canal: 'Correo'
+    };
+
+    const vinculacionActualizada = {
+      ...(empleado.vinculacion || {
+        fechaRegistroCandidato: fechaHoy,
+        notificaciones: []
+      }),
+      etapaActual: 'vinculado_activo' as const,
+      fechaVinculacionFinalizada: fechaHoy,
+      notificaciones: [notifBienvenida, ...(empleado.vinculacion?.notificaciones || [])]
+    };
+
+    const empleadoActualizado: Empleado = {
+      ...empleado,
+      activo: true,
+      estadoLaboral: 'Activo',
+      laboral: {
+        ...(empleado.laboral || {
+          codigoInterno: empleado.documento,
+          fechaIngreso: fechaCorta,
+          fechaInicioLaboral: fechaCorta,
+          tipoContrato: 'Contrato a Término Indefinido',
+          fechaInicioContrato: fechaCorta,
+          jornadaLaboral: 'Tiempo completo',
+          modalidadTrabajo: 'Presencial',
+          lugarTrabajo: 'Bogotá D.C.',
+          cargoId: empleado.cargoId,
+          areaId: empleado.areaId || ''
+        }),
+        estado: 'Activo'
+      },
+      vinculacion: vinculacionActualizada,
+      historialLaboral: [
+        {
+          id: uid(),
+          fechaHora: fechaHoy,
+          usuario: currentUser?.nombre || 'Administrador GH',
+          accion: 'REINTEGRO',
+          titulo: 'Vinculación Laboral Formalizada (Pase a Estado Activo)',
+          motivo: 'Culminación de todas las etapas del flujo de contratación (Pre-selección → Hoja de Vida → Condiciones y Contrato → Firma Digital Ley 527/1999 → Formalización de Expediente).',
+          valorNuevo: 'Estado: ACTIVO en funciones de nómina y SG-SST'
+        },
+        ...(empleado.historialLaboral || [])
+      ]
+    };
+
+    if (onActualizarEmpleado) {
+      await onActualizarEmpleado(empleadoActualizado);
+    }
+  };
 
   const handleDescargarDocumento = (nombreArchivo: string, tipo: string = 'Documento') => {
     const nombreOrg = empresa?.razonSocial || empresa?.nombreComercial || 'EMPRESA';
@@ -270,6 +358,18 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Flujo de Contratación & Vinculación Laboral (4 Etapas CST) */}
+      <BannerFlujoVinculacionExpediente
+        empleado={empleado}
+        onAbrirDiligenciarHv={() => setModalDiligenciarHv(true)}
+        onAbrirDefinirContrato={() => setModalDefinirContrato(true)}
+        onAbrirFirmaContrato={() => setModalFirmaContrato(true)}
+        onAbrirNotificaciones={() => setModalNotificacionesVinculacion(true)}
+        onFinalizarVinculacion={handleFinalizarVinculacion}
+        onIrAPestana={(tabId) => setActiveTab(tabId)}
+        esEmpleado={esColaborador}
+      />
 
       {/* Tabs Bar */}
       <div className="flex items-center gap-1 overflow-x-auto border-b border-[#8FA7D6]/40 pb-px text-xs">
@@ -1316,6 +1416,56 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modales del Flujo de Vinculación y Contratación Laboral */}
+      {modalDiligenciarHv && (
+        <ModalDiligenciarHojaVida
+          empleado={empleado}
+          onClose={() => setModalDiligenciarHv(false)}
+          onGuardarHojaVida={async (empActualizado) => {
+            if (onActualizarEmpleado) await onActualizarEmpleado(empActualizado);
+            setModalDiligenciarHv(false);
+          }}
+          esVistaCandidato={esColaborador}
+        />
+      )}
+
+      {modalDefinirContrato && (
+        <ModalDefinirContratoVinculacion
+          empleado={empleado}
+          cargos={cargos}
+          areas={areas}
+          procesos={procesos}
+          centrosTrabajo={centrosTrabajo}
+          empleados={empleados}
+          empresa={empresa}
+          onClose={() => setModalDefinirContrato(false)}
+          onContratoDefinido={async (empActualizado) => {
+            if (onActualizarEmpleado) await onActualizarEmpleado(empActualizado);
+            setModalDefinirContrato(false);
+          }}
+        />
+      )}
+
+      {modalFirmaContrato && (
+        <ModalFirmaContratoLaboral
+          empleado={empleado}
+          empresa={empresa}
+          onClose={() => setModalFirmaContrato(false)}
+          onContratoFirmado={async (empActualizado) => {
+            if (onActualizarEmpleado) await onActualizarEmpleado(empActualizado);
+            setModalFirmaContrato(false);
+          }}
+          esVistaCandidato={esColaborador}
+        />
+      )}
+
+      {modalNotificacionesVinculacion && (
+        <ModalVerNotificacionesVinculacion
+          empleado={empleado}
+          onClose={() => setModalNotificacionesVinculacion(false)}
+        />
       )}
     </div>
   );
