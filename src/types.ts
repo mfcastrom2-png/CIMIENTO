@@ -266,6 +266,33 @@ export interface NotificacionVinculacion {
   enlaceAccion?: string;
 }
 
+export type TipoNotificacionPWA =
+  | 'nomina_desprendible'
+  | 'manual_funciones'
+  | 'capacitacion_sst'
+  | 'solicitud_aprobada'
+  | 'comunicado_general';
+
+export interface NotificacionPWAColaborador {
+  id: string;
+  empleadoId?: string; // ID específico del empleado o 'todos' para difusión masiva
+  empleadoNombre?: string;
+  documentoEmpleado?: string;
+  cargoId?: string;
+  cargoNombre?: string;
+  tipo: TipoNotificacionPWA;
+  titulo: string;
+  mensaje: string;
+  fechaCreacion: string;
+  leido: boolean;
+  canal: 'push_pwa' | 'in_app' | 'mixto';
+  estadoEnvioPush?: 'entregado' | 'pendiente' | 'no_soportado' | 'permiso_denegado';
+  enlaceAccion?: string;
+  periodoNomina?: string;
+  versionManual?: string;
+  metadatos?: Record<string, any>;
+}
+
 export interface ContratoLaboralDigital {
   id: string;
   codigoContrato: string;

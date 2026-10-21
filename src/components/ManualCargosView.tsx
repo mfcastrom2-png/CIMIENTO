@@ -16,12 +16,15 @@ import {
   AlertCircle,
   Briefcase,
   Printer,
-  Lock
+  Lock,
+  Bell,
+  Sparkles
 } from 'lucide-react';
 import { uid, fichaVacia, initialEmpresa } from '../data/initialData';
 import { TIPOS_CONTRATO_COLOMBIA } from '../data/colombiaData';
 import { esContratoSinNominaLaboral } from '../services/payrollEngine';
 import { generarSiguienteCodigo } from '../lib/codigoUtils';
+import { pwaNotificationService } from '../services/pwaNotificationService';
 
 interface ManualCargosViewProps {
   cargos: Cargo[];
@@ -381,8 +384,30 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
       historial: [...f.historial, itemHist]
     });
 
+    pwaNotificationService.notificarActualizacionManualFunciones({
+      cargoId: currentCargo.id,
+      cargoNombre: currentCargo.nombre,
+      version: nueva,
+      resumenCambios: vMotivo.trim(),
+      empresaNombre: empresa?.razonSocial || empresa?.nombreComercial
+    });
+
     setVMotivo('');
     setVersionModal(false);
+  };
+
+  const [notifPushMsg, setNotifPushMsg] = useState<string | null>(null);
+
+  const handleNotificarManualPush = async () => {
+    await pwaNotificationService.notificarActualizacionManualFunciones({
+      cargoId: currentCargo.id,
+      cargoNombre: currentCargo.nombre,
+      version: f.identificacion.version,
+      resumenCambios: `Manual de funciones y responsabilidades del cargo "${currentCargo.nombre}" actualizado en plataforma.`,
+      empresaNombre: empresa?.razonSocial || empresa?.nombreComercial
+    });
+    setNotifPushMsg(`Se despachó alerta Push PWA sobre el Manual de Funciones del cargo: "${currentCargo.nombre}".`);
+    setTimeout(() => setNotifPushMsg(null), 3500);
   };
 
   const tabs = [
@@ -404,6 +429,13 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
         <div className="fixed bottom-5 right-5 z-50 bg-[#18235C] text-white text-xs px-4 py-2.5 rounded shadow-lg flex items-center gap-2 animate-bounce">
           <Check className="w-4 h-4" />
           <span>Cambios guardados con éxito en la ficha del cargo.</span>
+        </div>
+      )}
+
+      {notifPushMsg && (
+        <div className="fixed bottom-5 right-5 z-50 bg-[#18235C] text-white text-xs px-4 py-2.5 rounded shadow-lg flex items-center gap-2 border border-[#F59E0B]/50 animate-bounce">
+          <Bell className="w-4 h-4 text-[#F59E0B]" />
+          <span>{notifPushMsg}</span>
         </div>
       )}
 
@@ -490,12 +522,23 @@ export const ManualCargosView: React.FC<ManualCargosViewProps> = ({
                 <span>Imprimir Ficha</span>
               </button>
             ) : (
-              <button
-                onClick={() => setVersionModal(true)}
-                className="text-xs font-semibold px-3 py-1.5 rounded bg-[#B5842A] hover:bg-[#966b1e] text-white transition-colors cursor-pointer"
-              >
-                Nueva versión
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleNotificarManualPush}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[#18235C] hover:bg-[#101740] text-white flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer border border-[#8FA7D6]/40"
+                  title="Despachar alerta push PWA a los colaboradores sobre este manual de funciones"
+                >
+                  <Bell className="w-3.5 h-3.5 text-[#F59E0B]" />
+                  <span>Notificar Manual PWA</span>
+                </button>
+                <button
+                  onClick={() => setVersionModal(true)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded bg-[#B5842A] hover:bg-[#966b1e] text-white transition-colors cursor-pointer"
+                >
+                  Nueva versión
+                </button>
+              </div>
             )}
           </div>
         </div>

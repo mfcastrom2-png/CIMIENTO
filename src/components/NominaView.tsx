@@ -28,11 +28,13 @@ import {
   filtrarEmpleadosDisponiblesEnPeriodo,
   obtenerFechaIngresoEmpleado
 } from '../services/payrollEngine';
+import { pwaNotificationService } from '../services/pwaNotificationService';
 import { obtenerParametrosNominaFB } from '../lib/firebase';
 import { descargarElementoComoPdf, imprimirDocumento } from '../utils/printUtils';
 import {
   AlertCircle,
   AlertTriangle,
+  Bell,
   Building2,
   Calendar,
   Check,
@@ -391,6 +393,28 @@ export function NominaView({
       })
     );
     await ejecutarGuardadoNominaLoteAtómico(nuevoEstado);
+  };
+
+  // Handler para despachar notificaciones Push PWA sobre publicación de desprendibles de nómina
+  const handleNotificarColaboradoresPush = async () => {
+    const colaboradoresData = liquidaciones.map(liq => ({
+      id: liq.empleadoId,
+      nombre: liq.empleadoNombre,
+      documento: liq.empleadoDocumento,
+      valorNeto: liq.netoAPagar
+    }));
+
+    const periodoTexto = periodoActivo.nombre || `${periodoActivo.tipoPeriodo || 'Nómina'} ${periodoActivo.ano || ''} (${periodoActivo.codigoPeriodo})`;
+    const res = await pwaNotificationService.notificarPublicacionDesprendiblesNomina({
+      periodo: periodoTexto,
+      colaboradores: colaboradoresData,
+      empresaNombre: empresa?.razonSocial || empresa?.nombreComercial
+    });
+
+    setMensajeSincronizacion({
+      tipo: 'success',
+      texto: `✅ Se despacharon ${res.enviadas} alertas Push PWA a los colaboradores notificando la publicación oficial de sus desprendibles de nómina.`
+    });
   };
 
   // VISTA ESPECIALIZADA PARA EL ROL EMPLEADO: Consulta y descarga exclusiva de su propio desprendible
@@ -934,6 +958,15 @@ export function NominaView({
                 Reabrir a Borrador
               </button>
             )}
+
+            <button
+              onClick={handleNotificarColaboradoresPush}
+              className="px-3 py-1.5 text-xs font-bold bg-[#18235C] hover:bg-[#101740] text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer border border-[#8FA7D6]/40"
+              title="Disparar alerta push a los dispositivos móviles de los colaboradores notificando sus desprendibles de pago"
+            >
+              <Bell className="w-3.5 h-3.5 text-[#F59E0B]" />
+              <span>Notificar Desprendibles PWA</span>
+            </button>
           </div>
         </div>
 

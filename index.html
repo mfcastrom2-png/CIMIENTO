@@ -1,6 +1,56 @@
 <!doctype html>
 <html lang="es">
   <head>
+    <script>
+      (function() {
+        if (typeof window !== 'undefined') {
+          window.addEventListener('unhandledrejection', function(e) {
+            if (e.reason && ((e.reason.message && e.reason.message.includes('WebSocket')) || String(e.reason).includes('WebSocket'))) {
+              e.preventDefault();
+              e.stopImmediatePropagation();
+            }
+          });
+          window.addEventListener('error', function(e) {
+            if (e.message && (e.message.includes('WebSocket') || e.message.includes('[vite]'))) {
+              e.preventDefault();
+              e.stopImmediatePropagation();
+            }
+          });
+          if (window.WebSocket) {
+            var OrigWS = window.WebSocket;
+            var MockWS = function(url, protocols) {
+              var strUrl = String(url || '');
+              var isViteHmr = protocols === 'vite-hmr' || protocols === 'vite-ping' || strUrl.includes('token=') || strUrl.includes('vite');
+              if (isViteHmr) {
+                var target = new EventTarget();
+                target.readyState = 1;
+                target.OPEN = 1;
+                target.CLOSED = 3;
+                target.CLOSING = 2;
+                target.CONNECTING = 0;
+                target.url = strUrl;
+                target.protocol = Array.isArray(protocols) ? protocols[0] : (protocols || '');
+                target.send = function() {};
+                target.close = function() {};
+                setTimeout(function() {
+                  try {
+                    target.dispatchEvent(new Event('open'));
+                  } catch (err) {}
+                }, 10);
+                return target;
+              }
+              return new OrigWS(url, protocols);
+            };
+            MockWS.prototype = OrigWS.prototype;
+            MockWS.CONNECTING = OrigWS.CONNECTING;
+            MockWS.OPEN = OrigWS.OPEN;
+            MockWS.CLOSING = OrigWS.CLOSING;
+            MockWS.CLOSED = OrigWS.CLOSED;
+            window.WebSocket = MockWS;
+          }
+        }
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>B GROUP INGENIERIA S.A.S. — Gestión Humana</title>

@@ -47,6 +47,8 @@ import { ModuloSistema } from './types';
 import { ModulosPortalView } from './components/navigation/ModulosPortalView';
 import { IncapacidadesView } from './components/IncapacidadesView';
 import { PWAInstallButton } from './components/pwa/PWAInstallButton';
+import { PWANotificationCenterModal } from './components/pwa/PWANotificationCenterModal';
+import { pwaNotificationService } from './services/pwaNotificationService';
 
 import {
   Bell,
@@ -137,6 +139,22 @@ function AppLayout() {
   }, [location.pathname, navigate]);
 
   const currentPath = location.pathname.replace('/', '') || 'dashboard';
+
+  const [pwaNotifModalOpen, setPwaNotifModalOpen] = useState(false);
+  const [conteoNoLeidasPwa, setConteoNoLeidasPwa] = useState<number>(() => {
+    return pwaNotificationService.contarNoLeidas(currentUser?.empleadoId);
+  });
+
+  useEffect(() => {
+    const actualizarConteo = () => {
+      setConteoNoLeidasPwa(pwaNotificationService.contarNoLeidas(currentUser?.empleadoId));
+    };
+    actualizarConteo();
+    window.addEventListener('pwa:notificaciones-actualizadas', actualizarConteo);
+    return () => {
+      window.removeEventListener('pwa:notificaciones-actualizadas', actualizarConteo);
+    };
+  }, [currentUser]);
 
   const pendientesCount = solicitudes.filter(s => s.estado === 'Pendiente').length;
   const currentEvaluacionDetalle = evaluaciones.find(e => e.id === activeEvaluacionDetalleId);
@@ -435,6 +453,21 @@ function AppLayout() {
                 <span>{pendientesCount} por aprobar</span>
               </button>
             )}
+
+            {/* Botón Centro de Notificaciones PWA (Nómina y Manual de Funciones) */}
+            <button
+              type="button"
+              onClick={() => setPwaNotifModalOpen(true)}
+              className="relative p-1.5 rounded-lg bg-[#101740] hover:bg-[#18235C] text-white border border-[#8FA7D6]/30 transition-colors cursor-pointer"
+              title="Centro de Notificaciones PWA (Desprendibles de nómina y manuales de funciones)"
+            >
+              <Bell className="w-4 h-4 text-[#F59E0B]" />
+              {conteoNoLeidasPwa > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center justify-center shadow-xs ring-1 ring-[#18235C]">
+                  {conteoNoLeidasPwa}
+                </span>
+              )}
+            </button>
 
             {/* Botón PWA para instalar la App en Móvil / PC */}
             <PWAInstallButton variant="header" />
@@ -1149,6 +1182,18 @@ function AppLayout() {
 
       {/* Sugerencia flotante para instalación en dispositivos móviles */}
       <PWAInstallButton variant="floating" />
+
+      {/* Modal Centro de Notificaciones PWA */}
+      {pwaNotifModalOpen && (
+        <PWANotificationCenterModal
+          currentUser={currentUser}
+          onClose={() => {
+            setPwaNotifModalOpen(false);
+            setConteoNoLeidasPwa(pwaNotificationService.contarNoLeidas(currentUser?.empleadoId));
+          }}
+          onNavigate={(path) => navigate(path)}
+        />
+      )}
     </div>
   );
 }
