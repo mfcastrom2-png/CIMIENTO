@@ -736,6 +736,7 @@ function AppLayout() {
                   <SstView
                     key="sst-general"
                     userRole={userRole}
+                    currentUser={currentUser}
                     currentEmpleadoId={currentUser?.empleadoId || currentUser?.id || empleados[0]?.id || 'e1'}
                     empleados={empleados}
                     cargos={cargos}
@@ -755,6 +756,7 @@ function AppLayout() {
                     procesos={procesos}
                     empleados={empleados}
                     userRole={userRole}
+                    currentUser={currentUser}
                   />
                 }
               />
@@ -767,6 +769,7 @@ function AppLayout() {
                     procesos={procesos}
                     empleados={empleados}
                     userRole={userRole}
+                    currentUser={currentUser}
                   />
                 }
               />
@@ -779,6 +782,7 @@ function AppLayout() {
                     procesos={procesos}
                     empleados={empleados}
                     userRole={userRole}
+                    currentUser={currentUser}
                     onNavigate={(view) => navigate('/' + view)}
                   />
                 }
@@ -792,6 +796,7 @@ function AppLayout() {
                     procesos={procesos}
                     empleados={empleados}
                     userRole={userRole}
+                    currentUser={currentUser}
                     onNavigate={(view) => navigate('/' + view)}
                   />
                 }
@@ -805,6 +810,7 @@ function AppLayout() {
                     procesos={procesos}
                     empleados={empleados}
                     userRole={userRole}
+                    currentUser={currentUser}
                     onNavigate={(view) => navigate('/' + view)}
                   />
                 }

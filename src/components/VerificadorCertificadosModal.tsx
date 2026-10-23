@@ -97,7 +97,7 @@ export const VerificadorCertificadosModal: React.FC<VerificadorCertificadosModal
             </div>
             <div>
               <h2 className="font-extrabold text-base leading-tight">
-                Verificador de Autenticidad: Diploma SST y Certificado Laboral
+                Verificador de documentos
               </h2>
               <span className="text-[11px] text-[#8FA7D6] block">
                 Validación de Firma Digital y Código QR Oficial · Ley 527 de 1999 & Art. 57 CST
@@ -118,7 +118,7 @@ export const VerificadorCertificadosModal: React.FC<VerificadorCertificadosModal
           {/* Buscador de Código */}
           <form onSubmit={handleBuscar} className="space-y-2">
             <label className="block font-bold text-[#18235C] text-xs">
-              Ingrese el Código de Verificación o Token del Documento:
+              Ingrese el Código de Verificación
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -222,40 +222,6 @@ export const VerificadorCertificadosModal: React.FC<VerificadorCertificadosModal
               </div>
             </div>
           )}
-
-          {/* Accesos rápidos exclusivos: Diploma SST y Certificado Laboral */}
-          <div className="space-y-2 pt-2 border-t border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-              Pruebas Rápidas de Verificación Institucional:
-            </span>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const cod = 'DIP-SST-2026-3391';
-                  setCodigoBusqueda(cod);
-                  ejecutarVerificacion(cod);
-                }}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-[#18235C] hover:text-white text-[#18235C] rounded-lg font-mono text-[11px] font-semibold border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <Award className="w-3 h-3 text-blue-600" />
-                <span>Diploma SST (DIP-SST-3391)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const cod = 'CERT-901458789-2026-774120';
-                  setCodigoBusqueda(cod);
-                  ejecutarVerificacion(cod);
-                }}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-[#18235C] hover:text-white text-[#18235C] rounded-lg font-mono text-[11px] font-semibold border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <FileText className="w-3 h-3 text-emerald-600" />
-                <span>Certificado Laboral (CERT-2026-774120)</span>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Modal Footer */}

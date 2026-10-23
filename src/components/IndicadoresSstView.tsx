@@ -54,13 +54,18 @@ import {
   ArrowRight,
   ExternalLink,
   FileSpreadsheet,
-  TrendingDown
+  TrendingDown,
+  Lock
 } from 'lucide-react';
 import {
   getStoredIncapacidades,
   calcularAusentismoMes,
   ResumenAusentismoMes
 } from '../data/incapacidadesData';
+import { UsuarioSistema } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { puedeEditarSST } from '../utils/sstAuthUtils';
+import { BannerPermisoSst } from './sst/BannerPermisoSst';
 
 interface IndicadoresSstViewProps {
   cargos?: Cargo[];
@@ -68,6 +73,7 @@ interface IndicadoresSstViewProps {
   procesos?: ProcesoOrganizacion[];
   empleados?: Empleado[];
   userRole?: Role;
+  currentUser?: UsuarioSistema | null;
   onNavigate?: (view: string) => void;
 }
 
@@ -81,8 +87,24 @@ export function IndicadoresSstView({
   procesos = [],
   empleados = [],
   userRole = 'admin',
+  currentUser,
   onNavigate
 }: IndicadoresSstViewProps) {
+  const auth = useAuth();
+  const activeUser = currentUser || auth?.currentUser;
+  const tienePermisoEdicion = puedeEditarSST(activeUser, userRole);
+  const [toastAccesoDenegado, setToastAccesoDenegado] = useState<string | null>(null);
+
+  const verificarPermisoEscritura = (accion: string): boolean => {
+    if (!tienePermisoEdicion) {
+      setToastAccesoDenegado(
+        `Acceso restringido: Solo los roles "Responsable SG-SST" o "Administrador Gestión Humana" tienen facultades para ${accion}. Su perfil actual tiene permisos de solo consulta (Res. 0312/2019 y Dec. 1072/2015).`
+      );
+      setTimeout(() => setToastAccesoDenegado(null), 4500);
+      return false;
+    }
+    return true;
+  };
   const syncContext = useCompanySyncOptional();
   const empresa = syncContext?.empresa;
   const razonSocial = empresa?.razonSocial || empresa?.nombreComercial || 'Empresa';
@@ -428,6 +450,7 @@ export function IndicadoresSstView({
 
   // Cargar plantilla sugerida
   const handleCargarPlantillaSugerida = () => {
+    if (!verificarPermisoEscritura('cargar los indicadores normativos estándar')) return;
     const codigosExistentes = new Set(indicadores.map(i => i.codigo));
     const nuevos: IndicadorSST[] = PLANTILLA_INDICADORES_NORMATIVOS_0312
       .filter(p => !codigosExistentes.has(p.codigo))
@@ -449,6 +472,7 @@ export function IndicadoresSstView({
 
   // Abrir modal de creación de indicador
   const handleAbrirCrearIndicador = () => {
+    if (!verificarPermisoEscritura('crear nuevos indicadores técnicos')) return;
     setIndicadorEnEdicionId(null);
     setFormCodigo(`IND-${String(indicadores.length + 1).padStart(2, '0')}`);
     setFormNombre('');
@@ -478,6 +502,7 @@ export function IndicadoresSstView({
   // Guardar Indicador
   const handleGuardarIndicador = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!verificarPermisoEscritura('guardar fichas técnicas de indicadores')) return;
     if (!formNombre.trim()) {
       showToast('Por favor ingrese el nombre del indicador.');
       return;
@@ -527,6 +552,7 @@ export function IndicadoresSstView({
 
   // Abrir Modal de Registro de Medición
   const handleAbrirRegistrarMedicion = (indId?: string) => {
+    if (!verificarPermisoEscritura('registrar o modificar mediciones de indicadores')) return;
     const idToUse = indId || indicadores[0]?.id || '';
     const ind = indicadores.find(i => i.id === idToUse);
     const per = new Date().toISOString().slice(0, 7);
@@ -556,6 +582,7 @@ export function IndicadoresSstView({
 
   // Sincronizar o registrar medición oficial de ausentismo médico para el período
   const handleSincronizarMedicionAusentismo = (periodoTarget?: string) => {
+    if (!verificarPermisoEscritura('sincronizar o registrar mediciones de ausentismo médico')) return;
     const per = periodoTarget || mesFiltroAusentismo;
     if (!indicadorAusentismoCatalogo) {
       showToast('No se encontró el indicador de Ausentismo en el catálogo.');
@@ -618,6 +645,7 @@ export function IndicadoresSstView({
   };
 
   const handleCrearAccionParaAusentismo = () => {
+    if (!verificarPermisoEscritura('formular planes de acción de mejora')) return;
     if (!indicadorAusentismoCatalogo) return;
     setAccIndicadorId(indicadorAusentismoCatalogo.id);
     setAccPeriodo(mesFiltroAusentismo);
@@ -674,6 +702,7 @@ export function IndicadoresSstView({
   // Guardar Medición
   const handleGuardarMedicion = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!verificarPermisoEscritura('guardar mediciones de indicadores')) return;
     const ind = indicadores.find(i => i.id === medIndicadorId);
     if (!ind || !calculoMedicionEnVivo) {
       showToast('Seleccione un indicador válido.');
@@ -732,6 +761,7 @@ export function IndicadoresSstView({
 
   // Eliminación o paso a Histórico según exigencia de trazabilidad Res. 0312
   const handleEliminarOArchivarIndicador = (ind: IndicadorSST) => {
+    if (!verificarPermisoEscritura('eliminar o archivar indicadores del catálogo')) return;
     const tieneMediciones = mediciones.some(m => m.indicadorId === ind.id);
     if (tieneMediciones) {
       setIndicadores(prev => prev.map(i => i.id === ind.id ? { ...i, estado: 'Histórico' } : i));
@@ -744,6 +774,7 @@ export function IndicadoresSstView({
 
   // Alternar estado Activo / Inactivo
   const handleToggleEstadoIndicador = (ind: IndicadorSST) => {
+    if (!verificarPermisoEscritura('cambiar el estado de los indicadores')) return;
     const nuevoEstado: EstadoIndicadorSST = ind.estado === 'Activo' ? 'Inactivo' : 'Activo';
     setIndicadores(prev => prev.map(i => i.id === ind.id ? { ...i, estado: nuevoEstado } : i));
     showToast(`Indicador ${ind.codigo} ahora está ${nuevoEstado}.`);
@@ -751,11 +782,12 @@ export function IndicadoresSstView({
 
   // Eliminar medición
   const handleEliminarMedicion = (medId: string) => {
+    if (!verificarPermisoEscritura('eliminar mediciones asentadas')) return;
     setMediciones(prev => prev.filter(m => m.id !== medId));
     showToast('Medición eliminada del registro histórico.');
   };
 
-  // Abrir Análisis Histórico
+  // Abrir Análisis Histórico (lectura permitida)
   const handleAbrirAnalisisHistorico = (ind: IndicadorSST) => {
     setIndicadorParaAnalisis(ind);
     setAnalisisCausaManual('');
@@ -767,6 +799,7 @@ export function IndicadoresSstView({
 
   // Abrir Verificación de Acción
   const handleAbrirVerificacionAccion = (acc: AccionMejoraIndicadorSST) => {
+    if (!verificarPermisoEscritura('evaluar y verificar la eficacia de las acciones')) return;
     setAccionParaVerificar(acc);
     setVerifFecha(new Date().toISOString().slice(0, 10));
     setVerifResponsable('Responsable SG-SST / COPASST');
@@ -779,6 +812,7 @@ export function IndicadoresSstView({
   // Guardar Verificación de Acción
   const handleGuardarVerificacion = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!verificarPermisoEscritura('guardar la verificación de eficacia de acciones')) return;
     if (!accionParaVerificar) return;
     if (!verifResultado.trim()) {
       showToast('Ingrese las conclusiones de la verificación de eficacia.');
@@ -804,6 +838,7 @@ export function IndicadoresSstView({
 
   // Reabrir Acción No Eficaz
   const handleReabrirAccion = (acc: AccionMejoraIndicadorSST) => {
+    if (!verificarPermisoEscritura('reabrir acciones de mejora')) return;
     setAcciones(prev => prev.map(a => a.id === acc.id ? {
       ...a,
       estado: 'En ejecución',
@@ -815,6 +850,7 @@ export function IndicadoresSstView({
 
   // Generar nueva acción vinculada desde no eficaz
   const handleGenerarNuevaAccionDesdeNoEficaz = (acc: AccionMejoraIndicadorSST) => {
+    if (!verificarPermisoEscritura('generar nuevas acciones vinculadas')) return;
     setAccIndicadorId(acc.indicadorId);
     setAccPeriodo(new Date().toISOString().slice(0, 7));
     setAccHallazgo(`Replanificación de acción previa no eficaz: ${acc.hallazgoDesviacion}`);
@@ -829,6 +865,7 @@ export function IndicadoresSstView({
   // Guardar Acción
   const handleGuardarAccion = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!verificarPermisoEscritura('guardar acciones de mejora')) return;
     const ind = indicadores.find(i => i.id === accIndicadorId);
     if (!accHallazgo.trim() || !accPropuesta.trim()) {
       showToast('Diligencie la descripción del hallazgo y la acción propuesta.');
@@ -922,6 +959,28 @@ export function IndicadoresSstView({
 
   return (
     <div className="space-y-6 animate-fade-in font-sans pb-12">
+      {/* Banner de protección y verificación de rol para SG-SST */}
+      {!tienePermisoEdicion && (
+        <BannerPermisoSst
+          currentUser={activeUser}
+          userRole={userRole}
+          moduloNombre="Indicadores y Fichas Técnicas del SG-SST (Res. 0312/2019 Arts. 30-32)"
+        />
+      )}
+
+      {/* Alerta de acción restringida */}
+      {toastAccesoDenegado && (
+        <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-semibold flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+            <span>{toastAccesoDenegado}</span>
+          </div>
+          <button onClick={() => setToastAccesoDenegado(null)} className="text-amber-700 hover:text-amber-900 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-semibold flex items-center justify-between shadow-xs">
@@ -955,10 +1014,22 @@ export function IndicadoresSstView({
           <button
             type="button"
             onClick={handleCargarPlantillaSugerida}
-            className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-950 border border-indigo-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Cargar los 10 indicadores normativos estándar según Resolución 0312 de 2019"
+            className={`px-3 py-2 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              tienePermisoEdicion
+                ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-950 border-indigo-300'
+                : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-150'
+            }`}
+            title={
+              tienePermisoEdicion
+                ? 'Cargar los 10 indicadores normativos estándar según Resolución 0312 de 2019'
+                : 'Requiere rol responsable_sst o admin_gh para cargar la plantilla'
+            }
           >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+            {tienePermisoEdicion ? (
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+            ) : (
+              <Lock className="w-3.5 h-3.5 text-slate-500" />
+            )}
             <span>Cargar Indicadores Normativos</span>
           </button>
 
@@ -966,7 +1037,7 @@ export function IndicadoresSstView({
             type="button"
             onClick={handleExportarCSV}
             className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Exportar matriz completa a archivo CSV"
+            title="Exportar matriz completa a archivo CSV (Consulta disponible para todos)"
           >
             <Download className="w-3.5 h-3.5 text-slate-600" />
             <span>Exportar CSV</span>
@@ -975,18 +1046,44 @@ export function IndicadoresSstView({
           <button
             type="button"
             onClick={() => handleAbrirRegistrarMedicion()}
-            className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            className={`px-3 py-2 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              tienePermisoEdicion
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
+                : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-150'
+            }`}
+            title={
+              tienePermisoEdicion
+                ? 'Registrar medición periódica'
+                : 'Requiere rol responsable_sst o admin_gh para registrar mediciones'
+            }
           >
-            <Activity className="w-3.5 h-3.5 text-emerald-700" />
+            {tienePermisoEdicion ? (
+              <Activity className="w-3.5 h-3.5 text-emerald-700" />
+            ) : (
+              <Lock className="w-3.5 h-3.5 text-slate-500" />
+            )}
             <span>Registrar Medición</span>
           </button>
 
           <button
             type="button"
             onClick={handleAbrirCrearIndicador}
-            className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer ${
+              tienePermisoEdicion
+                ? 'bg-[#18235C] hover:bg-[#101740] text-white'
+                : 'bg-slate-200 text-slate-600 hover:bg-slate-300 border border-slate-300'
+            }`}
+            title={
+              tienePermisoEdicion
+                ? 'Registrar nuevo indicador'
+                : 'Requiere rol responsable_sst o admin_gh para crear indicadores'
+            }
           >
-            <Plus className="w-4 h-4 text-[#00FF00]" />
+            {tienePermisoEdicion ? (
+              <Plus className="w-4 h-4 text-[#00FF00]" />
+            ) : (
+              <Lock className="w-4 h-4 text-slate-500" />
+            )}
             <span>Nuevo Indicador</span>
           </button>
         </div>
@@ -1525,65 +1622,85 @@ export function IndicadoresSstView({
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleAbrirRegistrarMedicion(ind.id)}
-                              className="p-1.5 text-emerald-700 hover:bg-emerald-50 rounded-lg cursor-pointer"
-                              title="Registrar medición para este indicador"
-                            >
-                              <Activity className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIndicadorEnEdicionId(ind.id);
-                                setFormCodigo(ind.codigo);
-                                setFormNombre(ind.nombre);
-                                setFormDescripcion(ind.descripcion);
-                                setFormTipo(ind.tipo);
-                                setFormCiclo(ind.cicloPHVA);
-                                setFormProcesoRel(ind.procesoRelacionado);
-                                setFormAreaId(ind.areaId || '');
-                                setFormEstandar(ind.estandar0312Relacionado || '');
-                                setFormNorma(ind.referenciaNormativa);
-                                setFormObjetivo(ind.objetivoMedicion);
-                                setFormInterpretacion(ind.interpretacion);
-                                setFormUnidad(ind.unidadMedida);
-                                setFormSentido(ind.sentido);
-                                setFormFormula(ind.formulaTexto);
-                                setFormVarNum(ind.nombreVariableNumerador);
-                                setFormVarDen(ind.nombreVariableDenominador);
-                                setFormFactor(ind.factorMultiplicador);
-                                setFormMeta(ind.meta);
-                                setFormLimiteAmarillo(ind.limiteAmarillo);
-                                setFormPeriodicidad(ind.periodicidad);
-                                setFormRespMed(ind.responsableMedicionCargo || '');
-                                setFormRespAna(ind.responsableAnalisisCargo || '');
-                                setModalIndicadorOpen(true);
-                              }}
-                              className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg cursor-pointer"
-                              title="Editar Ficha Técnica"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleEliminarOArchivarIndicador(ind)}
-                              className="p-1.5 text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer"
-                              title={mediciones.some(m => m.indicadorId === ind.id) ? 'Pasar a Histórico (con mediciones)' : 'Eliminar Indicador'}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {tienePermisoEdicion ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAbrirRegistrarMedicion(ind.id)}
+                                  className="p-1.5 text-emerald-700 hover:bg-emerald-50 rounded-lg cursor-pointer"
+                                  title="Registrar medición para este indicador"
+                                >
+                                  <Activity className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIndicadorEnEdicionId(ind.id);
+                                    setFormCodigo(ind.codigo);
+                                    setFormNombre(ind.nombre);
+                                    setFormDescripcion(ind.descripcion);
+                                    setFormTipo(ind.tipo);
+                                    setFormCiclo(ind.cicloPHVA);
+                                    setFormProcesoRel(ind.procesoRelacionado);
+                                    setFormAreaId(ind.areaId || '');
+                                    setFormEstandar(ind.estandar0312Relacionado || '');
+                                    setFormNorma(ind.referenciaNormativa);
+                                    setFormObjetivo(ind.objetivoMedicion);
+                                    setFormInterpretacion(ind.interpretacion);
+                                    setFormUnidad(ind.unidadMedida);
+                                    setFormSentido(ind.sentido);
+                                    setFormFormula(ind.formulaTexto);
+                                    setFormVarNum(ind.nombreVariableNumerador);
+                                    setFormVarDen(ind.nombreVariableDenominador);
+                                    setFormFactor(ind.factorMultiplicador);
+                                    setFormMeta(ind.meta);
+                                    setFormLimiteAmarillo(ind.limiteAmarillo);
+                                    setFormPeriodicidad(ind.periodicidad);
+                                    setFormRespMed(ind.responsableMedicionCargo || '');
+                                    setFormRespAna(ind.responsableAnalisisCargo || '');
+                                    setModalIndicadorOpen(true);
+                                  }}
+                                  className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg cursor-pointer"
+                                  title="Editar Ficha Técnica"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEliminarOArchivarIndicador(ind)}
+                                  className="p-1.5 text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer"
+                                  title={mediciones.some(m => m.indicadorId === ind.id) ? 'Pasar a Histórico (con mediciones)' : 'Eliminar Indicador'}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-medium"
+                                title="Solo lectura: Requiere rol responsable_sst o admin_gh para editar o asentar mediciones"
+                              >
+                                <Lock className="w-3 h-3 text-slate-400" />
+                                <span>Solo Lectura</span>
+                              </span>
+                            )}
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleToggleEstadoIndicador(ind)}
-                            className={`mt-1 text-[9px] px-1.5 py-0.5 rounded font-bold cursor-pointer transition-colors ${
-                              ind.estado === 'Activo' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' :
-                              ind.estado === 'Histórico' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
-                              'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            onClick={() => {
+                              if (!tienePermisoEdicion) {
+                                verificarPermisoEscritura('cambiar el estado operativo del indicador');
+                                return;
+                              }
+                              handleToggleEstadoIndicador(ind);
+                            }}
+                            className={`mt-1 text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                              !tienePermisoEdicion
+                                ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                : ind.estado === 'Activo' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 cursor-pointer' :
+                                ind.estado === 'Histórico' ? 'bg-purple-50 text-purple-700 border border-purple-200 cursor-pointer' :
+                                'bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer'
                             }`}
-                            title="Haga clic para alternar estado Activo/Inactivo"
+                            title={tienePermisoEdicion ? 'Haga clic para alternar estado Activo/Inactivo' : 'Requiere rol responsable_sst o admin_gh'}
                           >
                             {ind.estado}
                           </button>
@@ -1987,9 +2104,14 @@ export function IndicadoresSstView({
               <button
                 type="button"
                 onClick={() => handleSincronizarMedicionAusentismo(mesFiltroAusentismo)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer ${
+                  tienePermisoEdicion
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300 border border-slate-300'
+                }`}
+                title={tienePermisoEdicion ? 'Sincronizar o actualizar medición de ausentismo' : 'Requiere rol responsable_sst o admin_gh'}
               >
-                <RefreshCw className="w-4 h-4" />
+                {tienePermisoEdicion ? <RefreshCw className="w-4 h-4" /> : <Lock className="w-4 h-4 text-slate-500" />}
                 <span>
                   {mediciones.some(m => m.indicadorId === indicadorAusentismoCatalogo?.id && m.periodo === mesFiltroAusentismo)
                     ? 'Actualizar Medición Oficial en SG-SST'
@@ -2000,9 +2122,14 @@ export function IndicadoresSstView({
               <button
                 type="button"
                 onClick={handleCrearAccionParaAusentismo}
-                className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer ${
+                  tienePermisoEdicion
+                    ? 'bg-[#18235C] hover:bg-[#101740] text-white'
+                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300 border border-slate-300'
+                }`}
+                title={tienePermisoEdicion ? 'Formular acción de mejora PHVA' : 'Requiere rol responsable_sst o admin_gh'}
               >
-                <Award className="w-4 h-4 text-[#00FF00]" />
+                {tienePermisoEdicion ? <Award className="w-4 h-4 text-[#00FF00]" /> : <Lock className="w-4 h-4 text-slate-500" />}
                 <span>Formular Acción de Mejora PHVA</span>
               </button>
 
@@ -2208,9 +2335,14 @@ export function IndicadoresSstView({
             <button
               type="button"
               onClick={() => handleAbrirRegistrarMedicion()}
-              className="px-3.5 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                tienePermisoEdicion
+                  ? 'bg-[#18235C] hover:bg-[#101740] text-white'
+                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300 border border-slate-300'
+              }`}
+              title={tienePermisoEdicion ? 'Registrar nueva medición' : 'Requiere rol responsable_sst o admin_gh'}
             >
-              <Plus className="w-3.5 h-3.5 text-[#00FF00]" />
+              {tienePermisoEdicion ? <Plus className="w-3.5 h-3.5 text-[#00FF00]" /> : <Lock className="w-3.5 h-3.5 text-slate-500" />}
               <span>Registrar Nueva Medición</span>
             </button>
           </div>
@@ -2235,10 +2367,14 @@ export function IndicadoresSstView({
               <button
                 type="button"
                 onClick={() => handleSincronizarMedicionAusentismo(mesFiltroAusentismo)}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                title="Sincronizar medición automáticamente desde Incapacidades"
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs ${
+                  tienePermisoEdicion
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300 border border-slate-300'
+                }`}
+                title={tienePermisoEdicion ? 'Sincronizar medición automáticamente desde Incapacidades' : 'Requiere rol responsable_sst o admin_gh'}
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                {tienePermisoEdicion ? <RefreshCw className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5 text-slate-500" />}
                 <span>Sincronizar {mesFiltroAusentismo}</span>
               </button>
               <button
@@ -2342,6 +2478,7 @@ export function IndicadoresSstView({
             <button
               type="button"
               onClick={() => {
+                if (!verificarPermisoEscritura('crear nuevas acciones de mejora')) return;
                 setAccIndicadorId(indicadores[0]?.id || '');
                 setAccPeriodo(new Date().toISOString().slice(0, 7));
                 setAccHallazgo('');
@@ -2351,9 +2488,14 @@ export function IndicadoresSstView({
                 setAccFechaFin(new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
                 setModalAccionOpen(true);
               }}
-              className="px-3.5 py-1.5 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                tienePermisoEdicion
+                  ? 'bg-[#18235C] hover:bg-[#101740] text-white'
+                  : 'bg-slate-200 text-slate-600 hover:bg-slate-300 border border-slate-300'
+              }`}
+              title={tienePermisoEdicion ? 'Nueva Acción de Mejora' : 'Requiere rol responsable_sst o admin_gh'}
             >
-              <Plus className="w-3.5 h-3.5 text-[#00FF00]" />
+              {tienePermisoEdicion ? <Plus className="w-3.5 h-3.5 text-[#00FF00]" /> : <Lock className="w-3.5 h-3.5 text-slate-500" />}
               <span>Nueva Acción de Mejora</span>
             </button>
           </div>
@@ -2430,33 +2572,47 @@ export function IndicadoresSstView({
                             <span className="text-rose-700 font-bold text-xs inline-flex items-center gap-1">
                               <AlertOctagon className="w-3.5 h-3.5" /> No Eficaz
                             </span>
-                            <div className="flex items-center gap-1 mt-1">
-                              <button
-                                type="button"
-                                onClick={() => handleReabrirAccion(acc)}
-                                className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold cursor-pointer"
-                                title="Reabrir acción para replanificación PHVA"
-                              >
-                                Reabrir
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleGenerarNuevaAccionDesdeNoEficaz(acc)}
-                                className="px-2 py-0.5 bg-[#18235C] hover:bg-[#101740] text-white rounded text-[10px] font-bold cursor-pointer"
-                                title="Generar nueva acción vinculada"
-                              >
-                                Nueva Acción
-                              </button>
-                            </div>
+                            {tienePermisoEdicion ? (
+                              <div className="flex items-center gap-1 mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleReabrirAccion(acc)}
+                                  className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold cursor-pointer"
+                                  title="Reabrir acción para replanificación PHVA"
+                                >
+                                  Reabrir
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleGenerarNuevaAccionDesdeNoEficaz(acc)}
+                                  className="px-2 py-0.5 bg-[#18235C] hover:bg-[#101740] text-white rounded text-[10px] font-bold cursor-pointer"
+                                  title="Generar nueva acción vinculada"
+                                >
+                                  Nueva Acción
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">Solo lectura</span>
+                            )}
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleAbrirVerificacionAccion(acc)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold cursor-pointer shadow-xs"
-                          >
-                            Evaluar Eficacia
-                          </button>
+                          tienePermisoEdicion ? (
+                            <button
+                              type="button"
+                              onClick={() => handleAbrirVerificacionAccion(acc)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold cursor-pointer shadow-xs"
+                            >
+                              Evaluar Eficacia
+                            </button>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-medium"
+                              title="Requiere rol responsable_sst o admin_gh para evaluar eficacia"
+                            >
+                              <Lock className="w-3 h-3 text-slate-400" />
+                              <span>Solo Lectura</span>
+                            </span>
+                          )
                         )}
                       </td>
                     </tr>

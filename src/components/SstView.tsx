@@ -8,13 +8,17 @@ import {
   Cargo,
   AreaOrganizacion,
   ProcesoOrganizacion,
-  Role
+  Role,
+  UsuarioSistema
 } from '../types';
 import {
   ESTANDARES_0312_2019_INICIALES,
   PELIGROS_GTC45_INICIALES
 } from '../data/sstData';
 import { MatrizRiesgosGTC45View } from './MatrizRiesgosGTC45View';
+import { useAuth } from '../context/AuthContext';
+import { puedeEditarSST } from '../utils/sstAuthUtils';
+import { BannerPermisoSst } from './sst/BannerPermisoSst';
 import {
   AlertCircle,
   AlertOctagon,
@@ -54,11 +58,14 @@ import {
   Users,
   XCircle,
   Target,
-  ArrowUpRight
+  ArrowUpRight,
+  Lock,
+  X
 } from 'lucide-react';
 
 interface SstViewProps {
   userRole?: Role;
+  currentUser?: UsuarioSistema | null;
   currentEmpleadoId?: string;
   empleados?: Empleado[];
   cargos?: Cargo[];
@@ -71,6 +78,7 @@ interface SstViewProps {
 
 export function SstView({
   userRole = 'admin',
+  currentUser,
   currentEmpleadoId = 'e6',
   empleados = [],
   cargos = [],
@@ -80,6 +88,21 @@ export function SstView({
   onUpdateEmpleado,
   onNavigate
 }: SstViewProps) {
+  const auth = useAuth();
+  const activeUser = currentUser || auth?.currentUser;
+  const tienePermisoEdicion = puedeEditarSST(activeUser, userRole);
+  const [toastAccesoDenegado, setToastAccesoDenegado] = useState<string | null>(null);
+
+  const verificarPermisoEscritura = (accion: string): boolean => {
+    if (!tienePermisoEdicion) {
+      setToastAccesoDenegado(
+        `Acceso restringido: Solo los roles "Responsable SG-SST" o "Administrador Gestión Humana" tienen facultades para ${accion}. Su perfil actual tiene permisos de solo consulta (Res. 0312/2019 y Dec. 1072/2015).`
+      );
+      setTimeout(() => setToastAccesoDenegado(null), 4500);
+      return false;
+    }
+    return true;
+  };
   const [estandares, setEstandares] = useState<EstandarMinimoSST[]>(ESTANDARES_0312_2019_INICIALES);
   const [peligros, setPeligros] = useState<PeligroRiesgoGTC45[]>(PELIGROS_GTC45_INICIALES);
 
@@ -145,6 +168,7 @@ export function SstView({
 
   // Manejar cambio de estado de un estándar
   const handleChangeEstado = (id: string, nuevoEstado: EstadoEstandar) => {
+    if (!verificarPermisoEscritura('calificar los estándares mínimos de SG-SST')) return;
     setEstandares(prev => prev.map(e => {
       if (e.id === id) {
         return {
@@ -159,6 +183,7 @@ export function SstView({
 
   // Manejar actualización de evidencia de un estándar
   const handleUpdateEvidencia = (id: string, evidencia: string, observaciones: string) => {
+    if (!verificarPermisoEscritura('actualizar evidencias técnicas y soportes')) return;
     setEstandares(prev => prev.map(e => {
       if (e.id === id) {
         return {
@@ -194,6 +219,28 @@ export function SstView({
 
   return (
     <div className="space-y-6">
+      {/* Banner informativo de permisos para SG-SST */}
+      {!tienePermisoEdicion && (
+        <BannerPermisoSst
+          currentUser={activeUser}
+          userRole={userRole}
+          moduloNombre="Estándares Mínimos y Autoevaluación SG-SST (Resolución 0312 de 2019)"
+        />
+      )}
+
+      {/* Alerta de acción restringida */}
+      {toastAccesoDenegado && (
+        <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-semibold flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+            <span>{toastAccesoDenegado}</span>
+          </div>
+          <button onClick={() => setToastAccesoDenegado(null)} className="text-amber-700 hover:text-amber-900 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header Principal del Módulo SG-SST */}
       <div className="bg-white rounded-xl border border-[#8FA7D6] p-5 sm:p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -540,7 +587,10 @@ export function SstView({
                             id="modal-evidencia-input"
                             defaultValue={est.evidenciaRegistrada}
                             rows={3}
-                            className="w-full px-3 py-2 bg-[#FFFFFF] rounded border border-[#8FA7D6] text-[#18235C]"
+                            disabled={!tienePermisoEdicion}
+                            className={`w-full px-3 py-2 rounded border border-[#8FA7D6] text-[#18235C] ${
+                              !tienePermisoEdicion ? 'bg-slate-100 cursor-not-allowed' : 'bg-[#FFFFFF]'
+                            }`}
                             placeholder="Describa el documento, acta, certificación o código del soporte digital..."
                           />
                         </div>
@@ -553,29 +603,43 @@ export function SstView({
                             id="modal-obs-input"
                             type="text"
                             defaultValue={est.observaciones}
-                            className="w-full px-3 py-2 bg-[#FFFFFF] rounded border border-[#8FA7D6] text-[#18235C]"
+                            disabled={!tienePermisoEdicion}
+                            className={`w-full px-3 py-2 rounded border border-[#8FA7D6] text-[#18235C] ${
+                              !tienePermisoEdicion ? 'bg-slate-100 cursor-not-allowed' : 'bg-[#FFFFFF]'
+                            }`}
                             placeholder="Vigencias, entidad certificadora o notas..."
                           />
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-3 border-t border-[#8FA7D6]">
-                        <button
-                          onClick={() => setEditingEstandarId(null)}
-                          className="px-3 py-1.5 text-xs text-[#282829] hover:text-[#18235C]"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          onClick={() => {
-                            const ev = (document.getElementById('modal-evidencia-input') as HTMLTextAreaElement)?.value || '';
-                            const obs = (document.getElementById('modal-obs-input') as HTMLInputElement)?.value || '';
-                            handleUpdateEvidencia(est.id, ev, obs);
-                          }}
-                          className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-xs font-semibold transition-colors"
-                        >
-                          Guardar Soporte
-                        </button>
+                      <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#8FA7D6]">
+                        {!tienePermisoEdicion ? (
+                          <div className="flex items-center gap-1.5 text-xs text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                            <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>Solo lectura (Se requiere rol responsable_sst o admin_gh)</span>
+                          </div>
+                        ) : <div />}
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingEstandarId(null)}
+                            className="px-3 py-1.5 text-xs text-[#282829] hover:text-[#18235C] cursor-pointer"
+                          >
+                            Cerrar
+                          </button>
+                          {tienePermisoEdicion && (
+                            <button
+                              onClick={() => {
+                                const ev = (document.getElementById('modal-evidencia-input') as HTMLTextAreaElement)?.value || '';
+                                const obs = (document.getElementById('modal-obs-input') as HTMLInputElement)?.value || '';
+                                handleUpdateEvidencia(est.id, ev, obs);
+                              }}
+                              className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              Guardar Soporte
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -594,6 +658,7 @@ export function SstView({
           procesos={procesos}
           empleados={empleados}
           userRole={userRole}
+          currentUser={activeUser}
         />
       )}
 

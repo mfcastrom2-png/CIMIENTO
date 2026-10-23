@@ -13,10 +13,41 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
 }) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('bgroup_pwa_floating_dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isMinimized, setIsMinimized] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('bgroup_pwa_floating_minimized') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
-  // Si la aplicación ya está instalada y operando como PWA nativa, no mostramos el botón
-  if (isInstalled || dismissed) {
+  const handleDismiss = () => {
+    setDismissed(true);
+    try {
+      localStorage.setItem('bgroup_pwa_floating_dismissed', 'true');
+    } catch {
+      // Ignore localStorage restrictions
+    }
+  };
+
+  const handleToggleMinimize = (minimizedState: boolean) => {
+    setIsMinimized(minimizedState);
+    try {
+      localStorage.setItem('bgroup_pwa_floating_minimized', String(minimizedState));
+    } catch {
+      // Ignore localStorage restrictions
+    }
+  };
+
+  // Si la aplicación ya está instalada o el usuario eliminó el aviso, no mostramos el banner
+  if (isInstalled || (variant === 'floating' && dismissed)) {
     return null;
   }
 
@@ -62,43 +93,139 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
     );
   }
 
-  // Render como Banner flotante inferior (ideal para móvil)
+  // Render como Banner flotante inferior con opción de minimizar o eliminar
   if (variant === 'floating') {
     return (
       <>
-        <div className={`fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-40 bg-[#18235C] text-white p-3.5 rounded-2xl shadow-2xl border border-indigo-400/30 flex items-center justify-between gap-3 animate-fadeIn ${className}`}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F59E0B] text-[#18235C] flex items-center justify-center shrink-0 font-black shadow-md">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                <span>Instalar B Group GH</span>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-400/30 font-semibold">PWA</span>
-              </h4>
-              <p className="text-[11px] text-slate-300 truncate">
-                Acceso directo rápido y sin barra de navegador
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
+        {isMinimized ? (
+          // Versión MINIMIZADA: botón compacto tipo píldora en la esquina que no obstruye la lectura
+          <aside
+            aria-label="Instalación de aplicación móvil PWA minimizada"
+            className={`fixed bottom-3 right-3 sm:bottom-4 sm:right-6 z-40 flex items-center gap-1.5 bg-[#18235C]/95 hover:bg-[#18235C] text-white px-2.5 py-1.5 rounded-full shadow-xl border border-indigo-300/30 backdrop-blur-md transition-all duration-200 select-none ${className}`}
+          >
             <button
+              type="button"
               onClick={handleAction}
-              className="px-3 py-1.5 bg-[#F59E0B] hover:bg-[#D97706] text-[#18235C] text-xs font-black rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1"
+              className="flex items-center gap-1.5 text-xs font-bold text-white hover:text-[#F59E0B] transition-colors cursor-pointer py-0.5 px-1"
+              title="Instalar B Group GH en este dispositivo"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Instalar</span>
+              <div className="w-6 h-6 rounded-full bg-[#F59E0B] text-[#18235C] flex items-center justify-center shrink-0">
+                <Smartphone className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-[11px] font-bold">Instalar App</span>
             </button>
+
+            <div className="h-4 w-px bg-white/20 mx-0.5" />
+
+            {/* Botón Maximizar */}
             <button
-              onClick={() => setDismissed(true)}
-              className="p-1 text-slate-400 hover:text-white rounded-lg transition-colors"
-              title="Cerrar sugerencia"
+              type="button"
+              onClick={() => handleToggleMinimize(false)}
+              className="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              title="Expandir aviso de instalación"
+              aria-label="Expandir aviso de instalación"
             >
-              <X className="w-4 h-4" />
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
             </button>
-          </div>
-        </div>
+
+            {/* Botón Eliminar / Cerrar */}
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="p-1 text-slate-400 hover:text-red-300 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              title="Eliminar aviso (no volver a mostrar)"
+              aria-label="Eliminar aviso"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </aside>
+        ) : (
+          // Versión EXPANDIDA: banner con información completa y controles de minimizar y eliminar
+          <aside
+            aria-label="Aviso de instalación de aplicación móvil B Group GH"
+            className={`fixed bottom-3 left-3 right-3 sm:left-auto sm:right-6 sm:w-96 z-40 bg-[#18235C] text-white p-3.5 rounded-2xl shadow-2xl border border-indigo-400/40 backdrop-blur-md flex flex-col gap-2.5 animate-fadeIn ${className}`}
+          >
+            {/* Barra superior con título y controles de minimizar / eliminar */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-[#F59E0B] text-[#18235C] flex items-center justify-center shrink-0 font-black shadow-xs">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                    <span>Instalar B Group GH</span>
+                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 py-0.2 rounded border border-emerald-400/30 font-semibold shrink-0">PWA</span>
+                  </h4>
+                </div>
+              </div>
+
+              {/* Botones de acción de la ventana: Minimizar y Eliminar */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleToggleMinimize(true)}
+                  className="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+                  title="Minimizar aviso para no obstruir datos"
+                  aria-label="Minimizar aviso"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismiss}
+                  className="p-1 text-slate-400 hover:text-red-300 hover:bg-white/10 rounded-md transition-colors cursor-pointer"
+                  title="Eliminar aviso (no volver a mostrar)"
+                  aria-label="Eliminar aviso"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Texto descriptivo */}
+            <p className="text-[11px] text-slate-300 leading-snug">
+              Accede directamente desde tu pantalla de inicio o escritorio, rápido y sin la barra del navegador.
+            </p>
+
+            {/* Botones de acción inferiores */}
+            <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => handleToggleMinimize(true)}
+                className="text-[11px] text-slate-300 hover:text-white font-medium px-2 py-1 rounded hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1"
+                title="Minimizar a píldora en la esquina"
+              >
+                <span>Minimizar</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDismiss}
+                  className="text-[11px] text-slate-300 hover:text-red-300 font-medium px-2 py-1 rounded hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Eliminar aviso"
+                >
+                  <span>Eliminar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAction}
+                  className="px-3 py-1.5 bg-[#F59E0B] hover:bg-[#D97706] text-[#18235C] text-xs font-black rounded-lg transition-colors cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Instalar ahora</span>
+                </button>
+              </div>
+            </div>
+          </aside>
+        )}
 
         {showIOSGuide && (
           <GuiaInstalacionModal

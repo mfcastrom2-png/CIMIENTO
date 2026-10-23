@@ -5,9 +5,13 @@ import {
   AreaOrganizacion,
   ProcesoOrganizacion,
   Empleado,
-  Role
+  Role,
+  UsuarioSistema
 } from '../types';
 import { useCompanySyncOptional } from '../context/SyncContext';
+import { useAuth } from '../context/AuthContext';
+import { puedeEditarSST } from '../utils/sstAuthUtils';
+import { BannerPermisoSst } from './sst/BannerPermisoSst';
 import {
   Layers,
   Plus,
@@ -34,7 +38,8 @@ import {
   Sparkles,
   HelpCircle,
   AlertCircle,
-  Copy
+  Copy,
+  Lock
 } from 'lucide-react';
 
 const CLASIFICACIONES_GTC45 = [
@@ -82,6 +87,7 @@ interface MatrizRiesgosGTC45ViewProps {
   procesos?: ProcesoOrganizacion[];
   empleados?: Empleado[];
   userRole?: Role;
+  currentUser?: UsuarioSistema | null;
   onNavigate?: (view: string) => void;
 }
 
@@ -92,8 +98,15 @@ export function MatrizRiesgosGTC45View({
   areas = [],
   procesos = [],
   empleados = [],
-  userRole = 'admin'
+  userRole = 'admin',
+  currentUser,
+  onNavigate
 }: MatrizRiesgosGTC45ViewProps) {
+  const auth = useAuth();
+  const activeUser = currentUser || auth?.currentUser;
+  const tienePermisoEdicion = puedeEditarSST(activeUser, userRole);
+  const [toastAccesoDenegado, setToastAccesoDenegado] = useState<string | null>(null);
+
   const syncContext = useCompanySyncOptional();
   const empresa = syncContext?.empresa;
   const razonSocial = empresa?.razonSocial || empresa?.nombreComercial || 'Empresa';
@@ -254,6 +267,10 @@ export function MatrizRiesgosGTC45View({
 
   // Abrir modal de creación (limpio, sin datos ficticios)
   const handleAbrirCrear = () => {
+    if (!tienePermisoEdicion) {
+      setToastAccesoDenegado('Acceso denegado: Se requiere rol "responsable_sst" o "admin_gh" para registrar evaluaciones en la Matriz GTC 45.');
+      return;
+    }
     setPeligroEnEdicionId(null);
     setModoNuevoProceso(false);
     const primerProceso = listaProcesosDisponibles[0] || '';
@@ -289,6 +306,10 @@ export function MatrizRiesgosGTC45View({
 
   // Abrir modal de edición
   const handleAbrirEditar = (item: PeligroRiesgoGTC45) => {
+    if (!tienePermisoEdicion) {
+      setToastAccesoDenegado('Acceso denegado: Se requiere rol "responsable_sst" o "admin_gh" para modificar evaluaciones en la Matriz GTC 45.');
+      return;
+    }
     setPeligroEnEdicionId(item.id);
     const esProcesoEnLista = listaProcesosDisponibles.includes(item.proceso);
     setModoNuevoProceso(!esProcesoEnLista);
@@ -322,6 +343,10 @@ export function MatrizRiesgosGTC45View({
 
   // Duplicar peligro como plantilla
   const handleDuplicar = (item: PeligroRiesgoGTC45) => {
+    if (!tienePermisoEdicion) {
+      setToastAccesoDenegado('Acceso denegado: Se requiere rol "responsable_sst" o "admin_gh" para duplicar evaluaciones en la Matriz GTC 45.');
+      return;
+    }
     handleAbrirEditar({
       ...item,
       id: `pel_${Date.now()}`,
@@ -334,6 +359,11 @@ export function MatrizRiesgosGTC45View({
   // Guardar creación o edición
   const handleGuardarPeligro = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!tienePermisoEdicion) {
+      setToastAccesoDenegado('Acceso denegado: Se requiere rol "responsable_sst" o "admin_gh" para guardar cambios en la Matriz GTC 45.');
+      return;
+    }
 
     if (!formProceso.trim()) {
       alert('Por favor ingrese o seleccione el proceso.');
@@ -405,6 +435,10 @@ export function MatrizRiesgosGTC45View({
 
   // Eliminar peligro
   const handleEliminarPeligro = (id: string) => {
+    if (!tienePermisoEdicion) {
+      setToastAccesoDenegado('Acceso denegado: Se requiere rol "responsable_sst" o "admin_gh" para eliminar evaluaciones en la Matriz GTC 45.');
+      return;
+    }
     setPeligros(prev => prev.filter(p => p.id !== id));
     setConfirmarEliminarId(null);
     showToast('Peligro eliminado de la matriz.');
@@ -412,6 +446,10 @@ export function MatrizRiesgosGTC45View({
 
   // Vaciar matriz / eliminar riesgos
   const handleVaciarMatriz = () => {
+    if (!tienePermisoEdicion) {
+      setToastAccesoDenegado('Acceso denegado: Se requiere rol "responsable_sst" o "admin_gh" para vaciar la Matriz GTC 45.');
+      return;
+    }
     if (confirm('¿Desea vaciar la matriz y eliminar todas las evaluaciones registradas? Esta acción no se puede deshacer.')) {
       setPeligros([]);
       try {
@@ -567,6 +605,28 @@ export function MatrizRiesgosGTC45View({
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Banner Informativo de Acceso Restringido para Edición */}
+      {!tienePermisoEdicion && (
+        <BannerPermisoSst
+          currentUser={activeUser}
+          modulo="la Matriz de Peligros y Riesgos GTC 45"
+          className="mb-2"
+        />
+      )}
+
+      {/* Toast de Acceso Denegado por Rol */}
+      {toastAccesoDenegado && (
+        <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-rose-900 text-xs font-semibold flex items-center justify-between shadow-xs animate-shake">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{toastAccesoDenegado}</span>
+          </div>
+          <button onClick={() => setToastAccesoDenegado(null)} className="text-rose-700 hover:text-rose-900 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-semibold flex items-center justify-between shadow-xs">
@@ -631,9 +691,22 @@ export function MatrizRiesgosGTC45View({
           <button
             type="button"
             onClick={handleAbrirCrear}
-            className="px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors ${
+              tienePermisoEdicion
+                ? 'bg-[#18235C] hover:bg-[#101740] text-white cursor-pointer'
+                : 'bg-slate-200 text-slate-600 border border-slate-300 cursor-not-allowed opacity-90'
+            }`}
+            title={
+              tienePermisoEdicion
+                ? 'Registrar nueva evaluación de peligro GTC 45'
+                : 'Edición restringida: Requiere rol responsable_sst o admin_gh'
+            }
           >
-            <Plus className="w-4 h-4 text-[#00FF00]" />
+            {tienePermisoEdicion ? (
+              <Plus className="w-4 h-4 text-[#00FF00]" />
+            ) : (
+              <Lock className="w-3.5 h-3.5 text-amber-700" />
+            )}
             <span>Nuevo Peligro / Evaluación</span>
           </button>
         </div>
@@ -925,50 +998,62 @@ export function MatrizRiesgosGTC45View({
                           <Eye className="w-4 h-4" />
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDuplicar(item)}
-                          className="p-1.5 text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Duplicar como plantilla para nueva evaluación"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleAbrirEditar(item)}
-                          className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                          title="Editar parámetros y controles"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-
-                        {confirmarEliminarId === item.id ? (
-                          <div className="flex items-center gap-1 bg-rose-50 p-1 rounded-lg border border-rose-200">
+                        {tienePermisoEdicion ? (
+                          <>
                             <button
                               type="button"
-                              onClick={() => handleEliminarPeligro(item.id)}
-                              className="px-2 py-0.5 bg-rose-600 text-white rounded text-[10px] font-bold cursor-pointer"
+                              onClick={() => handleDuplicar(item)}
+                              className="p-1.5 text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              title="Duplicar como plantilla para nueva evaluación"
                             >
-                              Confirmar
+                              <Copy className="w-4 h-4" />
                             </button>
+
                             <button
                               type="button"
-                              onClick={() => setConfirmarEliminarId(null)}
-                              className="p-0.5 text-slate-500 hover:text-slate-700 cursor-pointer"
+                              onClick={() => handleAbrirEditar(item)}
+                              className="p-1.5 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                              title="Editar parámetros y controles"
                             >
-                              <X className="w-3.5 h-3.5" />
+                              <Edit3 className="w-4 h-4" />
                             </button>
-                          </div>
+
+                            {confirmarEliminarId === item.id ? (
+                              <div className="flex items-center gap-1 bg-rose-50 p-1 rounded-lg border border-rose-200">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEliminarPeligro(item.id)}
+                                  className="px-2 py-0.5 bg-rose-600 text-white rounded text-[10px] font-bold cursor-pointer"
+                                >
+                                  Confirmar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmarEliminarId(null)}
+                                  className="p-0.5 text-slate-500 hover:text-slate-700 cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmarEliminarId(item.id)}
+                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Eliminar de la matriz"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmarEliminarId(item.id)}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Eliminar de la matriz"
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200 font-medium"
+                            title="Edición restringida a usuarios con rol 'responsable_sst' o 'admin_gh'"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            <Lock className="w-3 h-3 text-amber-700" />
+                            <span>Solo Lectura</span>
+                          </span>
                         )}
                       </div>
                     </div>
@@ -1600,12 +1685,19 @@ export function MatrizRiesgosGTC45View({
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
-                >
-                  {peligroEnEdicionId ? 'Guardar Cambios de Evaluación' : 'Asentar Peligro en la Matriz GTC 45'}
-                </button>
+                {tienePermisoEdicion ? (
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-[#18235C] hover:bg-[#101740] text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+                  >
+                    {peligroEnEdicionId ? 'Guardar Cambios de Evaluación' : 'Asentar Peligro en la Matriz GTC 45'}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-xs text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-300 font-semibold">
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Edición bloqueada (Requiere rol responsable_sst o admin_gh)</span>
+                  </div>
+                )}
               </div>
             </form>
           </div>

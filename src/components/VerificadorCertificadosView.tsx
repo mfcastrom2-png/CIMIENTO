@@ -144,7 +144,7 @@ export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewPr
             <span>Servicio Oficial de Validación de Autenticidad Digital</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#18235C]">
-            Verificador de Autenticidad: Diploma SST y Certificado Laboral
+            Verificador de documentos
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto">
             Valide en tiempo real la validez jurídica, integridad criptográfica y vigencia de <strong>Diplomas SST</strong> (Seguridad y Salud en el Trabajo) y <strong>Certificados Laborales</strong> expedidos por <strong>{razonSocial}</strong> bajo la <strong>Ley 527 de 1999</strong> y el <strong>Código Sustantivo del Trabajo (CST)</strong>.
@@ -168,7 +168,7 @@ export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewPr
         <div className="bg-white p-6 rounded-2xl border border-[#8FA7D6]/40 shadow-xs space-y-4">
           <form onSubmit={handleBuscar} className="space-y-3">
             <label className="block font-extrabold text-sm text-[#18235C]">
-              Ingrese el Código de Verificación, Token SHA-256 o Radicado del Documento:
+              Ingrese el Código de Verificación
             </label>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
@@ -291,68 +291,6 @@ export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewPr
               </div>
             </div>
           )}
-        </div>
-
-        {/* Ejemplos de Verificación para Pruebas: Exclusivo Diploma SST y Certificado Laboral */}
-        <div className="bg-white p-6 rounded-2xl border border-[#8FA7D6]/40 shadow-xs space-y-3">
-          <span className="text-xs font-extrabold text-[#18235C] uppercase tracking-wider block">
-            Ejemplos de Códigos Registrados para Consulta Rápida:
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* 1. Diploma SST */}
-            <button
-              type="button"
-              onClick={() => {
-                const cod = 'DIP-SST-2026-3391';
-                setCodigoBusqueda(cod);
-                ejecutarVerificacion(cod);
-              }}
-              className="p-4 bg-slate-50 hover:bg-[#18235C] hover:text-white rounded-xl border border-slate-200 transition-all text-left space-y-1.5 group cursor-pointer shadow-xs"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#18235C] group-hover:text-white">
-                  <Award className="w-4 h-4 text-blue-600 group-hover:text-[#00FF00]" />
-                  <span>Diploma SST</span>
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 group-hover:bg-white/20 group-hover:text-white">
-                  SG-SST
-                </span>
-              </div>
-              <span className="text-xs font-mono text-slate-500 group-hover:text-slate-200 block">
-                DIP-SST-2026-3391
-              </span>
-              <p className="text-[11px] text-slate-500 group-hover:text-slate-300">
-                Constancia y diploma de capacitación en Seguridad en Alturas y Prevención SG-SST.
-              </p>
-            </button>
-
-            {/* 2. Certificado Laboral */}
-            <button
-              type="button"
-              onClick={() => {
-                const cod = 'CERT-901458789-2026-774120';
-                setCodigoBusqueda(cod);
-                ejecutarVerificacion(cod);
-              }}
-              className="p-4 bg-slate-50 hover:bg-[#18235C] hover:text-white rounded-xl border border-slate-200 transition-all text-left space-y-1.5 group cursor-pointer shadow-xs"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#18235C] group-hover:text-white">
-                  <FileText className="w-4 h-4 text-emerald-600 group-hover:text-[#00FF00]" />
-                  <span>Certificado Laboral</span>
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 group-hover:bg-white/20 group-hover:text-white">
-                  Gestión Humana
-                </span>
-              </div>
-              <span className="text-xs font-mono text-slate-500 group-hover:text-slate-200 block">
-                CERT-2026-774120
-              </span>
-              <p className="text-[11px] text-slate-500 group-hover:text-slate-300">
-                Acreditación laboral oficial conforme al Código Sustantivo del Trabajo (Art. 57 CST).
-              </p>
-            </button>
-          </div>
         </div>
       </div>
 
