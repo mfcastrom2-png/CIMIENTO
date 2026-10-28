@@ -78,6 +78,29 @@ export async function generarHashSha256(cadena: string): Promise<string> {
 }
 
 /**
+ * Obtiene la URL base absoluta de la aplicación, preservando subdirectorios (ej: GitHub Pages /repo-name/ o dominio raíz),
+ * asegurando compatibilidad total con HashRouter y enlaces externos desde correos electrónicos.
+ */
+export function obtenerBaseUrlAplicacion(): string {
+  if (typeof window === 'undefined') return 'https://bgroup-gh.web.app/';
+  const hrefSinHash = window.location.href.split('#')[0].split('?')[0];
+  const baseLimpia = hrefSinHash.replace(/\/index\.html$/i, '');
+  return baseLimpia.endsWith('/') ? baseLimpia : `${baseLimpia}/`;
+}
+
+export function construirEnlaceHojaVidaCandidato(documento: string): string {
+  const base = obtenerBaseUrlAplicacion();
+  const docEncoded = encodeURIComponent(documento.trim());
+  return `${base}#/hoja-vida?doc=${docEncoded}`;
+}
+
+export function construirEnlaceFirmaContrato(documento: string): string {
+  const base = obtenerBaseUrlAplicacion();
+  const docEncoded = encodeURIComponent(documento.trim());
+  return `${base}#/expediente?doc=${docEncoded}&etapa=firma_contrato`;
+}
+
+/**
  * Construye el cuerpo del correo institucional para invitar al candidato a diligenciar su Hoja de Vida
  */
 export function generarTextoInvitacionHojaVida(params: {
@@ -89,9 +112,7 @@ export function generarTextoInvitacionHojaVida(params: {
 }): { asunto: string; cuerpo: string; enlace: string } {
   const nombreOrg = params.empresa?.razonSocial || params.empresa?.nombreComercial || 'B GROUP INGENIERIA S.A.S.';
   const nitOrg = params.empresa?.nit ? `NIT: ${params.empresa.nit}` : 'NIT: 900.995.99-2';
-  const enlace = typeof window !== 'undefined'
-    ? `${window.location.origin}/expediente?doc=${encodeURIComponent(params.candidatoDocumento)}&etapa=hoja_vida`
-    : `https://bgroup-gh.web.app/expediente?doc=${encodeURIComponent(params.candidatoDocumento)}`;
+  const enlace = construirEnlaceHojaVidaCandidato(params.candidatoDocumento);
 
   const asunto = `Invitación al Proceso de Vinculación y Diligenciamiento de Hoja de Vida — ${nombreOrg}`;
   const cuerpo = `Apreciado(a) ${params.candidatoNombre},
@@ -108,6 +129,7 @@ ENLACE SEGURO DE DILIGENCIAMIENTO:
 ${enlace}
 
 CÓDIGO ÚNICO DE ACCESO: ${params.candidatoDocumento}
+(Si el enlace no abre directamente, puede ingresar al portal institucional y digitar su número de documento).
 
 Una vez complete este registro, la Dirección de Gestión Humana procederá con la estructuración del contrato individual de trabajo para su posterior revisión y firma digital.
 
@@ -157,9 +179,7 @@ export function generarTextoNotificacionContratoListo(params: {
 }): { asunto: string; cuerpo: string; enlace: string } {
   const nombreOrg = params.empresa?.razonSocial || params.empresa?.nombreComercial || 'B GROUP INGENIERIA S.A.S.';
   const nitOrg = params.empresa?.nit ? `NIT: ${params.empresa.nit}` : 'NIT: 900.995.99-2';
-  const enlace = typeof window !== 'undefined'
-    ? `${window.location.origin}/expediente?doc=${encodeURIComponent(params.candidatoDocumento)}&etapa=firma_contrato`
-    : `https://bgroup-gh.web.app/expediente?doc=${encodeURIComponent(params.candidatoDocumento)}`;
+  const enlace = construirEnlaceFirmaContrato(params.candidatoDocumento);
 
   const asunto = `Contrato Laboral listo para Revisión y Firma Digital — ${nombreOrg} (${params.codigoContrato})`;
   const cuerpo = `Apreciado(a) ${params.candidatoNombre},

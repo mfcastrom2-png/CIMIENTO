@@ -95,7 +95,8 @@ service cloud.firestore {
     }
 
     // 3. Empleados: Confidencialidad salarial y Habeas Data (SEC-A01 & SEC-B03)
-    // Administradores leen todo; colaboradores leen únicamente su propio expediente con correo verificado o empleadoId
+    // Administradores leen todo; colaboradores leen únicamente su propio expediente con correo verificado o empleadoId;
+    // Candidatos en pre-selección pueden consultar y diligenciar su Hoja de Vida Digital institucional.
     match /empleados/{empleadoId} {
       allow read: if isAdmin()
         || (
@@ -111,8 +112,19 @@ service cloud.firestore {
               && currentUser().data.empleadoId == empleadoId
             )
           )
+        )
+        || (
+          resource.data.estadoLaboral == 'Pre-selección'
+          || (('vinculacion' in resource.data) && resource.data.vinculacion.etapaActual in ['pre_seleccion', 'hoja_vida_completada', 'pendiente_firma_contrato', 'contrato_firmado'])
         );
-      allow create, update, delete: if isAdmin();
+
+      allow update: if isAdmin()
+        || (
+          resource.data.estadoLaboral == 'Pre-selección'
+          && request.resource.data.estadoLaboral == 'Pre-selección'
+        );
+
+      allow create, delete: if isAdmin();
     }
 
     // 4. Cargos, Áreas y Procesos Organizacionales (Lectura para toda la empresa, escritura admin)
@@ -386,6 +398,12 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if signedIn();
       allow update, delete: if isAdmin();
+    }
+
+    // 19. Verificador de Documentos y Certificados Emitidos (Consulta pública de autenticidad por código, emisión SST/Admin)
+    match /certificados_emitidos/{codigoId} {
+      allow read: if true;
+      allow write: if isSSTorAdmin();
     }
 
     // Default deny catch-all

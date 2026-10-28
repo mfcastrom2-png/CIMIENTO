@@ -122,7 +122,7 @@ export const ModalNuevoCandidatoVinculacion: React.FC<ModalNuevoCandidatoVincula
           segundoNombre: segundoNombre.trim() || undefined,
           primerApellido: primerApellido.trim(),
           segundoApellido: segundoApellido.trim() || undefined,
-          fechaNacimiento: '1995-01-01',
+          fechaNacimiento: '',
           lugarNacimiento: ciudad,
           nacionalidad: 'Colombiana',
           genero: 'No especificado',

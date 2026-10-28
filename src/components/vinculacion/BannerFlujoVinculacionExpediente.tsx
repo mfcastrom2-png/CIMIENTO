@@ -21,8 +21,10 @@ import {
   Send,
   Building2,
   Check,
-  ArrowRight
+  ArrowRight,
+  Copy
 } from 'lucide-react';
+import { construirEnlaceHojaVidaCandidato } from '../../services/vinculacionService';
 
 interface BannerFlujoVinculacionExpedienteProps {
   empleado: Empleado;
@@ -51,6 +53,7 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
 
   // Permitir colapsar si ya está activo
   const [colapsado, setColapsado] = useState(esActivo);
+  const [enlaceCopiado, setEnlaceCopiado] = useState(false);
 
   const totalNotificaciones = vinculacion?.notificaciones?.length || 0;
 
@@ -227,6 +230,31 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
                   <button
                     type="button"
+                    onClick={() => {
+                      const doc = empleado.documento || empleado.codigo || '';
+                      const url = construirEnlaceHojaVidaCandidato(doc);
+                      navigator.clipboard.writeText(url);
+                      setEnlaceCopiado(true);
+                      setTimeout(() => setEnlaceCopiado(false), 2500);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="Copiar el enlace seguro para enviar por WhatsApp o correo al candidato"
+                  >
+                    {enlaceCopiado ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        <span className="text-emerald-700">¡Enlace Copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-slate-600" />
+                        <span>Copiar Enlace Candidato</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={onAbrirDiligenciarHv}
                     className="px-4 py-2 rounded-xl bg-[#18235C] hover:bg-[#1E3A8A] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
                   >
@@ -292,6 +320,16 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
                   <button
                     type="button"
+                    onClick={onAbrirDiligenciarHv}
+                    className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                    title="Ver datos registrados en la Hoja de Vida Digital"
+                  >
+                    <FileText className="w-4 h-4 text-[#18235C]" />
+                    <span>Ver Hoja de Vida</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={onAbrirDefinirContrato}
                     className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
                   >
@@ -329,6 +367,16 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
                   <button
                     type="button"
+                    onClick={onAbrirDiligenciarHv}
+                    className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                    title="Ver datos registrados en la Hoja de Vida Digital"
+                  >
+                    <FileText className="w-4 h-4 text-[#18235C]" />
+                    <span>Ver Hoja de Vida</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={onAbrirFirmaContrato}
                     className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
                   >
@@ -364,6 +412,16 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={onAbrirDiligenciarHv}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 border border-slate-200 cursor-pointer"
+                    title="Ver datos registrados en la Hoja de Vida Digital"
+                  >
+                    <FileText className="w-4 h-4 text-[#18235C]" />
+                    <span>Ver Hoja de Vida Digital</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={onAbrirFirmaContrato}

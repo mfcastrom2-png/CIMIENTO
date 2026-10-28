@@ -517,6 +517,7 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
         onActualizarEmpleado={onUpdateEmpleado}
         usuarioVinculado={usuarioVinculado}
         initialTab={initialExpedienteTab}
+        isSuperAdmin={canManageEmployees}
       />
     );
   }

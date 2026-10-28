@@ -64,7 +64,9 @@ export async function guardarConfiguracionBuzon(
 ): Promise<void> {
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(STORAGE_KEY_BUZON, JSON.stringify(config));
+      // Protección de credenciales (OWASP A02:2021): Nunca guardar contraseñas SMTP en texto plano en localStorage
+      const { passwordSmtp, ...safeConfig } = config;
+      localStorage.setItem(STORAGE_KEY_BUZON, JSON.stringify(safeConfig));
     } catch {}
   }
 

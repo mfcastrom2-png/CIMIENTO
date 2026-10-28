@@ -13,9 +13,19 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon-48x48.png', 'apple-touch-icon.png', 'icon.svg', 'manifest.json'],
+        includeAssets: [
+          'favicon-48x48.png',
+          'apple-touch-icon.png',
+          'icon.svg',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-512x512.png',
+          'manifest.json',
+          'manifest.webmanifest',
+          '404.html'
+        ],
         manifest: {
-          id: './',
+          id: '/',
           name: 'B GROUP INGENIERIA S.A.S. — Gestión Humana',
           short_name: 'B Group GH',
           description: 'Sistema integral de gestión humana, nómina y prestaciones sociales colombianas (CST), SG-SST y expediente digital de colaboradores.',
@@ -23,8 +33,8 @@ export default defineConfig(({ mode }) => {
           background_color: '#18235C',
           display: 'standalone',
           orientation: 'portrait-primary',
-          start_url: './',
-          scope: './',
+          start_url: '/',
+          scope: '/',
           lang: 'es-CO',
           categories: ['business', 'productivity'],
           icons: [
@@ -51,6 +61,22 @@ export default defineConfig(({ mode }) => {
               sizes: 'any',
               type: 'image/svg+xml',
               purpose: 'any',
+            },
+          ],
+          shortcuts: [
+            {
+              name: 'Expedientes de Empleados',
+              short_name: 'Empleados',
+              description: 'Ver lista y expedientes de colaboradores',
+              url: '/?modulo=empleados',
+              icons: [{ src: './pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: 'Vincular Candidato',
+              short_name: 'Vinculación',
+              description: 'Iniciar flujo de contratación y pre-selección',
+              url: '/?modulo=empleados&accion=vincular',
+              icons: [{ src: './pwa-192x192.png', sizes: '192x192' }],
             },
           ],
         },

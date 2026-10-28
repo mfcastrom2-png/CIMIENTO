@@ -19,7 +19,10 @@ import {
   AlertTriangle,
   Building2,
   Calendar,
-  Phone
+  Phone,
+  Printer,
+  Edit,
+  ArrowRight
 } from 'lucide-react';
 import { uid } from '../../data/initialData';
 import { DEPARTAMENTOS_COLOMBIA, NIVELES_EDUCATIVOS, ESTADOS_CIVILES } from '../../data/colombiaData';
@@ -38,13 +41,34 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
   onGuardarHojaVida,
   esVistaCandidato = false
 }) => {
-  // Pestaña activa del formulario de Hoja de Vida
+  // Pestaña activa del formulario o visualización de Hoja de Vida
   const [tabHv, setTabHv] = useState<'personal' | 'residencia' | 'estudios' | 'experiencia' | 'declaracion'>('personal');
 
-  // Datos Personales
-  const [fechaNacimiento, setFechaNacimiento] = useState(empleado.persona?.fechaNacimiento || '1995-05-15');
-  const [lugarNacimiento, setLugarNacimiento] = useState(empleado.persona?.lugarNacimiento || 'Bogotá D.C.');
-  const [genero, setGenero] = useState(empleado.persona?.genero || 'Masculino');
+  // Identificar si el colaborador se encuentra en etapa inicial de Pre-selección
+  const estaEnPreseleccion = Boolean(
+    (
+      empleado.vinculacion?.etapaActual === 'pre_seleccion' ||
+      empleado.estadoLaboral === 'Pre-selección' ||
+      empleado.laboral?.estado === 'Pre-selección'
+    ) &&
+    empleado.vinculacion?.etapaActual !== 'hoja_vida_completada' &&
+    empleado.vinculacion?.etapaActual !== 'pendiente_firma_contrato' &&
+    empleado.vinculacion?.etapaActual !== 'contrato_firmado' &&
+    empleado.vinculacion?.etapaActual !== 'vinculado_activo' &&
+    !empleado.activo &&
+    empleado.estadoLaboral !== 'Activo' &&
+    empleado.laboral?.estado !== 'Activo'
+  );
+
+  // Si ya está seleccionado/vinculado, inicia por defecto en modo de visualización de datos registrados
+  const [modoEdicion, setModoEdicion] = useState<boolean>(estaEnPreseleccion);
+
+  // Datos Personales (SIN datos de prueba falsos)
+  const [fechaNacimiento, setFechaNacimiento] = useState(empleado.persona?.fechaNacimiento || '');
+  const [lugarNacimiento, setLugarNacimiento] = useState(empleado.persona?.lugarNacimiento || '');
+  const [genero, setGenero] = useState(
+    empleado.persona?.genero && empleado.persona.genero !== 'No especificado' ? empleado.persona.genero : 'Femenino'
+  );
   const [estadoCivil, setEstadoCivil] = useState(empleado.persona?.estadoCivil || 'Soltero(a)');
   const [nacionalidad, setNacionalidad] = useState(empleado.persona?.nacionalidad || 'Colombiana');
   const [rhGrupo, setRhGrupo] = useState('O+');
@@ -74,41 +98,14 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
     empleado.contacto?.contactoEmergenciaTelefono || ''
   );
 
-  // Formación Académica
+  // Formación Académica (SIN datos de prueba)
   const [estudios, setEstudios] = useState<EstudioAcademicoEmpleado[]>(
-    empleado.estudios && empleado.estudios.length > 0
-      ? empleado.estudios
-      : [
-          {
-            id: uid(),
-            nivelEducativo: 'Profesional',
-            programa: 'Ingeniería de Sistemas / Telecomunicaciones',
-            tituloObtenido: 'Ingeniero(a)',
-            institucion: 'Universidad Nacional de Colombia',
-            ciudad: 'Bogotá D.C.',
-            fechaInicio: '2016-01-15',
-            fechaFin: '2021-06-20',
-            fechaGraduacion: '2021-07-15',
-            estado: 'Graduado'
-          }
-        ]
+    empleado.estudios && empleado.estudios.length > 0 ? empleado.estudios : []
   );
 
-  // Experiencia Laboral
+  // Experiencia Laboral (SIN datos de prueba)
   const [experiencias, setExperiencias] = useState<ExperienciaLaboralEmpleado[]>(
-    empleado.experiencias && empleado.experiencias.length > 0
-      ? empleado.experiencias
-      : [
-          {
-            id: uid(),
-            empresa: 'Servicios Tecnológicos de Colombia S.A.S.',
-            cargo: 'Especialista de Redes y Soporte',
-            fechaIngreso: '2022-01-15',
-            fechaRetiro: '2025-12-20',
-            mesesExperiencia: 48,
-            funcionesPrincipales: 'Configuración de enlaces de telecomunicaciones, atención de incidencias técnicas y supervisión de infraestructura.'
-          }
-        ]
+    empleado.experiencias && empleado.experiencias.length > 0 ? empleado.experiencias : []
   );
 
   // Declaraciones legales
@@ -127,8 +124,8 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
       tituloObtenido: '',
       institucion: '',
       ciudad: ciudad || 'Bogotá D.C.',
-      fechaInicio: '2020-01-15',
-      fechaFin: '2022-06-30',
+      fechaInicio: '',
+      fechaFin: '',
       estado: 'Graduado'
     };
     setEstudios([...estudios, nuevo]);
@@ -148,9 +145,8 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
       id: uid(),
       empresa: '',
       cargo: '',
-      fechaIngreso: '2023-01-15',
-      fechaRetiro: '2024-12-31',
-      mesesExperiencia: 24,
+      fechaIngreso: '',
+      fechaRetiro: '',
       funcionesPrincipales: ''
     };
     setExperiencias([...experiencias, nueva]);
@@ -164,12 +160,13 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
     setExperiencias(experiencias.map(e => (e.id === id ? { ...e, [campo]: valor } : e)));
   };
 
+  // Guardar Hoja de Vida
   const handleGuardarFinal = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorValidacion(null);
 
     if (!direccion.trim()) {
-      setErrorValidacion('Debe ingresar su dirección de residencia.');
+      setErrorValidacion('Debe ingresar la dirección de residencia.');
       setTabHv('residencia');
       return;
     }
@@ -223,13 +220,15 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
       };
 
       // Resumen de formación y experiencia
-      const formacionResumen = estudios.length > 0
-        ? `${estudios[0].nivelEducativo}: ${estudios[0].tituloObtenido || estudios[0].programa} (${estudios[0].institucion})`
-        : 'Formación académica registrada';
+      const formacionResumen =
+        estudios.length > 0
+          ? `${estudios[0].nivelEducativo}: ${estudios[0].tituloObtenido || estudios[0].programa} (${estudios[0].institucion})`
+          : empleado.formacion || 'Formación académica registrada';
 
-      const experienciaResumen = experiencias.length > 0
-        ? `${experiencias[0].cargo} en ${experiencias[0].empresa}`
-        : 'Experiencia previa registrada';
+      const experienciaResumen =
+        experiencias.length > 0
+          ? `${experiencias[0].cargo} en ${experiencias[0].empresa}`
+          : empleado.experiencia || 'Experiencia previa registrada';
 
       const empleadoActualizado: Empleado = {
         ...empleado,
@@ -297,27 +296,67 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-extrabold text-white">
-                  Hoja de Vida & Datos de Vinculación Laboral
+                  Hoja de Vida Digital del Colaborador
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                  Etapa 1: Pre-selección
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    estaEnPreseleccion
+                      ? 'bg-purple-500/20 text-purple-200 border-purple-400/30'
+                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+                  }`}
+                >
+                  {estaEnPreseleccion
+                    ? 'Etapa 1: Pre-selección'
+                    : empleado.activo
+                    ? 'Colaborador Activo · Seleccionado'
+                    : 'Candidato Seleccionado'}
                 </span>
+                {!modoEdicion && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white/10 text-slate-200">
+                    Modo Consulta
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                Candidato: <strong className="text-white">{empleado.nombre}</strong> · C.C. <strong className="font-mono text-[#F59E0B]">{empleado.documento}</strong>
+                Colaborador: <strong className="text-white">{empleado.nombre}</strong> · C.C.{' '}
+                <strong className="font-mono text-[#F59E0B]">{empleado.documento}</strong>
+                {empleado.laboral?.cargoNombre && ` · Cargo: ${empleado.laboral.cargoNombre}`}
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {!modoEdicion && !esVistaCandidato && (
+              <button
+                type="button"
+                onClick={() => setModoEdicion(true)}
+                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-white/10"
+                title="Habilitar edición de la Hoja de Vida"
+              >
+                <Edit className="w-3.5 h-3.5 text-[#F59E0B]" />
+                <span>Modificar Información</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              title="Imprimir Hoja de Vida"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Barra de pestañas */}
@@ -373,573 +412,807 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
               tabHv === 'declaracion' ? 'bg-[#18235C] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
             <span>5. Habeas Data & Veracidad</span>
           </button>
         </div>
 
-        {/* Contenido */}
-        <form onSubmit={handleGuardarFinal} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs text-slate-700">
-          {errorValidacion && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{errorValidacion}</span>
-            </div>
-          )}
-
-          {/* TAB 1: DATOS PERSONALES */}
-          {tabHv === 'personal' && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <span className="font-bold text-[#18235C] block">Información Demográfica Básica:</span>
-                <span className="text-[11px] text-slate-500">
-                  Los datos deben coincidir con su cédula de ciudadanía o documento de identidad oficial.
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Fecha de Nacimiento *</label>
-                  <input
-                    type="date"
-                    required
-                    value={fechaNacimiento}
-                    onChange={e => setFechaNacimiento(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Lugar de Nacimiento (Ciudad) *</label>
-                  <input
-                    type="text"
-                    required
-                    value={lugarNacimiento}
-                    onChange={e => setLugarNacimiento(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Nacionalidad *</label>
-                  <input
-                    type="text"
-                    required
-                    value={nacionalidad}
-                    onChange={e => setNacionalidad(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Género *</label>
-                  <select
-                    value={genero}
-                    onChange={e => setGenero(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  >
-                    <option value="Femenino">Femenino</option>
-                    <option value="Masculino">Masculino</option>
-                    <option value="No binario">No binario</option>
-                    <option value="Prefiero no decir">Prefiero no decir</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Estado Civil *</label>
-                  <select
-                    value={estadoCivil}
-                    onChange={e => setEstadoCivil(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  >
-                    {ESTADOS_CIVILES.map(ec => (
-                      <option key={ec} value={ec}>
-                        {ec}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Grupo Sanguíneo & RH *</label>
-                  <select
-                    value={rhGrupo}
-                    onChange={e => setRhGrupo(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold"
-                  >
-                    <option value="O+">O Positivo (O+)</option>
-                    <option value="O-">O Negativo (O-)</option>
-                    <option value="A+">A Positivo (A+)</option>
-                    <option value="A-">A Negativo (A-)</option>
-                    <option value="B+">B Positivo (B+)</option>
-                    <option value="B-">B Negativo (B-)</option>
-                    <option value="AB+">AB Positivo (AB+)</option>
-                    <option value="AB-">AB Negativo (AB-)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-3">
-                <button
-                  type="button"
-                  onClick={() => setTabHv('residencia')}
-                  className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer"
-                >
-                  Continuar a Residencia & Contacto →
-                </button>
+        {/* ========================================================================= */}
+        {/* CONDICIONAL: MODO CONSULTA (YA SELECCIONADO) O MODO EDICIÓN (PRE-SELECCIÓN) */}
+        {/* ========================================================================= */}
+        {!modoEdicion ? (
+          /* MODO CONSULTA / VISUALIZACIÓN DE DATOS REGISTRADOS */
+          <div className="p-6 space-y-5 overflow-y-auto flex-1 text-xs text-slate-700">
+            {/* Aviso informativo de datos registrados */}
+            <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="leading-relaxed text-emerald-950">
+                <strong>Hoja de Vida Formalizada:</strong> El colaborador ya ha sido seleccionado en el proceso de vinculación. A continuación se muestran los datos personales, académicos y laborales registrados en el expediente digital.
               </div>
             </div>
-          )}
 
-          {/* TAB 2: RESIDENCIA Y CONTACTO */}
-          {tabHv === 'residencia' && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <span className="font-bold text-[#18235C] block">Domicilio Habitual & Residencia:</span>
-                <span className="text-[11px] text-slate-500">
-                  Lugar donde se prestará el servicio o residencia principal del trabajador.
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block font-bold text-slate-700 mb-1">Dirección Completa de Residencia *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Carrera 15 # 93-47 Apto 402"
-                    value={direccion}
-                    onChange={e => setDireccion(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Barrio / Sector</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Chicó Norte"
-                    value={barrio}
-                    onChange={e => setBarrio(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Departamento *</label>
-                  <select
-                    value={departamento}
-                    onChange={e => {
-                      setDepartamento(e.target.value);
-                      const dep = DEPARTAMENTOS_COLOMBIA.find(d => d.nombre === e.target.value);
-                      if (dep && dep.municipios && dep.municipios.length > 0) setCiudad(dep.municipios[0]);
-                    }}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  >
-                    {DEPARTAMENTOS_COLOMBIA.map(d => (
-                      <option key={d.nombre} value={d.nombre}>
-                        {d.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Ciudad / Municipio *</label>
-                  <input
-                    type="text"
-                    required
-                    value={ciudad}
-                    onChange={e => setCiudad(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Celular Personal *</label>
-                  <input
-                    type="tel"
-                    required
-                    value={celular}
-                    onChange={e => setCelular(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-mono"
-                  />
+            {/* TAB 1: DATOS PERSONALES (CONSULTA) */}
+            {tabHv === 'personal' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Tipo y Número de Documento</span>
+                    <span className="font-bold text-[#18235C] text-sm font-mono">
+                      {empleado.persona?.tipoDocumento || empleado.tipoDocumento || 'CC'} {empleado.documento}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Fecha de Nacimiento</span>
+                    <span className="font-bold text-slate-800 text-sm font-mono">
+                      {empleado.persona?.fechaNacimiento || 'No registrada'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Lugar de Nacimiento</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {empleado.persona?.lugarNacimiento || 'No registrado'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Nacionalidad</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {empleado.persona?.nacionalidad || 'Colombiana'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Género</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {empleado.persona?.genero || 'No especificado'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Estado Civil</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {empleado.persona?.estadoCivil || 'Soltero(a)'}
+                    </span>
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Contacto de Emergencia */}
-              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
-                <span className="font-bold text-amber-950 flex items-center gap-1.5 text-xs">
-                  <Phone className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Contacto de Emergencia Obligatorio (CST & SG-SST) *</span>
-                </span>
+            {/* TAB 2: RESIDENCIA Y CONTACTO (CONSULTA) */}
+            {tabHv === 'residencia' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl sm:col-span-2 space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Dirección de Residencia</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {empleado.contacto?.direccion && empleado.contacto.direccion !== 'Pendiente por candidato'
+                        ? empleado.contacto.direccion
+                        : 'No registrada'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Barrio</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {empleado.contacto?.barrio || 'No especificado'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Ciudad / Municipio</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {empleado.contacto?.ciudad || 'Bogotá D.C.'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Departamento</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {empleado.contacto?.departamento || 'Bogotá D.C.'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Celular de Contacto</span>
+                    <span className="font-bold text-slate-800 text-sm font-mono">
+                      {empleado.contacto?.celular || empleado.telefono || 'No registrado'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl sm:col-span-3 space-y-1">
+                    <span className="text-[10px] text-slate-500 block font-semibold">Correo Electrónico Personal</span>
+                    <span className="font-bold text-[#18235C] text-sm">
+                      {empleado.contacto?.correoPersonal || empleado.email || 'No registrado'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Contacto de Emergencia */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 text-[#F59E0B]" />
+                    <span>Contacto de Emergencia Registrado (Decreto 1072/2015)</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                      <span className="text-[10px] text-slate-500 block">Nombre Completo</span>
+                      <span className="font-bold text-slate-800">
+                        {empleado.contacto?.contactoEmergenciaNombre || 'No registrado'}
+                      </span>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                      <span className="text-[10px] text-slate-500 block">Parentesco</span>
+                      <span className="font-bold text-slate-800">
+                        {empleado.contacto?.contactoEmergenciaParentesco || 'No registrado'}
+                      </span>
+                    </div>
+                    <div className="p-2.5 bg-white rounded-xl border border-slate-200">
+                      <span className="text-[10px] text-slate-500 block">Teléfono de Emergencia</span>
+                      <span className="font-bold text-slate-800 font-mono">
+                        {empleado.contacto?.contactoEmergenciaTelefono || 'No registrado'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: FORMACIÓN ACADÉMICA (CONSULTA) */}
+            {tabHv === 'estudios' && (
+              <div className="space-y-3 animate-fadeIn">
+                {(empleado.estudios || []).length > 0 ? (
+                  (empleado.estudios || []).map((est, idx) => (
+                    <div key={est.id || idx} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <span className="font-bold text-[#18235C] text-sm">
+                          {est.tituloObtenido || est.programa}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          {est.nivelEducativo || 'Estudio'} · {est.estado || 'Graduado'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                        <p><strong className="text-slate-600">Institución:</strong> <span className="text-slate-900">{est.institucion}</span></p>
+                        {est.fechaGraduacion && (
+                          <p><strong className="text-slate-600">Fecha Graduación:</strong> <span className="font-mono text-slate-900">{est.fechaGraduacion}</span></p>
+                        )}
+                        {est.tarjetaProfesional && (
+                          <p><strong className="text-slate-600">Tarjeta Prof.:</strong> <span className="font-mono text-slate-900">{est.tarjetaProfesional}</span></p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center space-y-1">
+                    <GraduationCap className="w-8 h-8 text-slate-400 mx-auto" />
+                    <p className="text-slate-700 font-bold">Sin formación académica adicional registrada en el formulario digital.</p>
+                    <p className="text-slate-500 text-[11px]">Perfil base en expediente: {empleado.formacion || 'Bachiller / Técnico'}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: EXPERIENCIA LABORAL (CONSULTA) */}
+            {tabHv === 'experiencia' && (
+              <div className="space-y-3 animate-fadeIn">
+                {(empleado.experiencias || []).length > 0 ? (
+                  (empleado.experiencias || []).map((exp, idx) => (
+                    <div key={exp.id || idx} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <span className="font-bold text-[#18235C] text-sm">{exp.cargo}</span>
+                        <span className="text-slate-500 font-mono text-[11px]">
+                          {exp.fechaIngreso} — {exp.fechaRetiro || 'Actual'}
+                        </span>
+                      </div>
+                      <p><strong className="text-slate-600">Empresa / Empleador:</strong> <span className="font-bold text-slate-900">{exp.empresa}</span></p>
+                      {exp.funcionesPrincipales && (
+                        <p className="text-slate-700 leading-relaxed text-xs pt-1">
+                          <strong className="text-slate-600">Funciones:</strong> {exp.funcionesPrincipales}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center space-y-1">
+                    <History className="w-8 h-8 text-slate-400 mx-auto" />
+                    <p className="text-slate-700 font-bold">Sin trayectoria previa adicional registrada en el formulario digital.</p>
+                    <p className="text-slate-500 text-[11px]">Trayectoria base en expediente: {empleado.experiencia || 'No especificada'}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 5: HABEAS DATA & TRAZABILIDAD (CONSULTA) */}
+            {tabHv === 'declaracion' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <span className="font-bold text-[#18235C] flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Tratamiento de Datos Personales & Declaración Juramentada</span>
+                  </span>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    El colaborador autorizó expresamente el tratamiento de sus datos personales conforme a la <strong>Ley 1581 de 2012</strong> y declaró la veracidad de la información conforme al <strong>Art. 62 del Código Sustantivo del Trabajo (CST)</strong>.
+                  </p>
+                  <div className="pt-2 border-t border-slate-200 text-[11px] text-slate-500 font-mono space-y-1">
+                    <p>• Fecha de Radicación: {empleado.vinculacion?.fechaHojaVidaCompletada ? new Date(empleado.vinculacion.fechaHojaVidaCompletada).toLocaleString('es-CO') : 'Formalizado en sistema'}</p>
+                    <p>• Etapa Actual del Flujo: {empleado.vinculacion?.etapaActual || 'vinculado_activo'}</p>
+                    <p>• Estado de Vinculación: {empleado.activo ? 'ACTIVO' : 'EN PROCESO CONTRACTUAL'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Botones inferiores del modo consulta */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* MODO FORMULARIO: PRE-SELECCIÓN O EDICIÓN HABILITADA */
+          <form onSubmit={handleGuardarFinal} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs text-slate-700">
+            {errorValidacion && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{errorValidacion}</span>
+              </div>
+            )}
+
+            {/* TAB 1: DATOS PERSONALES */}
+            {tabHv === 'personal' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="font-bold text-[#18235C] block">Información Demográfica Básica:</span>
+                  <span className="text-[11px] text-slate-500">
+                    Los datos deben coincidir con su cédula de ciudadanía o documento de identidad oficial.
+                  </span>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Nombre Completo *</label>
+                    <label className="block font-bold text-slate-700 mb-1">Fecha de Nacimiento *</label>
                     <input
-                      type="text"
+                      type="date"
                       required
-                      placeholder="Ej. Gloria Martínez"
-                      value={contactoEmergenciaNombre}
-                      onChange={e => setContactoEmergenciaNombre(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
+                      value={fechaNacimiento}
+                      onChange={e => setFechaNacimiento(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
                     />
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Parentesco *</label>
+                    <label className="block font-bold text-slate-700 mb-1">Lugar de Nacimiento (Ciudad) *</label>
                     <input
                       type="text"
                       required
-                      placeholder="Ej. Madre / Cónyuge / Hermano"
-                      value={contactoEmergenciaParentesco}
-                      onChange={e => setContactoEmergenciaParentesco(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
+                      placeholder="Ej. Bogotá D.C."
+                      value={lugarNacimiento}
+                      onChange={e => setLugarNacimiento(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
                     />
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Teléfono / Celular *</label>
+                    <label className="block font-bold text-slate-700 mb-1">Nacionalidad *</label>
+                    <input
+                      type="text"
+                      required
+                      value={nacionalidad}
+                      onChange={e => setNacionalidad(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Género *</label>
+                    <select
+                      value={genero}
+                      onChange={e => setGenero(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    >
+                      <option value="Femenino">Femenino</option>
+                      <option value="Masculino">Masculino</option>
+                      <option value="No binario">No binario</option>
+                      <option value="Prefiero no decir">Prefiero no decir</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Estado Civil *</label>
+                    <select
+                      value={estadoCivil}
+                      onChange={e => setEstadoCivil(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    >
+                      {ESTADOS_CIVILES.map(ec => (
+                        <option key={ec} value={ec}>{ec}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Grupo Sanguíneo y RH *</label>
+                    <select
+                      value={rhGrupo}
+                      onChange={e => setRhGrupo(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold font-mono"
+                    >
+                      {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(rh => (
+                        <option key={rh} value={rh}>{rh}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setTabHv('residencia')}
+                    className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer hover:bg-[#1E3A8A] transition-colors"
+                  >
+                    Continuar a Residencia y Contacto →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: RESIDENCIA Y CONTACTO */}
+            {tabHv === 'residencia' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block font-bold text-slate-700 mb-1">Dirección de Residencia Actual *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Calle 100 # 19-61 Apto 402"
+                      value={direccion}
+                      onChange={e => setDireccion(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Barrio *</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Chapinero Central"
+                      value={barrio}
+                      onChange={e => setBarrio(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Departamento *</label>
+                    <select
+                      value={departamento}
+                      onChange={e => {
+                        setDepartamento(e.target.value);
+                        const dep = DEPARTAMENTOS_COLOMBIA.find(d => d.nombre === e.target.value);
+                        if (dep && dep.municipios && dep.municipios.length > 0) {
+                          setCiudad(dep.municipios[0]);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    >
+                      {DEPARTAMENTOS_COLOMBIA.map(d => (
+                        <option key={d.nombre} value={d.nombre}>{d.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Ciudad / Municipio *</label>
+                    <input
+                      type="text"
+                      required
+                      value={ciudad}
+                      onChange={e => setCiudad(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Celular de Contacto *</label>
                     <input
                       type="tel"
                       required
-                      placeholder="Ej. 3123456789"
-                      value={contactoEmergenciaTelefono}
-                      onChange={e => setContactoEmergenciaTelefono(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-mono"
+                      placeholder="300 123 4567"
+                      value={celular}
+                      onChange={e => setCelular(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold font-mono"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-3">
+                    <label className="block font-bold text-slate-700 mb-1">Correo Electrónico Personal *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="colaborador@correo.com"
+                      value={correoPersonal}
+                      onChange={e => setCorreoPersonal(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="flex justify-between pt-3">
-                <button
-                  type="button"
-                  onClick={() => setTabHv('personal')}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
-                >
-                  ← Anterior
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTabHv('estudios')}
-                  className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer"
-                >
-                  Continuar a Formación Académica →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: FORMACIÓN ACADÉMICA */}
-          {tabHv === 'estudios' && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <div>
-                  <span className="font-bold text-[#18235C] block">Estudios, Títulos & Formación:</span>
-                  <span className="text-[11px] text-slate-500">
-                    Registre su nivel educativo más alto y estudios relevantes para el cargo.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAgregarEstudio}
-                  className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-bold text-xs flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Agregar Estudio</span>
-                </button>
-              </div>
-
-              {estudios.map((est, idx) => (
-                <div key={est.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 relative">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-xs">
-                      #{idx + 1} — {est.nivelEducativo || 'Nivel Educativo'}
-                    </span>
-                    {estudios.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleEliminarEstudio(est.id)}
-                        className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"
-                        title="Eliminar este estudio"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
+                {/* Contacto de Emergencia */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 text-[#F59E0B]" />
+                    <span>Contacto en Caso de Emergencia (Obligatorio Decreto 1072 de 2015)</span>
+                  </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block font-bold text-slate-600 mb-0.5">Nivel Educativo</label>
-                      <select
-                        value={est.nivelEducativo}
-                        onChange={e => handleActualizarEstudio(est.id, 'nivelEducativo', e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
-                      >
-                        {NIVELES_EDUCATIVOS.map(n => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="block font-bold text-slate-600 mb-0.5">Título Obtenido / Programa *</label>
+                      <label className="block font-semibold text-slate-700 mb-1">Nombre Completo *</label>
                       <input
                         type="text"
                         required
-                        placeholder="Ej. Ingeniero de Telecomunicaciones / Bachiller"
-                        value={est.tituloObtenido}
-                        onChange={e => handleActualizarEstudio(est.id, 'tituloObtenido', e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
+                        placeholder="Nombre de allegado o familiar"
+                        value={contactoEmergenciaNombre}
+                        onChange={e => setContactoEmergenciaNombre(e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="sm:col-span-2">
-                      <label className="block font-bold text-slate-600 mb-0.5">Institución Educativa *</label>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Parentesco *</label>
                       <input
                         type="text"
                         required
-                        placeholder="Ej. Universidad Distrital / SENA / Colegio"
-                        value={est.institucion}
-                        onChange={e => handleActualizarEstudio(est.id, 'institucion', e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
+                        placeholder="Ej. Cónyuge, Padre, Hermano"
+                        value={contactoEmergenciaParentesco}
+                        onChange={e => setContactoEmergenciaParentesco(e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
                       />
                     </div>
-
                     <div>
-                      <label className="block font-bold text-slate-600 mb-0.5">Estado</label>
-                      <select
-                        value={est.estado}
-                        onChange={e => handleActualizarEstudio(est.id, 'estado', e.target.value as any)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
-                      >
-                        <option value="Graduado">Graduado</option>
-                        <option value="En curso">En curso</option>
-                        <option value="Aplazado">Aplazado</option>
-                        <option value="Incompleto">Incompleto</option>
-                      </select>
+                      <label className="block font-semibold text-slate-700 mb-1">Teléfono / Celular *</label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="300 000 0000"
+                        value={contactoEmergenciaTelefono}
+                        onChange={e => setContactoEmergenciaTelefono(e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                      />
                     </div>
                   </div>
                 </div>
-              ))}
 
-              <div className="flex justify-between pt-3">
-                <button
-                  type="button"
-                  onClick={() => setTabHv('residencia')}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
-                >
-                  ← Anterior
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTabHv('experiencia')}
-                  className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer"
-                >
-                  Continuar a Experiencia Laboral →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: EXPERIENCIA LABORAL */}
-          {tabHv === 'experiencia' && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <div>
-                  <span className="font-bold text-[#18235C] block">Trayectoria & Experiencia Laboral Previa:</span>
-                  <span className="text-[11px] text-slate-500">
-                    Indique empleadores anteriores, funciones y logros para verificación de antecedentes.
-                  </span>
+                <div className="flex justify-between pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setTabHv('personal')}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
+                  >
+                    ← Anterior
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTabHv('estudios')}
+                    className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer"
+                  >
+                    Continuar a Formación Académica →
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAgregarExperiencia}
-                  className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-bold text-xs flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Agregar Experiencia</span>
-                </button>
               </div>
+            )}
 
-              {experiencias.map((exp, idx) => (
-                <div key={exp.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 relative">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-xs">
-                      #{idx + 1} — {exp.empresa || 'Empresa Empleadora'}
-                    </span>
-                    {experiencias.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleEliminarExperiencia(exp.id)}
-                        className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"
-                        title="Eliminar esta experiencia"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-bold text-slate-600 mb-0.5">Empresa / Razón Social *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ej. Compañía de Redes S.A.S."
-                        value={exp.empresa}
-                        onChange={e => handleActualizarExperiencia(exp.id, 'empresa', e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-600 mb-0.5">Cargo Desempeñado *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ej. Técnico de Fibra Óptica"
-                        value={exp.cargo}
-                        onChange={e => handleActualizarExperiencia(exp.id, 'cargo', e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block font-bold text-slate-600 mb-0.5">Fecha de Ingreso</label>
-                      <input
-                        type="date"
-                        value={exp.fechaIngreso}
-                        onChange={e => handleActualizarExperiencia(exp.id, 'fechaIngreso', e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-600 mb-0.5">Fecha de Retiro</label>
-                      <input
-                        type="date"
-                        value={exp.fechaRetiro}
-                        onChange={e => handleActualizarExperiencia(exp.id, 'fechaRetiro', e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-semibold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-slate-600 mb-0.5">Meses de Experiencia</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={exp.mesesExperiencia || 12}
-                        onChange={e => handleActualizarExperiencia(exp.id, 'mesesExperiencia', Number(e.target.value))}
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-mono font-bold"
-                      />
-                    </div>
-                  </div>
-
+            {/* TAB 3: FORMACIÓN ACADÉMICA */}
+            {tabHv === 'estudios' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="flex items-center justify-between">
                   <div>
-                    <label className="block font-bold text-slate-600 mb-0.5">Funciones Principales y Responsabilidades</label>
-                    <textarea
-                      rows={2}
-                      value={exp.funcionesPrincipales}
-                      onChange={e => handleActualizarExperiencia(exp.id, 'funcionesPrincipales', e.target.value)}
-                      placeholder="Describa brevemente las actividades desarrolladas en este cargo..."
-                      className="w-full p-2 bg-white border border-slate-300 rounded-xl text-xs"
-                    />
+                    <h4 className="font-bold text-sm text-[#18235C]">Títulos y Formación Académica</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Registre su educación básica, técnica, tecnológica, profesional o posgrados.
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleAgregarEstudio}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#18235C] hover:bg-[#1E3A8A] text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar Estudio</span>
+                  </button>
                 </div>
-              ))}
 
-              <div className="flex justify-between pt-3">
-                <button
-                  type="button"
-                  onClick={() => setTabHv('estudios')}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
-                >
-                  ← Anterior
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTabHv('declaracion')}
-                  className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer"
-                >
-                  Continuar a Autorizaciones Legales →
-                </button>
+                {estudios.length === 0 && (
+                  <div className="p-8 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center space-y-2">
+                    <GraduationCap className="w-8 h-8 text-slate-400 mx-auto" />
+                    <p className="text-slate-700 font-bold text-xs">No hay estudios académicos registrados aún.</p>
+                    <p className="text-slate-500 text-[11px]">Haga clic en el botón superior para incluir su formación académica.</p>
+                    <button
+                      type="button"
+                      onClick={handleAgregarEstudio}
+                      className="mt-2 px-3.5 py-2 bg-[#18235C] hover:bg-[#1E3A8A] text-white font-bold rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agregar Primer Estudio</span>
+                    </button>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {estudios.map((est, idx) => (
+                    <div key={est.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <span className="font-bold text-[#18235C]">Título o Formación #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarEstudio(est.id)}
+                          className="text-rose-600 hover:text-rose-800 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                          title="Eliminar este registro"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Eliminar</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">Nivel Educativo *</label>
+                          <select
+                            value={est.nivelEducativo}
+                            onChange={e => handleActualizarEstudio(est.id, 'nivelEducativo', e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                          >
+                            {NIVELES_EDUCATIVOS.map(ne => (
+                              <option key={ne} value={ne}>{ne}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block font-semibold text-slate-700 mb-1">Título Obtenido / Programa *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej. Bachiller Académico, Técnico en Redes..."
+                            value={est.tituloObtenido}
+                            onChange={e => handleActualizarEstudio(est.id, 'tituloObtenido', e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block font-semibold text-slate-700 mb-1">Institución Educativa *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej. SENA, Universidad Nacional, Colegio..."
+                            value={est.institucion}
+                            onChange={e => handleActualizarEstudio(est.id, 'institucion', e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">Fecha de Graduación</label>
+                          <input
+                            type="date"
+                            value={est.fechaGraduacion || ''}
+                            onChange={e => handleActualizarEstudio(est.id, 'fechaGraduacion', e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setTabHv('residencia')}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
+                  >
+                    ← Anterior
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTabHv('experiencia')}
+                    className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer"
+                  >
+                    Continuar a Experiencia Laboral →
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* TAB 5: AUTORIZACIONES LEGALES Y VERACIDAD */}
-          {tabHv === 'declaracion' && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2">
-                <span className="font-black text-indigo-950 flex items-center gap-1.5 text-xs">
-                  <ShieldCheck className="w-4 h-4 text-indigo-700" />
-                  <span>Tratamiento de Datos Personales (Ley 1581 de 2012) & Veracidad</span>
-                </span>
-                <p className="text-[11px] text-indigo-900 leading-relaxed">
-                  De conformidad con la Ley Estatutaria 1581 de 2012, el Decreto 1377 de 2013 y el Código Sustantivo del Trabajo (CST), la información suministrada será utilizada exclusivamente para el proceso de selección, formalización de contrato individual de trabajo, afiliaciones a la Seguridad Social Integral (EPS, ARL, AFP, CCF) y conformación del expediente laboral digital único.
-                </p>
+            {/* TAB 4: EXPERIENCIA LABORAL */}
+            {tabHv === 'experiencia' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-sm text-[#18235C]">Experiencia Laboral Previa</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Registre sus empleos o contratos anteriores más relevantes (si aplica).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAgregarExperiencia}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#18235C] hover:bg-[#1E3A8A] text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar Experiencia</span>
+                  </button>
+                </div>
+
+                {experiencias.length === 0 && (
+                  <div className="p-8 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center space-y-2">
+                    <History className="w-8 h-8 text-slate-400 mx-auto" />
+                    <p className="text-slate-700 font-bold text-xs">No hay experiencia previa registrada.</p>
+                    <p className="text-slate-500 text-[11px]">Si cuenta con trayectoria laboral, agréguela con el botón superior.</p>
+                    <button
+                      type="button"
+                      onClick={handleAgregarExperiencia}
+                      className="mt-2 px-3.5 py-2 bg-[#18235C] hover:bg-[#1E3A8A] text-white font-bold rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agregar Experiencia Laboral</span>
+                    </button>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {experiencias.map((exp, idx) => (
+                    <div key={exp.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <span className="font-bold text-[#18235C]">Experiencia Laboral #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarExperiencia(exp.id)}
+                          className="text-rose-600 hover:text-rose-800 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                          title="Eliminar este empleo"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Eliminar</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">Empresa / Empleador *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Nombre de la empresa"
+                            value={exp.empresa}
+                            onChange={e => handleActualizarExperiencia(exp.id, 'empresa', e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">Cargo Desempeñado *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej. Técnico, Auxiliar, Coordinador..."
+                            value={exp.cargo}
+                            onChange={e => handleActualizarExperiencia(exp.id, 'cargo', e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">Fecha de Ingreso</label>
+                          <input
+                            type="date"
+                            value={exp.fechaIngreso}
+                            onChange={e => handleActualizarExperiencia(exp.id, 'fechaIngreso', e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">Fecha de Retiro</label>
+                          <input
+                            type="date"
+                            value={exp.fechaRetiro}
+                            onChange={e => handleActualizarExperiencia(exp.id, 'fechaRetiro', e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block font-semibold text-slate-700 mb-1">Funciones Principales</label>
+                          <textarea
+                            rows={2}
+                            placeholder="Breve resumen de responsabilidades desempeñadas..."
+                            value={exp.funcionesPrincipales}
+                            onChange={e => handleActualizarExperiencia(exp.id, 'funcionesPrincipales', e.target.value)}
+                            className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setTabHv('estudios')}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
+                  >
+                    ← Anterior
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTabHv('declaracion')}
+                    className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer"
+                  >
+                    Continuar a Autorizaciones Legales →
+                  </button>
+                </div>
               </div>
+            )}
 
-              <div className="space-y-3">
-                <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={aceptaHabeasData}
-                    onChange={e => setAceptaHabeasData(e.target.checked)}
-                    className="mt-0.5 rounded text-[#18235C] w-4 h-4"
-                  />
-                  <span className="text-xs text-slate-800 leading-snug">
-                    <strong>Autorización Expresa de Habeas Data:</strong> Autorizo a B GROUP INGENIERIA S.A.S. para recolectar, almacenar, procesar y transmitir mis datos personales suministrados para fines contractuales, laborales y de seguridad social.
+            {/* TAB 5: AUTORIZACIONES LEGALES Y VERACIDAD */}
+            {tabHv === 'declaracion' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2">
+                  <span className="font-black text-indigo-950 flex items-center gap-1.5 text-xs">
+                    <ShieldCheck className="w-4 h-4 text-indigo-700" />
+                    <span>Tratamiento de Datos Personales (Ley 1581 de 2012) & Veracidad</span>
                   </span>
-                </label>
+                  <p className="text-[11px] text-indigo-900 leading-relaxed">
+                    De conformidad con la Ley Estatutaria 1581 de 2012, el Decreto 1377 de 2013 y el Código Sustantivo del Trabajo (CST), la información suministrada será utilizada exclusivamente para el proceso de selección, formalización de contrato individual de trabajo, afiliaciones a la Seguridad Social Integral (EPS, ARL, AFP, CCF) y conformación del expediente laboral digital único.
+                  </p>
+                </div>
 
-                <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={declaraVeracidad}
-                    onChange={e => setDeclaraVeracidad(e.target.checked)}
-                    className="mt-0.5 rounded text-[#18235C] w-4 h-4"
-                  />
-                  <span className="text-xs text-slate-800 leading-snug">
-                    <strong>Declaración de Veracidad (Art. 62 CST):</strong> Declaro bajo la gravedad de juramento que toda la información consignada en esta Hoja de Vida es verídica, exacta y susceptible de comprobación documental. Entiendo que la inexactitud en los datos constituye justa causa para la terminación unilateral del contrato de trabajo.
-                  </span>
-                </label>
-              </div>
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={aceptaHabeasData}
+                      onChange={e => setAceptaHabeasData(e.target.checked)}
+                      className="mt-0.5 rounded text-[#18235C] w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-800 leading-snug">
+                      <strong>Autorización Expresa de Habeas Data:</strong> Autorizo a la empresa para recolectar, almacenar, procesar y transmitir mis datos personales suministrados para fines contractuales, laborales y de seguridad social.
+                    </span>
+                  </label>
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setTabHv('experiencia')}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
-                >
-                  ← Anterior
-                </button>
-                <button
-                  type="submit"
-                  disabled={guardando}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold flex items-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{guardando ? 'Guardando Hoja de Vida...' : 'Finalizar y Enviar Hoja de Vida a Gestión Humana'}</span>
-                </button>
+                  <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={declaraVeracidad}
+                      onChange={e => setDeclaraVeracidad(e.target.checked)}
+                      className="mt-0.5 rounded text-[#18235C] w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-800 leading-snug">
+                      <strong>Declaración de Veracidad (Art. 62 CST):</strong> Declaro bajo la gravedad de juramento que toda la información consignada en esta Hoja de Vida es verídica, exacta y susceptible de comprobación documental. Entiendo que la inexactitud en los datos constituye justa causa para la terminación unilateral del contrato de trabajo.
+                    </span>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setTabHv('experiencia')}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
+                  >
+                    ← Anterior
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={guardando}
+                    className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold flex items-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{guardando ? 'Guardando Hoja de Vida...' : 'Finalizar y Guardar Hoja de Vida'}</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </form>
+            )}
+          </form>
+        )}
       </div>
     </div>
   );

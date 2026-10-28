@@ -464,6 +464,79 @@ export const guardarEmpleadoFB = async (empleado: Empleado, autor?: UsuarioSiste
   );
 };
 
+/**
+ * Consulta un aspirante en pre-selección o proceso de vinculación por número de documento en Firestore.
+ * Permite que los candidatos convocados que abren el enlace desde cualquier dispositivo o navegador puedan cargar su expediente.
+ */
+export const buscarCandidatoPreseleccionFB = async (documento: string): Promise<Empleado | null> => {
+  const docLimpio = documento.trim().replace(/\D/g, '');
+  if (!docLimpio) return null;
+
+  try {
+    // 1. Buscar en 'empleados' por documento en estado 'Pre-selección'
+    const q1 = query(
+      collection(db, 'empleados'),
+      where('estadoLaboral', '==', 'Pre-selección'),
+      where('documento', '==', docLimpio),
+      limit(1)
+    );
+    const snap1 = await getDocs(q1);
+    if (!snap1.empty) {
+      return snap1.docs[0].data() as Empleado;
+    }
+
+    // 2. Buscar por código interno
+    const q2 = query(
+      collection(db, 'empleados'),
+      where('estadoLaboral', '==', 'Pre-selección'),
+      where('codigo', '==', docLimpio),
+      limit(1)
+    );
+    const snap2 = await getDocs(q2);
+    if (!snap2.empty) {
+      return snap2.docs[0].data() as Empleado;
+    }
+
+    // 3. Buscar por persona.numeroDocumento
+    const q3 = query(
+      collection(db, 'empleados'),
+      where('estadoLaboral', '==', 'Pre-selección'),
+      where('persona.numeroDocumento', '==', docLimpio),
+      limit(1)
+    );
+    const snap3 = await getDocs(q3);
+    if (!snap3.empty) {
+      return snap3.docs[0].data() as Empleado;
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('[Firestore] Error al consultar candidato de preselección en la nube:', err);
+    return null;
+  }
+};
+
+/**
+ * Guarda o actualiza la Hoja de Vida diligenciada por un candidato en pre-selección en Firestore.
+ * Funciona de manera segura tanto para candidatos públicos como para usuarios autenticados.
+ */
+export const guardarHojaVidaCandidatoFB = async (empleado: Empleado): Promise<void> => {
+  const docRef = doc(db, 'empleados', empleado.id);
+  const data = limpiarParaFirestore(empleado);
+  await setDoc(docRef, data, { merge: true });
+  if (auth.currentUser) {
+    try {
+      await registrarEventoAuditoria(
+        'ACTUALIZACION',
+        'empleados',
+        `Diligenciamiento de Hoja de Vida del candidato ${empleado.nombre} (C.C. ${empleado.documento})`,
+        null,
+        empleado.id
+      );
+    } catch {}
+  }
+};
+
 export const eliminarEmpleadoFB = async (id: string, nombreColaborador?: string, autor?: UsuarioSistema | null) => {
   await deleteDoc(doc(db, 'empleados', id));
   await registrarEventoAuditoria(

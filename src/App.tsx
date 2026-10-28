@@ -159,17 +159,39 @@ function AppLayout() {
   const pendientesCount = solicitudes.filter(s => s.estado === 'Pendiente').length;
   const currentEvaluacionDetalle = evaluaciones.find(e => e.id === activeEvaluacionDetalleId);
 
-  const queryParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-  const paramVerificar = queryParams.get('verificar') || queryParams.get('codigo');
+  // Soporte universal para parámetros de consulta en HashRouter (?doc=... en hash o en URL base)
+  const searchParams = useMemo(() => {
+    const locSearch = new URLSearchParams(location.search);
+    const winSearch = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    let hashParams = new URLSearchParams();
+    if (typeof window !== 'undefined' && window.location.hash.includes('?')) {
+      const qIndex = window.location.hash.indexOf('?');
+      hashParams = new URLSearchParams(window.location.hash.slice(qIndex));
+    }
+    return {
+      get: (key: string) => locSearch.get(key) || winSearch.get(key) || hashParams.get(key)
+    };
+  }, [location.search]);
+
+  const paramVerificar = searchParams.get('verificar') || searchParams.get('codigo');
   const isPublicVerificationRoute = location.pathname.startsWith('/verificar') || Boolean(paramVerificar);
 
-  const paramDocCandidato = queryParams.get('doc') || queryParams.get('documento');
-  const paramEtapa = queryParams.get('etapa');
+  const paramDocCandidato = searchParams.get('doc') || searchParams.get('documento') || searchParams.get('candidato');
+  const paramEtapa = searchParams.get('etapa');
   const isPublicCandidateRoute =
     location.pathname.startsWith('/hoja-vida') ||
     location.pathname.startsWith('/candidato') ||
     location.pathname.startsWith('/diligenciar-hoja-vida') ||
-    Boolean(paramDocCandidato && (paramEtapa === 'hoja_vida' || location.pathname.includes('expediente')));
+    Boolean(
+      paramDocCandidato &&
+      (
+        paramEtapa === 'hoja_vida' ||
+        paramEtapa === 'firma_contrato' ||
+        location.pathname.includes('expediente') ||
+        location.pathname.includes('hoja-vida') ||
+        location.pathname === '/'
+      )
+    );
 
   const esEmpleado = userRole === 'empleado' || currentUser?.rol === 'empleado';
 
@@ -1144,6 +1166,18 @@ function AppLayout() {
               />
               <Route
                 path="/diligenciar-hoja-vida"
+                element={
+                  <PortalCandidatoPublicoView
+                    empleados={empleados}
+                    documentoInicial={paramDocCandidato || ''}
+                    empresa={empresa}
+                    onActualizarEmpleado={handleUpdateEmpleado}
+                    onIrALogin={() => navigate('/dashboard')}
+                  />
+                }
+              />
+              <Route
+                path="/candidato"
                 element={
                   <PortalCandidatoPublicoView
                     empleados={empleados}

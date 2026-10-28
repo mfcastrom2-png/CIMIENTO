@@ -12,11 +12,17 @@ import {
   CheckCircle2,
   QrCode,
   Sparkles,
-  FileText
+  FileText,
+  Copy,
+  Check,
+  ExternalLink,
+  Globe,
+  ShieldAlert
 } from 'lucide-react';
 import { UsuarioSistema, ConfiguracionEmpresa } from '../types';
 import { CorporateLogo } from './CorporateLogo';
 import { PWAInstallButton } from './pwa/PWAInstallButton';
+import firebaseConfig from '../../firebase-applet-config.json';
 import {
   loginConEmail,
   loginConGoogle,
@@ -45,6 +51,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
+  const [unauthorizedDomainInfo, setUnauthorizedDomainInfo] = useState<{
+    hostname: string;
+    projectId: string;
+  } | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   const [resetCooldown, setResetCooldown] = useState<number>(() => {
     const lastReset = localStorage.getItem('cimiento_last_pwd_reset');
@@ -81,6 +92,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     event.preventDefault();
     setError(null);
     setMessage(null);
+    setUnauthorizedDomainInfo(null);
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail || !password) {
@@ -93,11 +105,24 @@ export const LoginView: React.FC<LoginViewProps> = ({
       const credential = await loginConEmail(cleanEmail, password);
       await finishLogin(credential.user.uid, cleanEmail);
     } catch (err: any) {
-      setError(
-        err?.code === 'auth/invalid-credential'
-          ? 'Credenciales inválidas. Verifique su correo y contraseña.'
-          : (err?.message || 'No fue posible iniciar sesión.')
-      );
+      const code = err?.code || '';
+      const msg = err?.message || '';
+      if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+        setUnauthorizedDomainInfo({
+          hostname,
+          projectId: firebaseConfig.projectId
+        });
+        setError('El dominio actual no está autorizado en Firebase Authentication.');
+      } else if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+        setError('Credenciales inválidas. Verifique su correo corporativo y contraseña.');
+      } else if (code === 'auth/user-not-found') {
+        setError('No existe una cuenta registrada con este correo electrónico.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Demasiados intentos fallidos. Por seguridad, espere unos momentos antes de reintentar.');
+      } else {
+        setError(msg || 'No fue posible iniciar sesión.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -106,12 +131,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const handleGoogleLogin = async () => {
     setError(null);
     setMessage(null);
+    setUnauthorizedDomainInfo(null);
     setIsLoading(true);
     try {
       const { user } = await loginConGoogle();
       await finishLogin(user.uid, user.email || undefined);
     } catch (err: any) {
-      setError(err?.message || 'No fue posible iniciar sesión con Google.');
+      const code = err?.code || '';
+      const msg = err?.message || '';
+      if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+        setUnauthorizedDomainInfo({
+          hostname,
+          projectId: firebaseConfig.projectId
+        });
+        setError('El dominio de producción no está autorizado en Firebase Authentication.');
+      } else if (code === 'auth/popup-closed-by-user') {
+        setError('Se cerró la ventana de autenticación con Google antes de completar el ingreso.');
+      } else if (code === 'auth/popup-blocked') {
+        setError('El navegador bloqueó la ventana emergente de Google. Permita las ventanas emergentes para este sitio.');
+      } else {
+        setError(msg || 'No fue posible iniciar sesión con Google.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -275,7 +316,87 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </p>
               </div>
 
-              {error && (
+              {unauthorizedDomainInfo && (
+                <div className="mb-4 p-4 rounded-2xl bg-amber-50/95 border border-amber-300 text-amber-950 text-xs sm:text-sm space-y-3 shadow-md animate-fadeIn">
+                  <div className="flex items-start gap-2.5">
+                    <ShieldAlert className="w-5 h-5 shrink-0 text-amber-700 mt-0.5" />
+                    <div>
+                      <h3 className="font-bold text-amber-900 text-sm">
+                        Dominio no autorizado en Firebase Authentication
+                      </h3>
+                      <p className="text-amber-800 text-xs mt-0.5 leading-relaxed">
+                        Firebase bloquea el inicio de sesión desde orígenes que no están en su lista de dominios autorizados de seguridad.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-2.5 rounded-xl border border-amber-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Globe className="w-4 h-4 text-slate-500 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                          Dominio a autorizar
+                        </span>
+                        <code className="text-xs font-mono font-bold text-slate-900 truncate block">
+                          {unauthorizedDomainInfo.hostname || 'Dominio actual'}
+                        </code>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (unauthorizedDomainInfo.hostname) {
+                          navigator.clipboard.writeText(unauthorizedDomainInfo.hostname);
+                          setCopiedDomain(true);
+                          setTimeout(() => setCopiedDomain(false), 2500);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shrink-0"
+                    >
+                      {copiedDomain ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>¡Copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copiar Dominio</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="space-y-1 text-xs text-amber-900 bg-amber-100/60 p-2.5 rounded-xl border border-amber-200/70">
+                    <span className="font-bold block text-[11px] uppercase tracking-wider text-amber-950">
+                      Pasos para solucionarlo (1 minuto):
+                    </span>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-700 pl-1">
+                      <li>
+                        Abre la consola en <strong className="text-slate-900">Authentication &gt; Settings</strong>.
+                      </li>
+                      <li>
+                        En <strong className="text-slate-900">Dominios autorizados</strong>, haz clic en <strong className="text-slate-900">Agregar dominio</strong>.
+                      </li>
+                      <li>
+                        Pega <code className="bg-amber-200/70 px-1 py-0.5 rounded font-mono text-[11px] text-amber-950 font-bold">{unauthorizedDomainInfo.hostname}</code> y pulsa <strong>Guardar</strong>.
+                      </li>
+                    </ol>
+                  </div>
+
+                  <a
+                    href={`https://console.firebase.google.com/project/${unauthorizedDomainInfo.projectId}/authentication/settings`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2 px-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-sm"
+                  >
+                    <span>Abrir Configuración en Firebase Console</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
+
+              {error && !unauthorizedDomainInfo && (
                 <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-start gap-2 animate-fadeIn">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
                   <span>{error}</span>

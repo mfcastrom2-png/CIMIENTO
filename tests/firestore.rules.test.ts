@@ -212,5 +212,11 @@ describe('Firestore Security Rules - Single-Tenant, PII Protection & RBAC Suite'
       expect(rulesContent).toContain('match /{document=**}');
       expect(rulesContent).toContain('allow read, write: if false;');
     });
+
+    it('Las reglas deben proteger la colección certificados_emitidos con lectura pública y escritura SST/Admin', () => {
+      expect(rulesContent).toContain('match /certificados_emitidos/{codigoId}');
+      expect(rulesContent).toContain('allow read: if true;');
+      expect(rulesContent).toContain('allow write: if isSSTorAdmin();');
+    });
   });
 });

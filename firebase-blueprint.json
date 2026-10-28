@@ -119,6 +119,24 @@
         "examenConocimiento": { "type": "object", "description": "Evaluación con nota mínima, tiempo y banco de preguntas con retroalimentación" },
         "participantes": { "type": "array", "description": "Registros individuales de asistencia, calificación, certificado y estado" }
       }
+    },
+    "CertificadoEmitido": {
+      "collection": "certificados_emitidos",
+      "fields": {
+        "codigoVerificacion": { "type": "string", "description": "Código único de verificación (ej. CER-LAB-2026-X, DIP-SST-X)" },
+        "tipoDocumento": { "type": "string", "description": "Diploma SST o Certificado Laboral" },
+        "titularNombre": { "type": "string", "description": "Nombre del titular del documento" },
+        "titularDocumento": { "type": "string", "description": "Cédula de ciudadanía o identificación del titular" },
+        "titularCargo": { "type": "string", "description": "Cargo del titular si aplica" },
+        "fechaEmision": { "type": "string", "description": "Fecha formal de expedición en español" },
+        "fechaRegistroISO": { "type": "string", "description": "Timestamp ISO 8601 del registro" },
+        "emisorRazonSocial": { "type": "string", "description": "Razón social de la empresa emisora" },
+        "emisorNit": { "type": "string", "description": "NIT con dígito de verificación" },
+        "firmanteNombre": { "type": "string", "description": "Nombre del representante o emisor firmante" },
+        "firmanteCargo": { "type": "string", "description": "Cargo formal del firmante" },
+        "hashIntegridad": { "type": "string", "description": "Hash criptográfico SHA-256 de integridad del documento" },
+        "estado": { "type": "string", "description": "VIGENTE_AUTENTICO, REVOCADO o ANULADO" }
+      }
     }
   }
 }

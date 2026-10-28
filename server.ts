@@ -9,13 +9,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-// Encabezados básicos de endurecimiento de seguridad HTTP (OWASP Secure Headers)
+// Encabezados de endurecimiento de seguridad HTTP para producción (OWASP Secure Headers)
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
   next();
 });
 
@@ -23,6 +28,14 @@ app.use((_req, res, next) => {
 const emailRateLimiter = new Map<string, { count: number; resetAt: number }>();
 const MAX_EMAILS_PER_WINDOW = 30; // máx 30 envíos
 const WINDOW_MS = 60 * 1000; // ventana de 1 minuto
+
+function getClientIp(req: express.Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
 
 function rateLimitCheck(ip: string): boolean {
   const now = Date.now();
@@ -36,6 +49,20 @@ function rateLimitCheck(ip: string): boolean {
   }
   record.count++;
   return true;
+}
+
+// Sanitizador de correos electrónicos y prevención de Inyección CRLF en cabeceras SMTP
+const EMAIL_REGEX = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+function isValidEmail(email: unknown): boolean {
+  if (typeof email !== 'string') return false;
+  const trimmed = email.trim();
+  if (/[\r\n]/.test(trimmed)) return false; // Bloquea inyección CRLF
+  return EMAIL_REGEX.test(trimmed);
+}
+
+function sanitizeHeaderString(val: unknown, fallback: string = ''): string {
+  if (typeof val !== 'string') return fallback;
+  return val.replace(/[\r\n]/g, ' ').trim();
 }
 
 app.use(express.json({ limit: '10mb' }));
@@ -75,7 +102,7 @@ function crearTransporterSMTP(config: {
  * ENDPOINT: Probar conexión SMTP en vivo y enviar correo real de prueba
  */
 app.post('/api/probar-conexion-smtp', async (req, res) => {
-  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+  const clientIp = getClientIp(req);
   if (!rateLimitCheck(clientIp)) {
     return res.status(429).json({
       success: false,
@@ -85,18 +112,25 @@ app.post('/api/probar-conexion-smtp', async (req, res) => {
 
   const { config, emailDestino } = req.body;
 
-  if (!config || !config.servidorSmtp || !config.emailRemitente) {
+  if (!config || !config.servidorSmtp || !isValidEmail(config.emailRemitente)) {
     return res.status(400).json({
       success: false,
-      message: 'Faltan parámetros de configuración del servidor SMTP o email remitente.'
+      message: 'Faltan parámetros de configuración del servidor SMTP o email remitente inválido.'
     });
   }
 
-  if (!emailDestino || !emailDestino.includes('@')) {
+  if (!isValidEmail(emailDestino)) {
     return res.status(400).json({
       success: false,
-      message: 'Debe especificar un correo destinatario válido para la prueba.'
+      message: 'Debe especificar un correo destinatario válido con formato estándar.'
     });
+  }
+
+  // Sanitizar cabeceras contra inyecciones CRLF
+  config.servidorSmtp = sanitizeHeaderString(config.servidorSmtp);
+  config.nombreRemitente = sanitizeHeaderString(config.nombreRemitente, 'Gestión Humana');
+  if (config.emailRespuesta && !isValidEmail(config.emailRespuesta)) {
+    config.emailRespuesta = undefined;
   }
 
   const logTimestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
@@ -182,7 +216,7 @@ app.post('/api/probar-conexion-smtp', async (req, res) => {
  * ENDPOINT: Enviar cualquier correo institucional real
  */
 app.post('/api/enviar-correo-institucional', async (req, res) => {
-  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+  const clientIp = getClientIp(req);
   if (!rateLimitCheck(clientIp)) {
     return res.status(429).json({
       success: false,
@@ -190,31 +224,36 @@ app.post('/api/enviar-correo-institucional', async (req, res) => {
     });
   }
 
-  const { config, destinatario, destinatarioNombre, asunto, cuerpoTexto, cuerpoHtml } = req.body;
+  const { config, destinatario, asunto, cuerpoTexto, cuerpoHtml } = req.body;
 
-  if (!config || !config.servidorSmtp || !config.emailRemitente) {
+  if (!config || !config.servidorSmtp || !isValidEmail(config.emailRemitente)) {
     return res.status(400).json({
       success: false,
-      message: 'Faltan parámetros de configuración del buzón corporativo.'
+      message: 'Faltan parámetros de configuración del buzón corporativo o remitente inválido.'
     });
   }
 
-  if (!destinatario || !destinatario.includes('@')) {
+  if (!isValidEmail(destinatario)) {
     return res.status(400).json({
       success: false,
-      message: 'Destinatario inválido.'
+      message: 'Destinatario inválido con formato de correo estándar.'
     });
   }
+
+  // Sanitizar cabeceras contra inyecciones CRLF
+  config.servidorSmtp = sanitizeHeaderString(config.servidorSmtp);
+  const nombreRemitenteSeguro = sanitizeHeaderString(config.nombreRemitente, 'Gestión Humana');
+  const asuntoSeguro = sanitizeHeaderString(asunto, 'Notificación Institucional');
 
   try {
     const transporter = crearTransporterSMTP(config);
-    const remitenteFinal = `"${config.nombreRemitente || 'Gestión Humana'}" <${config.emailRemitente}>`;
+    const remitenteFinal = `"${nombreRemitenteSeguro}" <${config.emailRemitente}>`;
 
     const info = await transporter.sendMail({
       from: remitenteFinal,
       to: destinatario,
-      replyTo: config.emailRespuesta || config.emailRemitente,
-      subject: asunto,
+      replyTo: isValidEmail(config.emailRespuesta) ? config.emailRespuesta : config.emailRemitente,
+      subject: asuntoSeguro,
       text: cuerpoTexto,
       html: cuerpoHtml || `<div style="font-family: Arial, sans-serif; white-space: pre-wrap;">${cuerpoTexto}</div>`
     });
@@ -249,7 +288,15 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
+    app.use(express.static(path.resolve(__dirname, 'dist'), {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.webmanifest')) {
+          res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+        } else if (filePath.endsWith('sw.js')) {
+          res.setHeader('Service-Worker-Allowed', '/');
+        }
+      }
+    }));
     app.get('*', (req, res) => {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });

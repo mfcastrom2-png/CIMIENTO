@@ -236,7 +236,7 @@ export const INITIAL_INCAPACIDADES: Incapacidad[] = [
     id: 'inc-004',
     empleadoId: 'e3',
     empleadoNombre: 'Laura Beltrán',
-    empleadoNumeroDocumento: '1.014.288.940',
+    empleadoNumeroDocumento: '1.032.556.881',
     cargoId: 'c3',
     cargoNombre: 'Analista de Contabilidad y Nómina',
     areaNombre: 'Finanzas y Contabilidad',

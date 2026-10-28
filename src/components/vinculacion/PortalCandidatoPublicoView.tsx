@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Empleado,
   ConfiguracionEmpresa,
@@ -25,7 +25,10 @@ import {
   Phone,
   Mail,
   Calendar,
-  Sparkles
+  Sparkles,
+  Printer,
+  ArrowLeft,
+  RefreshCw
 } from 'lucide-react';
 import { uid } from '../../data/initialData';
 import { DEPARTAMENTOS_COLOMBIA, NIVELES_EDUCATIVOS, ESTADOS_CIVILES } from '../../data/colombiaData';
@@ -34,6 +37,10 @@ import {
   generarTextoNotificacionHojaVidaCompletada,
   despacharNotificacionVinculacion
 } from '../../services/vinculacionService';
+import {
+  buscarCandidatoPreseleccionFB,
+  guardarHojaVidaCandidatoFB
+} from '../../lib/firebase';
 
 interface PortalCandidatoPublicoViewProps {
   empleados: Empleado[];
@@ -52,25 +59,97 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
 }) => {
   const [docBusqueda, setDocBusqueda] = useState(documentoInicial);
   const [docConsultado, setDocConsultado] = useState(documentoInicial);
+  const [candidatoRemoto, setCandidatoRemoto] = useState<Empleado | null>(null);
+  const [buscandoCandidatoNube, setBuscandoCandidatoNube] = useState(false);
+  const [errorBusquedaNube, setErrorBusquedaNube] = useState<string | null>(null);
 
-  const candidato = useMemo(() => {
+  useEffect(() => {
+    if (documentoInicial) {
+      setDocBusqueda(documentoInicial);
+      setDocConsultado(documentoInicial);
+    }
+  }, [documentoInicial]);
+
+  const candidatoLocal = useMemo(() => {
     if (!docConsultado) return null;
     const docLimpio = docConsultado.trim().replace(/\D/g, '');
-    return empleados.find(
-      e =>
-        e.documento?.replace(/\D/g, '') === docLimpio ||
-        e.codigo?.replace(/\D/g, '') === docLimpio ||
-        e.persona?.numeroDocumento?.replace(/\D/g, '') === docLimpio
-    ) || null;
+    return (
+      empleados.find(
+        e =>
+          e.documento?.replace(/\D/g, '') === docLimpio ||
+          e.codigo?.replace(/\D/g, '') === docLimpio ||
+          e.persona?.numeroDocumento?.replace(/\D/g, '') === docLimpio
+      ) || null
+    );
   }, [empleados, docConsultado]);
 
-  // Pestañas del formulario
+  const candidato = candidatoLocal || candidatoRemoto;
+
+  useEffect(() => {
+    if (!docConsultado) {
+      setCandidatoRemoto(null);
+      setErrorBusquedaNube(null);
+      return;
+    }
+
+    if (candidatoLocal) {
+      setCandidatoRemoto(null);
+      setErrorBusquedaNube(null);
+      return;
+    }
+
+    let activo = true;
+    setBuscandoCandidatoNube(true);
+    setErrorBusquedaNube(null);
+
+    buscarCandidatoPreseleccionFB(docConsultado)
+      .then(resultado => {
+        if (!activo) return;
+        setCandidatoRemoto(resultado);
+      })
+      .catch(err => {
+        if (!activo) return;
+        console.warn('Error al buscar candidato en la nube:', err);
+        setErrorBusquedaNube('No fue posible consultar el servidor.');
+      })
+      .finally(() => {
+        if (activo) setBuscandoCandidatoNube(false);
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [docConsultado, candidatoLocal]);
+
+  // Validar si la persona está en etapa de Pre-selección (habilitada para diligenciar la hoja de vida)
+  // o si ya está seleccionada / vinculada (habilitada para ver sus datos registrados)
+  const estaEnPreseleccion = Boolean(
+    candidato &&
+      (
+        candidato.vinculacion?.etapaActual === 'pre_seleccion' ||
+        candidato.estadoLaboral === 'Pre-selección' ||
+        candidato.laboral?.estado === 'Pre-selección'
+      ) &&
+      candidato.vinculacion?.etapaActual !== 'hoja_vida_completada' &&
+      candidato.vinculacion?.etapaActual !== 'pendiente_firma_contrato' &&
+      candidato.vinculacion?.etapaActual !== 'contrato_firmado' &&
+      candidato.vinculacion?.etapaActual !== 'vinculado_activo' &&
+      !candidato.activo &&
+      candidato.estadoLaboral !== 'Activo' &&
+      candidato.laboral?.estado !== 'Activo'
+  );
+
+  const yaEstaSeleccionado = Boolean(candidato && !estaEnPreseleccion);
+
+  // Pestañas del formulario o vista de consulta
   const [tabActual, setTabActual] = useState<'personal' | 'residencia' | 'estudios' | 'experiencia' | 'declaracion'>('personal');
 
-  // Datos personales
-  const [fechaNacimiento, setFechaNacimiento] = useState(candidato?.persona?.fechaNacimiento || '1995-05-15');
-  const [lugarNacimiento, setLugarNacimiento] = useState(candidato?.persona?.lugarNacimiento || 'Bogotá D.C.');
-  const [genero, setGenero] = useState(candidato?.persona?.genero || 'Masculino');
+  // Datos personales (SIN datos de prueba falsos)
+  const [fechaNacimiento, setFechaNacimiento] = useState(candidato?.persona?.fechaNacimiento || '');
+  const [lugarNacimiento, setLugarNacimiento] = useState(candidato?.persona?.lugarNacimiento || '');
+  const [genero, setGenero] = useState(
+    candidato?.persona?.genero && candidato.persona.genero !== 'No especificado' ? candidato.persona.genero : 'Femenino'
+  );
   const [estadoCivil, setEstadoCivil] = useState(candidato?.persona?.estadoCivil || 'Soltero(a)');
   const [nacionalidad, setNacionalidad] = useState(candidato?.persona?.nacionalidad || 'Colombiana');
   const [rhGrupo, setRhGrupo] = useState('O+');
@@ -100,38 +179,14 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
     candidato?.contacto?.contactoEmergenciaTelefono || ''
   );
 
-  // Formación académica
+  // Formación académica (SIN datos de prueba falsos)
   const [estudios, setEstudios] = useState<EstudioAcademicoEmpleado[]>(() => {
-    if (candidato?.estudios && candidato.estudios.length > 0) return candidato.estudios;
-    return [
-      {
-        id: uid(),
-        nivelEducativo: 'Tecnólogo',
-        programa: 'Redes y Telecomunicaciones',
-        tituloObtenido: 'Tecnólogo en Redes y Telecomunicaciones',
-        institucion: 'SENA',
-        fechaInicio: '2019-02-01',
-        fechaFin: '2021-11-20',
-        fechaGraduacion: '2021-11-20',
-        estado: 'Graduado',
-        tarjetaProfesional: ''
-      }
-    ];
+    return candidato?.estudios && candidato.estudios.length > 0 ? candidato.estudios : [];
   });
 
-  // Trayectoria laboral
+  // Trayectoria laboral (SIN datos de prueba falsos)
   const [experiencias, setExperiencias] = useState<ExperienciaLaboralEmpleado[]>(() => {
-    if (candidato?.experiencias && candidato.experiencias.length > 0) return candidato.experiencias;
-    return [
-      {
-        id: uid(),
-        empresa: 'Soluciones Ópticas SAS',
-        cargo: 'Técnico de Conectividad',
-        fechaIngreso: '2022-01-15',
-        fechaRetiro: '2025-12-20',
-        funcionesPrincipales: 'Instalación de acometidas de fibra óptica y pruebas de reflectometría.'
-      }
-    ];
+    return candidato?.experiencias && candidato.experiencias.length > 0 ? candidato.experiencias : [];
   });
 
   // Habeas Data & Declaración Jurada
@@ -142,6 +197,44 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
   const [guardando, setGuardando] = useState(false);
   const [guardadoExitoso, setGuardadoExitoso] = useState(false);
   const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
+
+  // Sincronizar estado cuando se carga o cambia el candidato consultado
+  useEffect(() => {
+    if (candidato) {
+      setFechaNacimiento(candidato.persona?.fechaNacimiento || '');
+      setLugarNacimiento(candidato.persona?.lugarNacimiento || '');
+      setGenero(
+        candidato.persona?.genero && candidato.persona.genero !== 'No especificado'
+          ? candidato.persona.genero
+          : 'Femenino'
+      );
+      setEstadoCivil(candidato.persona?.estadoCivil || 'Soltero(a)');
+      setNacionalidad(candidato.persona?.nacionalidad || 'Colombiana');
+      setRhGrupo('O+');
+      setDireccion(
+        candidato.contacto?.direccion && candidato.contacto.direccion !== 'Pendiente por candidato'
+          ? candidato.contacto.direccion
+          : ''
+      );
+      setBarrio(candidato.contacto?.barrio || '');
+      setDepartamento(candidato.contacto?.departamento || 'Bogotá D.C.');
+      setCiudad(candidato.contacto?.ciudad || 'Bogotá D.C.');
+      setCelular(candidato.contacto?.celular || candidato.telefono || '');
+      setCorreoPersonal(candidato.contacto?.correoPersonal || candidato.email || '');
+      setContactoEmergenciaNombre(
+        candidato.contacto?.contactoEmergenciaNombre && candidato.contacto.contactoEmergenciaNombre !== 'Pendiente por candidato'
+          ? candidato.contacto.contactoEmergenciaNombre
+          : ''
+      );
+      setContactoEmergenciaParentesco(candidato.contacto?.contactoEmergenciaParentesco || 'Familiar');
+      setContactoEmergenciaTelefono(candidato.contacto?.contactoEmergenciaTelefono || '');
+      setEstudios(candidato.estudios || []);
+      setExperiencias(candidato.experiencias || []);
+      setAutorizaHabeasData(false);
+      setDeclaraBajoJuramento(false);
+      setErrorValidacion(null);
+    }
+  }, [candidato]);
 
   const nombreEmpresa = empresa?.razonSocial || empresa?.nombreComercial || 'B GROUP INGENIERIA S.A.S.';
   const nitEmpresa = empresa?.nit ? `NIT: ${empresa.nit}` : 'NIT: 900.995.99-2';
@@ -195,13 +288,18 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
     setExperiencias(prev => prev.filter(e => e.id !== id));
   };
 
-  // Envío final de Hoja de Vida
+  // Envío final de Hoja de Vida (solo habilitado para candidatos en pre-selección)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorValidacion(null);
 
     if (!candidato) {
       setErrorValidacion('No se encontró el registro del candidato. Verifique su número de documento.');
+      return;
+    }
+
+    if (!estaEnPreseleccion) {
+      setErrorValidacion('Este candidato ya no se encuentra en etapa de Pre-selección. Su hoja de vida ya fue registrada y seleccionada.');
       return;
     }
 
@@ -334,7 +432,16 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
         ]
       };
 
+      // 1. Guardar de forma directa y garantizada en Firestore
+      try {
+        await guardarHojaVidaCandidatoFB(empleadoActualizado);
+      } catch (errFb) {
+        console.warn('Advertencia al guardar hoja de vida en Firestore:', errFb);
+      }
+
+      // 2. Notificar actualización en estado React y sincronizar estado remoto
       await onActualizarEmpleado(empleadoActualizado);
+      setCandidatoRemoto(empleadoActualizado);
 
       // Despachar notificación al correo de Gestión Humana
       try {
@@ -383,14 +490,26 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
 
       {/* Contenido Principal */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        {!candidato ? (
+        {buscandoCandidatoNube ? (
+          /* INDICADOR DE CARGA EN NUBE */
+          <div className="max-w-md mx-auto my-12 bg-slate-900 p-8 rounded-2xl border border-purple-500/30 text-center space-y-4 shadow-xl animate-fadeIn">
+            <div className="w-12 h-12 rounded-2xl bg-purple-950/70 text-purple-400 border border-purple-800/50 flex items-center justify-center mx-auto animate-spin">
+              <RefreshCw className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-white">Validando Registro de Pre-selección</h2>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Consultando el expediente digital asociado al documento <span className="font-mono text-purple-300 font-bold">{docConsultado}</span> en el servidor institucional...
+            </p>
+          </div>
+        ) : !docConsultado ? (
+          /* BÚSQUEDA INICIAL DEL ASPIRANTE */
           <div className="max-w-md mx-auto my-12 bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center space-y-4 shadow-xl">
             <div className="w-12 h-12 rounded-2xl bg-purple-950/60 text-purple-400 border border-purple-800/50 flex items-center justify-center mx-auto">
               <User className="w-6 h-6" />
             </div>
-            <h2 className="text-lg font-bold text-white">Consulta de Candidato</h2>
-            <p className="text-xs text-slate-400">
-              Ingrese su número de documento de identidad (Cédula de Ciudadanía, CE o Pasaporte) para acceder a su formulario de Hoja de Vida.
+            <h2 className="text-lg font-bold text-white">Consulta de Aspirante en Pre-selección</h2>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Ingrese su número de documento de identidad para ingresar al formulario de Hoja de Vida Digital o consultar sus antecedentes registrados.
             </p>
             <div className="space-y-3">
               <input
@@ -398,6 +517,9 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                 placeholder="Número de documento..."
                 value={docBusqueda}
                 onChange={e => setDocBusqueda(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') setDocConsultado(docBusqueda);
+                }}
                 className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono text-white text-center focus:outline-hidden focus:border-purple-500"
               />
               <button
@@ -409,8 +531,36 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
               </button>
             </div>
           </div>
+        ) : !candidato ? (
+          /* DOCUMENTO NO ENCONTRADO O NO REGISTRADO */
+          <div className="max-w-md mx-auto my-12 bg-slate-900 p-6 rounded-2xl border border-rose-800/60 text-center space-y-4 shadow-xl animate-fadeIn">
+            <div className="w-12 h-12 rounded-2xl bg-rose-950/60 text-rose-400 border border-rose-800/50 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-white">Aspirante No Registrado</h2>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              El documento ingresado <strong className="font-mono text-rose-300">{docConsultado}</strong> no figura en la base de datos de pre-selección ni en la nómina institucional.
+            </p>
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-400 text-left space-y-1">
+              <p>📌 <strong>Requisito de Acceso:</strong></p>
+              <p>
+                La Hoja de Vida Digital solo está habilitada para las personas que han sido registradas previamente en el proceso de vinculación laboral por el área de Talento Humano.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDocConsultado('');
+                setDocBusqueda('');
+              }}
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+            >
+              Intentar con otro documento
+            </button>
+          </div>
         ) : guardadoExitoso ? (
-          <div className="max-w-xl mx-auto my-12 bg-slate-900 border border-emerald-500/30 rounded-2xl p-8 text-center space-y-5 shadow-2xl">
+          /* PANTALLA DE ÉXITO TRAS DILIGENCIAR */
+          <div className="max-w-xl mx-auto my-12 bg-slate-900 border border-emerald-500/30 rounded-2xl p-8 text-center space-y-5 shadow-2xl animate-fadeIn">
             <div className="w-16 h-16 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-700/50 flex items-center justify-center mx-auto animate-bounce">
               <CheckCircle2 className="w-10 h-10" />
             </div>
@@ -431,9 +581,325 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
               <Sparkles className="w-4 h-4 inline mr-1 text-[#F59E0B]" />
               El equipo de Selección y Contratación revisará su información para formalizar la asignación salarial y remitirle a este mismo correo el <strong>Contrato Individual de Trabajo para su firma digital</strong> (Ley 527 de 1999).
             </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setGuardadoExitoso(false);
+                }}
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Ver Datos Registrados
+              </button>
+            </div>
+          </div>
+        ) : yaEstaSeleccionado ? (
+          /* ========================================================================= */
+          /* MODO CONSULTA: EMPLEADO QUE YA FUE SELECCIONADO / VINCULADO               */
+          /* "un empleado que ya está seleccionado si ingresa debe poder ver los datos */
+          /*  registrados en la hoja de vida digital"                                  */
+          /* ========================================================================= */
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden animate-fadeIn">
+            {/* Header del Colaborador Seleccionado */}
+            <div className="p-6 bg-gradient-to-r from-emerald-950/90 via-slate-900 to-slate-900 border-b border-emerald-800/40">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-900/70 text-emerald-300 border border-emerald-600/50">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      {candidato.activo || candidato.laboral?.estado === 'Activo'
+                        ? 'Colaborador Activo · Expediente Formalizado'
+                        : 'Candidato Seleccionado · Proceso de Vinculación en Curso'}
+                    </span>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      Cód: {candidato.codigo || candidato.documento}
+                    </span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    Hoja de Vida Digital — Datos Registrados
+                  </h2>
+                  <p className="text-xs text-slate-300 mt-1">
+                    Colaborador: <strong className="text-white">{candidato.nombre}</strong> · {candidato.persona?.tipoDocumento || candidato.tipoDocumento || 'CC'} {candidato.documento} · Cargo:{' '}
+                    <span className="text-[#F59E0B] font-bold">{candidato.laboral?.cargoNombre || 'Colaborador Vinculado'}</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1.5 border border-slate-700 cursor-pointer transition-colors shadow-xs"
+                    title="Imprimir resumen de Hoja de Vida"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-[#F59E0B]" />
+                    <span>Imprimir Hoja de Vida</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocConsultado('');
+                      setDocBusqueda('');
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 border border-purple-700/50 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Consultar otro documento
+                  </button>
+                </div>
+              </div>
+
+              {/* Noticia explicativa */}
+              <div className="mt-4 p-3.5 bg-slate-950/70 border border-emerald-800/40 rounded-xl text-xs text-slate-300 flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <strong className="text-white">Estado del Proceso:</strong> Usted ya ha superado la etapa de pre-selección y su Hoja de Vida Digital se encuentra formalizada en el expediente de <strong>{nombreEmpresa}</strong>. A continuación puede consultar la totalidad de la información demográfica, de residencia, académica y de experiencia registrada.
+                </div>
+              </div>
+
+              {/* Barra de pestañas */}
+              <div className="flex items-center gap-2 mt-6 overflow-x-auto pb-1 text-xs">
+                {[
+                  { id: 'personal', label: '1. Datos Personales', icon: User },
+                  { id: 'residencia', label: '2. Residencia & Contacto', icon: MapPin },
+                  { id: 'estudios', label: `3. Formación Académica (${(candidato.estudios || []).length})`, icon: GraduationCap },
+                  { id: 'experiencia', label: `4. Experiencia Previa (${(candidato.experiencias || []).length})`, icon: History },
+                  { id: 'declaracion', label: '5. Habeas Data & Trazabilidad', icon: ShieldCheck }
+                ].map(t => {
+                  const Icon = t.icon;
+                  const isActive = tabActual === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTabActual(t.id as any)}
+                      className={`px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                        isActive
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40'
+                          : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{t.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Contenido en Modo Visualización */}
+            <div className="p-6 space-y-6 text-xs text-slate-300">
+              {/* TAB 1: DATOS PERSONALES */}
+              {tabActual === 'personal' && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Tipo y Número de Documento</span>
+                      <span className="text-white font-mono font-bold text-sm">
+                        {candidato.persona?.tipoDocumento || candidato.tipoDocumento || 'CC'} {candidato.documento}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Fecha de Nacimiento</span>
+                      <span className="text-white font-bold text-sm font-mono">
+                        {candidato.persona?.fechaNacimiento || 'No registrada'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Lugar de Nacimiento</span>
+                      <span className="text-white font-bold text-sm">
+                        {candidato.persona?.lugarNacimiento || 'No registrado'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Nacionalidad</span>
+                      <span className="text-white font-bold text-sm">
+                        {candidato.persona?.nacionalidad || 'Colombiana'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Género</span>
+                      <span className="text-white font-bold text-sm">
+                        {candidato.persona?.genero && candidato.persona.genero !== 'No especificado'
+                          ? candidato.persona.genero
+                          : 'No especificado'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Estado Civil</span>
+                      <span className="text-white font-bold text-sm">
+                        {candidato.persona?.estadoCivil || 'Soltero(a)'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: RESIDENCIA Y CONTACTO */}
+              {tabActual === 'residencia' && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl sm:col-span-2 space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Dirección de Residencia</span>
+                      <span className="text-white font-bold text-sm">
+                        {candidato.contacto?.direccion && candidato.contacto.direccion !== 'Pendiente por candidato'
+                          ? candidato.contacto.direccion
+                          : 'No especificada'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Barrio</span>
+                      <span className="text-white font-bold text-sm">
+                        {candidato.contacto?.barrio || 'No especificado'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Ciudad / Municipio</span>
+                      <span className="text-white font-bold text-sm">
+                        {candidato.contacto?.ciudad || 'Bogotá D.C.'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Departamento</span>
+                      <span className="text-white font-bold text-sm">
+                        {candidato.contacto?.departamento || 'Bogotá D.C.'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Celular de Contacto</span>
+                      <span className="text-white font-mono font-bold text-sm">
+                        {candidato.contacto?.celular || candidato.telefono || 'No registrado'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl sm:col-span-3 space-y-1">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Correo Electrónico Personal</span>
+                      <span className="text-white font-bold text-sm">
+                        {candidato.contacto?.correoPersonal || candidato.email || 'No registrado'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Contacto de Emergencia */}
+                  <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                    <h3 className="font-bold text-sm text-[#F59E0B] flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      <span>Contacto en Caso de Emergencia (Decreto 1072 de 2015)</span>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-2.5 bg-slate-900 rounded-lg">
+                        <span className="text-[10px] text-slate-400 block">Nombre del Contacto</span>
+                        <span className="text-white font-semibold">
+                          {candidato.contacto?.contactoEmergenciaNombre || 'No registrado'}
+                        </span>
+                      </div>
+                      <div className="p-2.5 bg-slate-900 rounded-lg">
+                        <span className="text-[10px] text-slate-400 block">Parentesco</span>
+                        <span className="text-white font-semibold">
+                          {candidato.contacto?.contactoEmergenciaParentesco || 'No registrado'}
+                        </span>
+                      </div>
+                      <div className="p-2.5 bg-slate-900 rounded-lg">
+                        <span className="text-[10px] text-slate-400 block">Teléfono de Emergencia</span>
+                        <span className="text-white font-mono font-semibold">
+                          {candidato.contacto?.contactoEmergenciaTelefono || 'No registrado'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: FORMACIÓN ACADÉMICA */}
+              {tabActual === 'estudios' && (
+                <div className="space-y-3 animate-fadeIn">
+                  {(candidato.estudios || []).length > 0 ? (
+                    (candidato.estudios || []).map((est, idx) => (
+                      <div key={est.id || idx} className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <span className="font-bold text-emerald-400 text-sm">
+                            {est.tituloObtenido || est.programa}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            {est.nivelEducativo || 'Estudio'} · {est.estado || 'Graduado'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                          <p><strong className="text-slate-400">Institución:</strong> <span className="text-white">{est.institucion}</span></p>
+                          {est.fechaGraduacion && (
+                            <p><strong className="text-slate-400">Fecha de Graduación:</strong> <span className="text-white font-mono">{est.fechaGraduacion}</span></p>
+                          )}
+                          {est.tarjetaProfesional && (
+                            <p><strong className="text-slate-400">Tarjeta Profesional:</strong> <span className="text-white font-mono">{est.tarjetaProfesional}</span></p>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 bg-slate-950/60 border border-dashed border-slate-800 rounded-xl text-center space-y-1">
+                      <GraduationCap className="w-8 h-8 text-slate-500 mx-auto" />
+                      <p className="text-slate-300 font-semibold">Sin formación adicional registrada en el formulario digital.</p>
+                      <p className="text-slate-500 text-[11px]">Perfil base: {candidato.formacion || 'Bachiller / Técnico'}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 4: EXPERIENCIA LABORAL */}
+              {tabActual === 'experiencia' && (
+                <div className="space-y-3 animate-fadeIn">
+                  {(candidato.experiencias || []).length > 0 ? (
+                    (candidato.experiencias || []).map((exp, idx) => (
+                      <div key={exp.id || idx} className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <span className="font-bold text-white text-sm">{exp.cargo}</span>
+                          <span className="text-slate-400 font-mono text-[11px]">
+                            {exp.fechaIngreso} — {exp.fechaRetiro || 'Actual'}
+                          </span>
+                        </div>
+                        <p><strong className="text-slate-400">Empresa / Empleador:</strong> <span className="text-emerald-400 font-semibold">{exp.empresa}</span></p>
+                        {exp.funcionesPrincipales && (
+                          <p className="text-slate-300 leading-relaxed text-xs pt-1">
+                            <strong className="text-slate-400">Funciones:</strong> {exp.funcionesPrincipales}
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 bg-slate-950/60 border border-dashed border-slate-800 rounded-xl text-center space-y-1">
+                      <History className="w-8 h-8 text-slate-500 mx-auto" />
+                      <p className="text-slate-300 font-semibold">Sin trayectoria previa adicional registrada en el formulario digital.</p>
+                      <p className="text-slate-500 text-[11px]">Trayectoria base: {candidato.experiencia || 'No especificada'}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 5: HABEAS DATA & TRAZABILIDAD */}
+              {tabActual === 'declaracion' && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                    <span className="font-bold text-emerald-400 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Tratamiento de Datos Personales & Declaración Juramentada</span>
+                    </span>
+                    <p className="text-slate-300 text-xs leading-relaxed">
+                      El colaborador autorizó formalmente el tratamiento de sus datos personales conforme a la <strong>Ley 1581 de 2012</strong> y declaró la veracidad de la información conforme al <strong>Art. 62 del Código Sustantivo del Trabajo (CST)</strong>.
+                    </p>
+                    <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400 font-mono space-y-1">
+                      <p>• Fecha de Radicación: {candidato.vinculacion?.fechaHojaVidaCompletada ? new Date(candidato.vinculacion.fechaHojaVidaCompletada).toLocaleString('es-CO') : 'Formalizado en sistema'}</p>
+                      <p>• Etapa del Expediente: {candidato.vinculacion?.etapaActual || 'vinculado_activo'}</p>
+                      <p>• Estado de Contratación: {candidato.activo ? 'ACTIVO' : 'EN VINCULACIÓN'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
+          /* ========================================================================= */
+          /* MODO FORMULARIO: ASPIRANTE EN PRE-SELECCIÓN (HABILITADO)                   */
+          /* "solo esté habilitada para las personas que se registran en esta de        */
+          /*  preselección"                                                             */
+          /* ========================================================================= */
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden animate-fadeIn">
             {/* Header del Formulario */}
             <div className="p-6 bg-gradient-to-r from-purple-950/80 via-slate-900 to-slate-900 border-b border-slate-800">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -450,6 +916,17 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                     <span className="text-[#F59E0B] font-bold">{candidato.laboral?.cargoNombre || 'Cargo Asignado'}</span>
                   </p>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDocConsultado('');
+                    setDocBusqueda('');
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold self-start sm:self-auto cursor-pointer"
+                >
+                  Consultar otro documento
+                </button>
               </div>
 
               {/* Barra de pestañas */}
@@ -457,8 +934,8 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                 {[
                   { id: 'personal', label: '1. Datos Personales', icon: User },
                   { id: 'residencia', label: '2. Residencia & Contacto', icon: MapPin },
-                  { id: 'estudios', label: '3. Formación Académica', icon: GraduationCap },
-                  { id: 'experiencia', label: '4. Experiencia Laboral', icon: History },
+                  { id: 'estudios', label: `3. Formación Académica (${estudios.length})`, icon: GraduationCap },
+                  { id: 'experiencia', label: `4. Experiencia Laboral (${experiencias.length})`, icon: History },
                   { id: 'declaracion', label: '5. Habeas Data & Firma', icon: ShieldCheck }
                 ].map(t => {
                   const Icon = t.icon;
@@ -511,6 +988,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                       <input
                         type="text"
                         required
+                        placeholder="Ej. Bogotá D.C."
                         value={lugarNacimiento}
                         onChange={e => setLugarNacimiento(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
@@ -535,8 +1013,8 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                         onChange={e => setGenero(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
                       >
-                        <option value="Masculino">Masculino</option>
                         <option value="Femenino">Femenino</option>
+                        <option value="Masculino">Masculino</option>
                         <option value="No binario">No binario</option>
                         <option value="Prefiero no decir">Prefiero no decir</option>
                       </select>
@@ -644,6 +1122,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                       <input
                         type="tel"
                         required
+                        placeholder="300 123 4567"
                         value={celular}
                         onChange={e => setCelular(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono"
@@ -655,6 +1134,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                       <input
                         type="email"
                         required
+                        placeholder="aspirante@ejemplo.com"
                         value={correoPersonal}
                         onChange={e => setCorreoPersonal(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
@@ -674,6 +1154,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                         <input
                           type="text"
                           required
+                          placeholder="Nombre del familiar o allegado"
                           value={contactoEmergenciaNombre}
                           onChange={e => setContactoEmergenciaNombre(e.target.value)}
                           className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white"
@@ -695,6 +1176,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                         <input
                           type="tel"
                           required
+                          placeholder="300 000 0000"
                           value={contactoEmergenciaTelefono}
                           onChange={e => setContactoEmergenciaTelefono(e.target.value)}
                           className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono"
@@ -707,7 +1189,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                     <button
                       type="button"
                       onClick={() => setTabActual('personal')}
-                      className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white"
+                      className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white cursor-pointer"
                     >
                       Anterior
                     </button>
@@ -738,20 +1220,35 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                     </button>
                   </div>
 
+                  {estudios.length === 0 && (
+                    <div className="p-8 bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl text-center space-y-2">
+                      <GraduationCap className="w-8 h-8 text-purple-400 mx-auto" />
+                      <p className="text-slate-300 font-semibold text-xs">No hay títulos académicos agregados aún.</p>
+                      <p className="text-slate-500 text-[11px]">Haga clic en el botón para registrar su formación académica.</p>
+                      <button
+                        type="button"
+                        onClick={handleAddEstudio}
+                        className="mt-2 px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Agregar Formación Académica</span>
+                      </button>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     {estudios.map((est, idx) => (
                       <div key={est.id} className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
                         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                           <span className="font-bold text-purple-400">Título / Estudio #{idx + 1}</span>
-                          {estudios.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveEstudio(est.id)}
-                              className="text-rose-400 hover:text-rose-300 font-bold"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEstudio(est.id)}
+                            className="text-rose-400 hover:text-rose-300 font-bold p-1 cursor-pointer"
+                            title="Eliminar este estudio"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -772,6 +1269,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                             <input
                               type="text"
                               required
+                              placeholder="Ej. Bachiller Académico, Técnico en Sistemas..."
                               value={est.tituloObtenido}
                               onChange={e => handleUpdateEstudio(est.id, 'tituloObtenido', e.target.value)}
                               className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white"
@@ -782,6 +1280,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                             <input
                               type="text"
                               required
+                              placeholder="Ej. Colegio / Universidad / SENA"
                               value={est.institucion}
                               onChange={e => handleUpdateEstudio(est.id, 'institucion', e.target.value)}
                               className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white"
@@ -805,7 +1304,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                     <button
                       type="button"
                       onClick={() => setTabActual('residencia')}
-                      className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white"
+                      className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white cursor-pointer"
                     >
                       Anterior
                     </button>
@@ -825,7 +1324,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
               {tabActual === 'experiencia' && (
                 <div className="space-y-4 animate-fadeIn">
                   <div className="flex items-center justify-between">
-                    <p className="text-slate-400">Registre sus empleos o contratos anteriores más relevantes:</p>
+                    <p className="text-slate-400">Registre sus empleos o contratos anteriores más relevantes (si aplica):</p>
                     <button
                       type="button"
                       onClick={handleAddExperiencia}
@@ -836,47 +1335,87 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                     </button>
                   </div>
 
+                  {experiencias.length === 0 && (
+                    <div className="p-8 bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl text-center space-y-2">
+                      <History className="w-8 h-8 text-purple-400 mx-auto" />
+                      <p className="text-slate-300 font-semibold text-xs">No hay experiencia previa registrada.</p>
+                      <p className="text-slate-500 text-[11px]">Si cuenta con experiencia laboral previa, haga clic en el botón para agregarla.</p>
+                      <button
+                        type="button"
+                        onClick={handleAddExperiencia}
+                        className="mt-2 px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Agregar Experiencia Laboral</span>
+                      </button>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     {experiencias.map((exp, idx) => (
                       <div key={exp.id} className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
                         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                           <span className="font-bold text-purple-400">Experiencia Laboral #{idx + 1}</span>
-                          {experiencias.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveExperiencia(exp.id)}
-                              className="text-rose-400 hover:text-rose-300 font-bold"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExperiencia(exp.id)}
+                            className="text-rose-400 hover:text-rose-300 font-bold p-1 cursor-pointer"
+                            title="Eliminar esta experiencia"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-slate-400 mb-1">Empresa / Razón Social *</label>
+                            <label className="block text-slate-400 mb-1">Empresa / Empleador *</label>
                             <input
                               type="text"
                               required
+                              placeholder="Nombre de la empresa"
                               value={exp.empresa}
                               onChange={e => handleUpdateExperiencia(exp.id, 'empresa', e.target.value)}
                               className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white"
                             />
                           </div>
+
                           <div>
                             <label className="block text-slate-400 mb-1">Cargo Desempeñado *</label>
                             <input
                               type="text"
                               required
+                              placeholder="Ej. Auxiliar, Técnico, Asesor..."
                               value={exp.cargo}
                               onChange={e => handleUpdateExperiencia(exp.id, 'cargo', e.target.value)}
                               className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white"
                             />
                           </div>
+
+                          <div>
+                            <label className="block text-slate-400 mb-1">Fecha de Ingreso</label>
+                            <input
+                              type="date"
+                              value={exp.fechaIngreso}
+                              onChange={e => handleUpdateExperiencia(exp.id, 'fechaIngreso', e.target.value)}
+                              className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-400 mb-1">Fecha de Retiro</label>
+                            <input
+                              type="date"
+                              value={exp.fechaRetiro}
+                              onChange={e => handleUpdateExperiencia(exp.id, 'fechaRetiro', e.target.value)}
+                              className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-mono"
+                            />
+                          </div>
+
                           <div className="sm:col-span-2">
                             <label className="block text-slate-400 mb-1">Funciones Principales</label>
                             <textarea
                               rows={2}
+                              placeholder="Breve resumen de responsabilidades desempeñadas..."
                               value={exp.funcionesPrincipales}
                               onChange={e => handleUpdateExperiencia(exp.id, 'funcionesPrincipales', e.target.value)}
                               className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white"
@@ -891,7 +1430,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                     <button
                       type="button"
                       onClick={() => setTabActual('estudios')}
-                      className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white"
+                      className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white cursor-pointer"
                     >
                       Anterior
                     </button>
@@ -947,7 +1486,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                     <button
                       type="button"
                       onClick={() => setTabActual('experiencia')}
-                      className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white"
+                      className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white cursor-pointer"
                     >
                       Anterior
                     </button>
