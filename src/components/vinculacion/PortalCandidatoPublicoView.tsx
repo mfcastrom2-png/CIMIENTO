@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Empleado,
   ConfiguracionEmpresa,
@@ -28,7 +28,11 @@ import {
   Sparkles,
   Printer,
   ArrowLeft,
-  RefreshCw
+  RefreshCw,
+  WifiOff,
+  RotateCcw,
+  Check,
+  Clock
 } from 'lucide-react';
 import { uid } from '../../data/initialData';
 import { DEPARTAMENTOS_COLOMBIA, NIVELES_EDUCATIVOS, ESTADOS_CIVILES } from '../../data/colombiaData';
@@ -62,6 +66,12 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
   const [candidatoRemoto, setCandidatoRemoto] = useState<Empleado | null>(null);
   const [buscandoCandidatoNube, setBuscandoCandidatoNube] = useState(false);
   const [errorBusquedaNube, setErrorBusquedaNube] = useState<string | null>(null);
+  const [esErrorDeRed, setEsErrorDeRed] = useState(false);
+  const [intentoCarga, setIntentoCarga] = useState(1);
+  const [maxIntentosCarga] = useState(3);
+  const [etapaCargaTexto, setEtapaCargaTexto] = useState('Iniciando verificación institucional...');
+  const [segundosTranscurridos, setSegundosTranscurridos] = useState(0);
+  const [idReintentoManual, setIdReintentoManual] = useState(0);
 
   useEffect(() => {
     if (documentoInicial) {
@@ -69,6 +79,18 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
       setDocConsultado(documentoInicial);
     }
   }, [documentoInicial]);
+
+  // Cronómetro de latencia durante la carga activa
+  useEffect(() => {
+    if (!buscandoCandidatoNube) {
+      setSegundosTranscurridos(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setSegundosTranscurridos(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [buscandoCandidatoNube]);
 
   const candidatoLocal = useMemo(() => {
     if (!docConsultado) return null;
@@ -85,32 +107,60 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
 
   const candidato = candidatoLocal || candidatoRemoto;
 
-  useEffect(() => {
-    if (!docConsultado) {
+  const ejecutarConsultaCandidato = useCallback((documentoAValidar: string) => {
+    if (!documentoAValidar) {
       setCandidatoRemoto(null);
       setErrorBusquedaNube(null);
+      setEsErrorDeRed(false);
       return;
     }
 
     if (candidatoLocal) {
       setCandidatoRemoto(null);
       setErrorBusquedaNube(null);
+      setEsErrorDeRed(false);
       return;
     }
 
     let activo = true;
     setBuscandoCandidatoNube(true);
     setErrorBusquedaNube(null);
+    setEsErrorDeRed(false);
+    setIntentoCarga(1);
+    setEtapaCargaTexto('Conectando de forma segura con la base de datos...');
 
-    buscarCandidatoPreseleccionFB(docConsultado)
+    buscarCandidatoPreseleccionFB(documentoAValidar, {
+      maxIntentos: 3,
+      timeoutMs: 7500,
+      onProgreso: (intento, max, etapa) => {
+        if (!activo) return;
+        setIntentoCarga(intento);
+        setEtapaCargaTexto(etapa);
+      }
+    })
       .then(resultado => {
         if (!activo) return;
-        setCandidatoRemoto(resultado);
+        if (resultado.candidato) {
+          setCandidatoRemoto(resultado.candidato);
+          setErrorBusquedaNube(null);
+          setEsErrorDeRed(false);
+        } else if (resultado.esErrorConexion) {
+          setCandidatoRemoto(null);
+          setEsErrorDeRed(true);
+          setErrorBusquedaNube(resultado.error || 'La conexión tardó más de lo esperado o experimentó interrupciones.');
+        } else {
+          // Consulta completada con éxito: el documento no figura registrado en preselección
+          setCandidatoRemoto(null);
+          setEsErrorDeRed(false);
+          setErrorBusquedaNube(null);
+        }
       })
       .catch(err => {
         if (!activo) return;
-        console.warn('Error al buscar candidato en la nube:', err);
-        setErrorBusquedaNube('No fue posible consultar el servidor.');
+        console.warn('Error en consulta de candidato:', err);
+        setCandidatoRemoto(null);
+        setEsErrorDeRed(true);
+        setErrorBusquedaNube('No fue posible conectar con el servidor institucional.');
       })
       .finally(() => {
         if (activo) setBuscandoCandidatoNube(false);
@@ -119,7 +169,18 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
     return () => {
       activo = false;
     };
-  }, [docConsultado, candidatoLocal]);
+  }, [candidatoLocal]);
+
+  useEffect(() => {
+    const cancelar = ejecutarConsultaCandidato(docConsultado);
+    return () => {
+      if (cancelar) cancelar();
+    };
+  }, [docConsultado, idReintentoManual, ejecutarConsultaCandidato]);
+
+  const handleReintentarBusqueda = () => {
+    setIdReintentoManual(prev => prev + 1);
+  };
 
   // Validar si la persona está en etapa de Pre-selección (habilitada para diligenciar la hoja de vida)
   // o si ya está seleccionada / vinculada (habilitada para ver sus datos registrados)
@@ -491,15 +552,126 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
       {/* Contenido Principal */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
         {buscandoCandidatoNube ? (
-          /* INDICADOR DE CARGA EN NUBE */
-          <div className="max-w-md mx-auto my-12 bg-slate-900 p-8 rounded-2xl border border-purple-500/30 text-center space-y-4 shadow-xl animate-fadeIn">
-            <div className="w-12 h-12 rounded-2xl bg-purple-950/70 text-purple-400 border border-purple-800/50 flex items-center justify-center mx-auto animate-spin">
-              <RefreshCw className="w-6 h-6" />
+          /* INDICADOR DE CARGA EN NUBE CON SOPORTE PARA ALTA LATENCIA Y REINTENTOS */
+          <div className="max-w-lg mx-auto my-12 bg-slate-900/95 border border-purple-500/30 rounded-3xl p-6 sm:p-8 text-center space-y-5 shadow-2xl animate-fadeIn backdrop-blur-md">
+            <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-purple-500/20 animate-ping" />
+              <div className="relative w-14 h-14 rounded-2xl bg-purple-950 border border-purple-600/50 flex items-center justify-center text-purple-400 shadow-lg shadow-purple-900/50">
+                <RefreshCw className="w-7 h-7 animate-spin" />
+              </div>
             </div>
-            <h2 className="text-lg font-bold text-white">Validando Registro de Pre-selección</h2>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Consultando el expediente digital asociado al documento <span className="font-mono text-purple-300 font-bold">{docConsultado}</span> en el servidor institucional...
-            </p>
+
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950/70 border border-purple-700/50 text-[11px] font-mono text-purple-300">
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                <span>C.C. {docConsultado}</span>
+                {intentoCarga > 1 && (
+                  <>
+                    <span>·</span>
+                    <span className="text-[#F59E0B] font-bold">Intento {intentoCarga} de {maxIntentosCarga}</span>
+                  </>
+                )}
+              </div>
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                {intentoCarga > 1
+                  ? `Reconectando con el Servidor (${intentoCarga}/${maxIntentosCarga})`
+                  : 'Validando Registro de Pre-selección'}
+              </h2>
+              <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+                {etapaCargaTexto}
+              </p>
+            </div>
+
+            {/* Barra de progreso de conexión animada */}
+            <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
+              <div
+                className="h-full bg-gradient-to-r from-purple-600 via-indigo-500 to-[#F59E0B] transition-all duration-500 rounded-full"
+                style={{
+                  width: `${Math.min(95, Math.max(15, (intentoCarga / maxIntentosCarga) * 70 + segundosTranscurridos * 5))}%`
+                }}
+              />
+            </div>
+
+            {/* Retroalimentación en caso de latencia prolongada */}
+            {segundosTranscurridos >= 4 && (
+              <div className="p-3 bg-amber-950/40 border border-amber-700/50 rounded-xl text-left text-xs text-amber-200/90 space-y-1 animate-fadeIn">
+                <div className="flex items-center gap-1.5 font-bold text-amber-300 text-[11px] uppercase tracking-wide">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Latencia de red detectada ({segundosTranscurridos}s)</span>
+                </div>
+                <p className="text-[11px] text-amber-200/80 leading-normal">
+                  La respuesta del servidor está tomando unos momentos adicionales debido a la calidad de la conexión a internet. El sistema continuará reintentando de forma automática.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-center gap-3 pt-1">
+              {segundosTranscurridos >= 5 && (
+                <button
+                  type="button"
+                  onClick={handleReintentarBusqueda}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/60 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Forzar reintento</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setDocConsultado('');
+                  setDocBusqueda('');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancelar y cambiar documento
+              </button>
+            </div>
+          </div>
+        ) : esErrorDeRed ? (
+          /* ESTADO ESPECÍFICO DE FALLO DE RED TRAS AGOTAR REINTENTOS */
+          <div className="max-w-md mx-auto my-12 bg-slate-900 p-6 sm:p-8 rounded-2xl border border-amber-600/60 text-center space-y-4 shadow-xl animate-fadeIn">
+            <div className="w-14 h-14 rounded-2xl bg-amber-950/70 text-amber-400 border border-amber-700/50 flex items-center justify-center mx-auto shadow-lg shadow-amber-950/40">
+              <WifiOff className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-950 border border-amber-800 text-[10px] font-bold text-amber-300 uppercase tracking-wider">
+                Interrupción de Conexión
+              </span>
+              <h2 className="text-lg font-bold text-white">Dificultad de Conexión con el Servidor</h2>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                No fue posible verificar el documento <strong className="font-mono text-amber-300">{docConsultado}</strong> debido a inestabilidad o latencia en la red.
+              </p>
+            </div>
+
+            {errorBusquedaNube && (
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left text-xs font-mono text-slate-400 space-y-1">
+                <p className="text-[10px] uppercase font-bold text-slate-500">Detalle técnico:</p>
+                <p className="text-slate-300">{errorBusquedaNube}</p>
+              </div>
+            )}
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={handleReintentarBusqueda}
+                className="w-full py-2.5 bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-900/30 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Reintentar Verificación Ahora</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDocConsultado('');
+                  setDocBusqueda('');
+                  setEsErrorDeRed(false);
+                }}
+                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Intentar con otro documento
+              </button>
+            </div>
           </div>
         ) : !docConsultado ? (
           /* BÚSQUEDA INICIAL DEL ASPIRANTE */
@@ -532,7 +704,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
             </div>
           </div>
         ) : !candidato ? (
-          /* DOCUMENTO NO ENCONTRADO O NO REGISTRADO */
+          /* DOCUMENTO NO ENCONTRADO O NO REGISTRADO (CONFIRMADO TRAS CONEXIÓN EXITOSA) */
           <div className="max-w-md mx-auto my-12 bg-slate-900 p-6 rounded-2xl border border-rose-800/60 text-center space-y-4 shadow-xl animate-fadeIn">
             <div className="w-12 h-12 rounded-2xl bg-rose-950/60 text-rose-400 border border-rose-800/50 flex items-center justify-center mx-auto">
               <AlertTriangle className="w-6 h-6" />

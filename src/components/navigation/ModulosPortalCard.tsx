@@ -1,5 +1,5 @@
 import React from 'react';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, ChevronRight } from 'lucide-react';
 
 export interface PortalModule {
   id: string;
@@ -17,100 +17,112 @@ export interface PortalCardProps {
   onNavigate: (view: string) => void;
 }
 
-const colorClasses = {
+const colorConfig = {
   primary: {
-    bg: 'group-hover:to-[#8FA7D6]/20',
-    icon: 'text-[#8FA7D6]',
-    border: 'border-[#8FA7D6]/40 group-hover:border-[#8FA7D6]/70'
+    hoverBg: 'group-hover:to-[#18235C]/8',
+    icon: 'text-[#18235C]',
+    border: 'border-[#8FA7D6]/35 group-hover:border-[#18235C]/60',
+    iconBox: 'bg-[#18235C]/10 text-[#18235C] group-hover:bg-[#18235C] group-hover:text-white',
+    badge: 'bg-[#18235C]/10 text-[#18235C] border border-[#18235C]/20',
+    accentLine: 'via-[#18235C]'
   },
   secondary: {
-    bg: 'group-hover:to-[#00FF00]/20',
-    icon: 'text-[#00FF00]',
-    border: 'border-[#00FF00]/40 group-hover:border-[#00FF00]/70'
+    hoverBg: 'group-hover:to-[#1E3A8A]/8',
+    icon: 'text-[#1E3A8A]',
+    border: 'border-[#8FA7D6]/35 group-hover:border-[#1E3A8A]/60',
+    iconBox: 'bg-[#1E3A8A]/10 text-[#1E3A8A] group-hover:bg-[#1E3A8A] group-hover:text-white',
+    badge: 'bg-sky-50 text-sky-800 border border-sky-200',
+    accentLine: 'via-[#1E3A8A]'
   },
   accent: {
-    bg: 'group-hover:to-[#F59E0B]/20',
-    icon: 'text-[#F59E0B]',
-    border: 'border-[#F59E0B]/40 group-hover:border-[#F59E0B]/70'
+    hoverBg: 'group-hover:to-[#F59E0B]/10',
+    icon: 'text-[#D97706]',
+    border: 'border-[#F59E0B]/30 group-hover:border-[#F59E0B]/60',
+    iconBox: 'bg-[#F59E0B]/10 text-[#D97706] group-hover:bg-[#F59E0B] group-hover:text-white',
+    badge: 'bg-amber-50 text-amber-800 border border-amber-200',
+    accentLine: 'via-[#F59E0B]'
   },
   success: {
-    bg: 'group-hover:to-emerald-500/20',
-    icon: 'text-emerald-500',
-    border: 'border-emerald-500/40 group-hover:border-emerald-500/70'
+    hoverBg: 'group-hover:to-emerald-500/10',
+    icon: 'text-emerald-700',
+    border: 'border-emerald-200 group-hover:border-emerald-500/60',
+    iconBox: 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white',
+    badge: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+    accentLine: 'via-emerald-600'
   },
   warning: {
-    bg: 'group-hover:to-amber-500/20',
-    icon: 'text-amber-500',
-    border: 'border-amber-500/40 group-hover:border-amber-500/70'
+    hoverBg: 'group-hover:to-amber-500/10',
+    icon: 'text-amber-700',
+    border: 'border-amber-200 group-hover:border-amber-500/60',
+    iconBox: 'bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white',
+    badge: 'bg-amber-50 text-amber-800 border border-amber-200',
+    accentLine: 'via-amber-600'
   },
   danger: {
-    bg: 'group-hover:to-rose-500/20',
-    icon: 'text-rose-500',
-    border: 'border-rose-500/40 group-hover:border-rose-500/70'
+    hoverBg: 'group-hover:to-rose-500/10',
+    icon: 'text-rose-700',
+    border: 'border-rose-200 group-hover:border-rose-500/60',
+    iconBox: 'bg-rose-50 text-rose-700 group-hover:bg-rose-600 group-hover:text-white',
+    badge: 'bg-rose-50 text-rose-800 border border-rose-200',
+    accentLine: 'via-rose-600'
   }
-};
-
-const badgeColors = {
-  primary: 'bg-[#8FA7D6]/20 text-[#8FA7D6]',
-  secondary: 'bg-[#00FF00]/20 text-[#00FF00]',
-  accent: 'bg-[#F59E0B]/20 text-[#F59E0B]',
-  success: 'bg-emerald-500/20 text-emerald-600',
-  warning: 'bg-amber-500/20 text-amber-600',
-  danger: 'bg-rose-500/20 text-rose-600'
 };
 
 export const ModulosPortalCard: React.FC<PortalCardProps> = ({ modulo, onNavigate }) => {
   const Icon = modulo.icono;
-  const colors = colorClasses[modulo.color];
-  const badgeColor = badgeColors[modulo.color];
+  const config = colorConfig[modulo.color] || colorConfig.primary;
 
   return (
     <button
       type="button"
       aria-label={`Abrir módulo ${modulo.titulo}`}
       onClick={() => onNavigate(modulo.enlace)}
-      className={`relative bg-white rounded-xl border ${colors.border} transition-all duration-300 text-left flex flex-col h-36 overflow-hidden cursor-pointer group hover:shadow-lg hover:-translate-y-1`}
+      className={`relative bg-white rounded-2xl border ${config.border} transition-all duration-300 text-left flex flex-col h-40 overflow-hidden cursor-pointer group shadow-xs hover:shadow-md hover:-translate-y-1`}
     >
-      {/* Fondo degradado animado */}
-      <div className={`absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-transparent ${colors.bg} rounded-bl-full z-0 group-hover:scale-125 transition-transform duration-500`} />
+      {/* Fondo degradado suave decorativo */}
+      <div
+        className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-transparent ${config.hoverBg} rounded-bl-full z-0 group-hover:scale-125 transition-transform duration-500 pointer-events-none`}
+      />
 
-      <div className="flex items-start justify-between z-10 mb-3 p-5 pb-0">
-        {/* Icono con contenedor */}
-        <div className={`p-3 bg-white/50 rounded-lg border ${colors.border} group-hover:bg-gradient-to-br group-hover:from-white/70 group-hover:to-white/30 transition-all duration-300 shadow-sm`}>
-          <Icon className={`w-6 h-6 ${colors.icon} transition-all duration-300`} />
+      <div className="flex items-start justify-between z-10 p-4 pb-2">
+        {/* Contenedor del Icono */}
+        <div
+          className={`p-2.5 rounded-xl border border-black/5 shadow-2xs transition-all duration-300 ${config.iconBox}`}
+        >
+          <Icon className="w-5 h-5 transition-transform duration-300 group-hover:scale-105" />
         </div>
 
-        {/* Flecha animada */}
-        <div className="flex flex-col items-center gap-1">
-          <svg
-            className="chevron w-5 h-5 text-slate-300 transition-all duration-300 group-hover:translate-x-1 group-hover:text-[#00FF00]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
+        {/* Accesorios superiores: Badge y flecha */}
+        <div className="flex items-center gap-1.5">
           {modulo.badge && (
-            <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${badgeColor} whitespace-nowrap`}>
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-lg whitespace-nowrap shadow-2xs ${config.badge}`}
+            >
               {modulo.badge}
             </span>
           )}
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 group-hover:text-[#18235C] group-hover:bg-[#18235C]/5 transition-all duration-200">
+            <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+          </div>
         </div>
       </div>
 
-      {/* Contenido */}
-      <div className="z-10 px-5 pb-4 flex-1 flex flex-col justify-between">
+      {/* Título y Descripción con tipografía consistente */}
+      <div className="z-10 px-4 pb-4 flex-1 flex flex-col justify-between">
         <div>
-          <h3 className="font-bold text-sm text-[#18235C] mb-1 group-hover:text-[#101740] transition-colors duration-300 line-clamp-2">
+          <h3 className="font-extrabold text-sm text-[#18235C] mb-1 group-hover:text-[#101740] transition-colors duration-200 line-clamp-1 tracking-tight">
             {modulo.titulo}
           </h3>
-          <p className="text-xs text-slate-500 line-clamp-2">{modulo.descripcion}</p>
+          <p className="text-xs text-[#282829] opacity-80 line-clamp-2 leading-relaxed">
+            {modulo.descripcion}
+          </p>
         </div>
       </div>
 
-      {/* Borde animado inferior (efecto de línea de carga) */}
-      <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-[#00FF00] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      {/* Línea animada inferior con color corporativo */}
+      <div
+        className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent ${config.accentLine} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
+      />
     </button>
   );
 };

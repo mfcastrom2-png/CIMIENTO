@@ -464,77 +464,168 @@ export const guardarEmpleadoFB = async (empleado: Empleado, autor?: UsuarioSiste
   );
 };
 
+export interface OpcionesConsultaCandidato {
+  maxIntentos?: number;
+  timeoutMs?: number;
+  onProgreso?: (intento: number, maxIntentos: number, etapa: string) => void;
+}
+
+export interface ResultadoConsultaCandidato {
+  candidato: Empleado | null;
+  error?: string;
+  esErrorConexion?: boolean;
+  intentosRealizados: number;
+}
+
 /**
  * Consulta un aspirante en pre-selección o proceso de vinculación por número de documento en Firestore.
- * Permite que los candidatos convocados que abren el enlace desde cualquier dispositivo o navegador puedan cargar su expediente.
+ * Incorpora lógica de reintentos automáticos, protección por timeout y manejo de latencia de red en producción.
  */
-export const buscarCandidatoPreseleccionFB = async (documento: string): Promise<Empleado | null> => {
+export const buscarCandidatoPreseleccionFB = async (
+  documento: string,
+  opciones?: OpcionesConsultaCandidato
+): Promise<ResultadoConsultaCandidato> => {
   const docLimpio = documento.trim().replace(/\D/g, '');
-  if (!docLimpio) return null;
+  if (!docLimpio) return { candidato: null, intentosRealizados: 0 };
 
-  try {
-    // 1. Buscar en 'empleados' por documento en estado 'Pre-selección'
-    const q1 = query(
-      collection(db, 'empleados'),
-      where('estadoLaboral', '==', 'Pre-selección'),
-      where('documento', '==', docLimpio),
-      limit(1)
-    );
-    const snap1 = await getDocs(q1);
-    if (!snap1.empty) {
-      return snap1.docs[0].data() as Empleado;
+  const maxIntentos = Math.max(1, opciones?.maxIntentos ?? 3);
+  const timeoutMs = Math.max(2000, opciones?.timeoutMs ?? 7000);
+
+  let ultimoError: any = null;
+  let intentosEjecutados = 0;
+
+  for (let intento = 1; intento <= maxIntentos; intento++) {
+    intentosEjecutados = intento;
+    try {
+      opciones?.onProgreso?.(
+        intento,
+        maxIntentos,
+        intento === 1
+          ? 'Conectando con base de datos institucional...'
+          : `Reintentando consulta por latencia de red (Intento ${intento} de ${maxIntentos})...`
+      );
+
+      // Consulta con timeout controlado para no congelar la interfaz
+      const ejecutarQuery = async (): Promise<Empleado | null> => {
+        // 1. Buscar en 'empleados' por documento en estado 'Pre-selección'
+        const q1 = query(
+          collection(db, 'empleados'),
+          where('estadoLaboral', '==', 'Pre-selección'),
+          where('documento', '==', docLimpio),
+          limit(1)
+        );
+        const snap1 = await getDocs(q1);
+        if (!snap1.empty) {
+          return snap1.docs[0].data() as Empleado;
+        }
+
+        // 2. Buscar por código interno
+        const q2 = query(
+          collection(db, 'empleados'),
+          where('estadoLaboral', '==', 'Pre-selección'),
+          where('codigo', '==', docLimpio),
+          limit(1)
+        );
+        const snap2 = await getDocs(q2);
+        if (!snap2.empty) {
+          return snap2.docs[0].data() as Empleado;
+        }
+
+        // 3. Buscar por persona.numeroDocumento
+        const q3 = query(
+          collection(db, 'empleados'),
+          where('estadoLaboral', '==', 'Pre-selección'),
+          where('persona.numeroDocumento', '==', docLimpio),
+          limit(1)
+        );
+        const snap3 = await getDocs(q3);
+        if (!snap3.empty) {
+          return snap3.docs[0].data() as Empleado;
+        }
+
+        return null;
+      };
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Tiempo de espera agotado al conectar con el servidor (latencia alta).')),
+          timeoutMs
+        )
+      );
+
+      const resultado = await Promise.race([ejecutarQuery(), timeoutPromise]);
+      // Consulta ejecutada con éxito (sea que encontró al candidato o confirmó que no existe)
+      return {
+        candidato: resultado,
+        intentosRealizados: intento
+      };
+    } catch (err: any) {
+      ultimoError = err;
+      console.warn(`[Firestore] Intento ${intento}/${maxIntentos} falló para documento ${docLimpio}:`, err?.message || err);
+
+      if (intento < maxIntentos) {
+        // Pausa progresiva con backoff antes del siguiente intento (600ms, 1200ms)
+        const retardo = intento * 600;
+        await new Promise(r => setTimeout(r, retardo));
+      }
     }
-
-    // 2. Buscar por código interno
-    const q2 = query(
-      collection(db, 'empleados'),
-      where('estadoLaboral', '==', 'Pre-selección'),
-      where('codigo', '==', docLimpio),
-      limit(1)
-    );
-    const snap2 = await getDocs(q2);
-    if (!snap2.empty) {
-      return snap2.docs[0].data() as Empleado;
-    }
-
-    // 3. Buscar por persona.numeroDocumento
-    const q3 = query(
-      collection(db, 'empleados'),
-      where('estadoLaboral', '==', 'Pre-selección'),
-      where('persona.numeroDocumento', '==', docLimpio),
-      limit(1)
-    );
-    const snap3 = await getDocs(q3);
-    if (!snap3.empty) {
-      return snap3.docs[0].data() as Empleado;
-    }
-
-    return null;
-  } catch (err) {
-    console.warn('[Firestore] Error al consultar candidato de preselección en la nube:', err);
-    return null;
   }
+
+  // Si se agotaron los intentos debido a fallo de red / timeout
+  return {
+    candidato: null,
+    error: ultimoError?.message || 'Error de conectividad de red con el servidor.',
+    esErrorConexion: true,
+    intentosRealizados: intentosEjecutados
+  };
 };
 
 /**
  * Guarda o actualiza la Hoja de Vida diligenciada por un candidato en pre-selección en Firestore.
- * Funciona de manera segura tanto para candidatos públicos como para usuarios autenticados.
+ * Incluye reintentos automáticos para mitigar pérdidas de paquetes en redes móviles.
  */
-export const guardarHojaVidaCandidatoFB = async (empleado: Empleado): Promise<void> => {
+export const guardarHojaVidaCandidatoFB = async (
+  empleado: Empleado,
+  opciones?: { maxIntentos?: number; timeoutMs?: number }
+): Promise<void> => {
+  const maxIntentos = Math.max(1, opciones?.maxIntentos ?? 3);
+  const timeoutMs = Math.max(3000, opciones?.timeoutMs ?? 9000);
   const docRef = doc(db, 'empleados', empleado.id);
   const data = limpiarParaFirestore(empleado);
-  await setDoc(docRef, data, { merge: true });
-  if (auth.currentUser) {
+
+  let ultimoError: any = null;
+
+  for (let intento = 1; intento <= maxIntentos; intento++) {
     try {
-      await registrarEventoAuditoria(
-        'ACTUALIZACION',
-        'empleados',
-        `Diligenciamiento de Hoja de Vida del candidato ${empleado.nombre} (C.C. ${empleado.documento})`,
-        null,
-        empleado.id
+      const operacion = setDoc(docRef, data, { merge: true });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Tiempo de espera agotado al registrar la Hoja de Vida.')), timeoutMs)
       );
-    } catch {}
+
+      await Promise.race([operacion, timeoutPromise]);
+
+      if (auth.currentUser) {
+        try {
+          await registrarEventoAuditoria(
+            'ACTUALIZACION',
+            'empleados',
+            `Diligenciamiento de Hoja de Vida del candidato ${empleado.nombre} (C.C. ${empleado.documento})`,
+            null,
+            empleado.id
+          );
+        } catch {}
+      }
+      return;
+    } catch (err: any) {
+      ultimoError = err;
+      console.warn(`[Firestore] Intento ${intento}/${maxIntentos} al guardar falló:`, err?.message || err);
+      if (intento < maxIntentos) {
+        await new Promise(r => setTimeout(r, intento * 700));
+      }
+    }
   }
+
+  throw ultimoError || new Error('No fue posible guardar la Hoja de Vida tras varios reintentos por latencia de red.');
 };
 
 export const eliminarEmpleadoFB = async (id: string, nombreColaborador?: string, autor?: UsuarioSistema | null) => {

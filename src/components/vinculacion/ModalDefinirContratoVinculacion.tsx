@@ -84,22 +84,23 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
   const [numeroCuenta, setNumeroCuenta] = useState(empleado.compensacion?.numeroCuenta || '');
 
   // 3. Condiciones y Término del Contrato
-  const [tipoContrato, setTipoContrato] = useState(empleado.laboral?.tipoContrato || 'Contrato a Término Indefinido');
+  const [tipoContrato, setTipoContrato] = useState(empleado.laboral?.tipoContrato || 'Contrato a Término Fijo');
   const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().slice(0, 10));
-  const [duracionMeses, setDuracionMeses] = useState<number>(12);
+  const [duracionMeses, setDuracionMeses] = useState<number>(6);
   const [fechaFin, setFechaFin] = useState<string>(() => {
     const f = new Date();
-    f.setFullYear(f.getFullYear() + 1);
+    f.setMonth(f.getMonth() + 6);
+    f.setDate(f.getDate() - 1);
     return f.toISOString().slice(0, 10);
   });
 
-  // Periodo de prueba automático bajo CST
+  // Periodo de prueba automático bajo CST (Modelo B GROUP: 30 días calendario)
   const [periodoPruebaDias, setPeriodoPruebaDias] = useState<number>(() =>
-    calcularPeriodoPruebaAutomaticoCST(tipoContrato, duracionMeses)
+    calcularPeriodoPruebaAutomaticoCST(tipoContrato, 6)
   );
 
   const [jornadaLaboral, setJornadaLaboral] = useState(
-    'Jornada Ordinaria Completa (46 hrs semanales - Ley 2101 de 2021)'
+    'Tiempo completo (42 hrs semanales - Ley 2101)'
   );
   const [clausulaConfidencialidad, setClausulaConfidencialidad] = useState(true);
   const [clausulaExclusividad, setClausulaExclusividad] = useState(false);
