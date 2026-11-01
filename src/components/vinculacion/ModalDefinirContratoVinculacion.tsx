@@ -30,6 +30,8 @@ import { TIPOS_CONTRATO_COLOMBIA, MODALIDADES_TRABAJO, JORNADAS_LABORALES, BANCO
 import {
   calcularPeriodoPruebaAutomaticoCST,
   generarCodigoContratoLaboral,
+  obtenerSiguienteConsecutivoContratoLaboral,
+  normalizarCodigoContratoLaboral,
   generarTextoNotificacionContratoListo,
   despacharNotificacionVinculacion
 } from '../../services/vinculacionService';
@@ -112,6 +114,21 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
   const [guardando, setGuardando] = useState(false);
   const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
 
+  // Consecutivo oficial del contrato: inicia en 0001 (ej. CTR-BGROUP-2026-0001)
+  const codigoContratoPrevisto = useMemo(() => {
+    const codigoExistente = empleado.vinculacion?.contratoDigital?.codigoContrato;
+    if (
+      codigoExistente &&
+      !codigoExistente.includes('0368') &&
+      !codigoExistente.includes('368') &&
+      !codigoExistente.endsWith('-001')
+    ) {
+      return normalizarCodigoContratoLaboral(codigoExistente);
+    }
+    const siguienteConsecutivo = obtenerSiguienteConsecutivoContratoLaboral(empleados);
+    return generarCodigoContratoLaboral(siguienteConsecutivo);
+  }, [empleado.vinculacion?.contratoDigital?.codigoContrato, empleados]);
+
   // Al cambiar cargo, sugerir área y salario si están definidos
   const handleSeleccionarCargo = (nuevoCargoId: string) => {
     setCargoId(nuevoCargoId);
@@ -172,7 +189,17 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
 
     try {
       const fechaHoy = new Date().toISOString();
-      const codigoContrato = generarCodigoContratoLaboral(Math.floor(Math.random() * 800) + 100);
+      const codigoContrato = codigoContratoPrevisto;
+
+      // Guardar el correlativo oficial para trazabilidad secuencial
+      try {
+        const match = codigoContrato.match(/CTR-BGROUP-\d{4}-(\d+)/);
+        if (match && match[1]) {
+          localStorage.setItem('consecutivo_contratos_laborales_bgroup', String(parseInt(match[1], 10)));
+        }
+      } catch {
+        // Ignorar fallos de localStorage
+      }
 
       // Crear objeto del Contrato Laboral Digital en estado 'Pendiente Firma'
       const nuevoContratoDigital: ContratoLaboralDigital = {
@@ -682,6 +709,17 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
               <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-950 leading-relaxed">
                 <strong className="block text-amber-950 font-bold mb-0.5">Modalidad Contractual & Cláusulas del CST:</strong>
                 Determine el tipo de contrato, duración, periodo de prueba conforme a los artículos 76 a 80 del Código Sustantivo del Trabajo y jornada legal.
+              </div>
+
+              {/* Indicador de Consecutivo Oficial (inicia en 0001) */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100 border border-slate-200 text-xs">
+                <div className="flex items-center gap-2 text-slate-700">
+                  <ShieldCheck className="w-4 h-4 text-[#18235C]" />
+                  <span>Consecutivo Oficial de Contrato (Inicia en <strong>0001</strong>):</span>
+                </div>
+                <span className="font-mono font-bold text-sm text-[#18235C] bg-white px-2.5 py-0.5 rounded-lg border border-slate-300 shadow-sm">
+                  {codigoContratoPrevisto}
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

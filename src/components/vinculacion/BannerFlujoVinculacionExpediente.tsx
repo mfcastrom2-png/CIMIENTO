@@ -22,7 +22,8 @@ import {
   Building2,
   Check,
   ArrowRight,
-  Copy
+  Copy,
+  Download
 } from 'lucide-react';
 import { construirEnlaceHojaVidaCandidato } from '../../services/vinculacionService';
 
@@ -335,6 +336,16 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
                   >
                     <Briefcase className="w-4 h-4" />
                     <span>Editar Términos</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onAbrirFirmaContrato}
+                    className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-[#18235C] border border-[#18235C]/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                    title="Ver y descargar borrador de contrato en formato PDF antes de firmar"
+                  >
+                    <Download className="w-4 h-4 text-[#18235C]" />
+                    <span>Descargar Contrato (PDF)</span>
                   </button>
 
                   <button

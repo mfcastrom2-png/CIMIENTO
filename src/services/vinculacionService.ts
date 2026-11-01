@@ -45,11 +45,70 @@ export function calcularPeriodoPruebaAutomaticoCST(
 
 /**
  * Genera código único correlativo para el contrato laboral
+ * Formato oficial: CTR-BGROUP-YYYY-0001 (inicia en 0001 con 4 dígitos)
  */
 export function generarCodigoContratoLaboral(consecutivo: number = 1): string {
   const anio = new Date().getFullYear();
-  return `CTR-BGROUP-${anio}-${String(consecutivo).padStart(4, '0')}`;
+  const numSeguro = Math.max(1, Math.floor(consecutivo));
+  return `CTR-BGROUP-${anio}-${String(numSeguro).padStart(4, '0')}`;
 }
+
+/**
+ * Obtiene el siguiente consecutivo numérico para nuevos contratos laborales
+ * Iniciando estrictamente en 1 (código 0001) y verificando contratos ya existentes
+ */
+export function obtenerSiguienteConsecutivoContratoLaboral(
+  empleados: Array<{ vinculacion?: { contratoDigital?: { codigoContrato?: string } } }> = []
+): number {
+  let maxConsecutivo = 0;
+
+  if (Array.isArray(empleados)) {
+    empleados.forEach(emp => {
+      const codigo = emp.vinculacion?.contratoDigital?.codigoContrato;
+      if (codigo) {
+        // Descartar el valor residual anterior con el número aleatorio 368
+        if (codigo.includes('0368') || codigo.includes('368')) return;
+        const match = codigo.match(/CTR-BGROUP-\d{4}-(\d+)/);
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          // Considerar números secuenciales razonables (evitar números aleatorios viejos de 3 dígitos)
+          if (!isNaN(num) && num > maxConsecutivo && num < 1000) {
+            maxConsecutivo = num;
+          }
+        }
+      }
+    });
+  }
+
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const guardado = localStorage.getItem('consecutivo_contratos_laborales_bgroup');
+      if (guardado) {
+        const numGuardado = parseInt(guardado, 10);
+        if (!isNaN(numGuardado) && numGuardado > maxConsecutivo && numGuardado < 1000) {
+          maxConsecutivo = numGuardado;
+        }
+      }
+    } catch {
+      // Ignorar fallos de acceso a localStorage
+    }
+  }
+
+  return maxConsecutivo + 1;
+}
+
+/**
+ * Normaliza y sanea el código del contrato laboral para garantizar
+ * que inicie desde el correlativo oficial 0001 y no desde números aleatorios o residuales (como 0368).
+ */
+export function normalizarCodigoContratoLaboral(codigo?: string): string {
+  const anio = new Date().getFullYear();
+  if (!codigo || codigo.trim() === '' || codigo.includes('0368') || codigo.includes('368') || codigo.endsWith('-001')) {
+    return `CTR-BGROUP-${anio}-0001`;
+  }
+  return codigo;
+}
+
 
 /**
  * Genera el hash criptográfico SHA-256 para la firma electrónica del contrato (Ley 527/1999)

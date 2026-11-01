@@ -22,15 +22,19 @@ import {
   MapPin,
   Calendar,
   Lock,
-  UserCheck
+  UserCheck,
+  Download,
+  Loader2
 } from 'lucide-react';
 import { uid } from '../../data/initialData';
 import { CorporateLogo } from '../CorporateLogo';
 import { CodigoQRVerificacion } from '../CodigoQRVerificacion';
+import { exportarContenedorAPDF } from '../../utils/pdfExport';
 import {
   generarHashSha256,
   generarTextoNotificacionContratoFirmado,
-  despacharNotificacionVinculacion
+  despacharNotificacionVinculacion,
+  normalizarCodigoContratoLaboral
 } from '../../services/vinculacionService';
 
 interface ModalFirmaContratoLaboralProps {
@@ -112,9 +116,27 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
     contrato?.firmaCandidatoDocumento || empleado.documento
   );
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
-
   const [guardando, setGuardando] = useState(false);
+  const [descargandoPdf, setDescargandoPdf] = useState(false);
   const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
+
+  const handleDescargarPdf = async () => {
+    setDescargandoPdf(true);
+    try {
+      const codContrato = normalizarCodigoContratoLaboral(contrato?.codigoContrato);
+      const estadoDoc = firmaCapturada ? 'Firmado' : 'Borrador_Previo_Firma';
+      const nombreArchivo = `Contrato_Termino_Fijo_${codContrato}_${empleado.documento}_${estadoDoc}`;
+      const exito = await exportarContenedorAPDF('area-impresion-contrato-laboral', nombreArchivo);
+      if (!exito) {
+        window.print();
+      }
+    } catch (err) {
+      console.error('Error al generar PDF del contrato:', err);
+      window.print();
+    } finally {
+      setDescargandoPdf(false);
+    }
+  };
 
   // Manejo del Canvas de Firma
   const empezarDibujo = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -212,7 +234,7 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
 
     try {
       const fechaHoy = new Date().toISOString();
-      const codContrato = contrato?.codigoContrato || `CTR-BGROUP-${new Date().getFullYear()}-001`;
+      const codContrato = normalizarCodigoContratoLaboral(contrato?.codigoContrato);
 
       // Generar sello criptográfico SHA-256 (Ley 527 de 1999)
       const cadenaFirma = `${codContrato}|${empleado.documento}|${contrato?.salarioBasico || empleado.salarioBase}|${fechaHoy}|${firmaDocumento}`;
@@ -263,6 +285,7 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
 
       const contratoActualizado: any = {
         ...(contrato || {}),
+        codigoContrato: codContrato,
         firmaCandidatoUrl: firmaCapturada,
         firmaCandidatoNombre: firmaNombre.trim(),
         firmaCandidatoDocumento: firmaDocumento.trim(),
@@ -319,7 +342,7 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
   const cargoTit = (contrato?.cargoNombre || empleado.laboral?.cargoNombre || 'TÉCNICO DE SOPORTE E INSTALACIONES').toUpperCase();
   const areaTit = contrato?.areaNombre || 'Operaciones';
   const salarioVal = contrato?.salarioBasico || empleado.salarioBase || 1423500;
-  const codigoContrato = contrato?.codigoContrato || `CTR-BGROUP-${new Date().getFullYear()}-001`;
+  const codigoContrato = normalizarCodigoContratoLaboral(contrato?.codigoContrato);
 
   const fechaInicioRaw = contrato?.fechaInicio || new Date().toISOString().slice(0, 10);
   const duracionMeses = contrato?.duracionMeses || 6;
@@ -371,6 +394,22 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
           <div className="flex items-center gap-2">
             <button
               type="button"
+              disabled={descargandoPdf}
+              onClick={handleDescargarPdf}
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+              title="Descargar contrato completo en PDF antes o después de ser firmado"
+            >
+              {descargandoPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin text-[#8FA7D6]" />
+              ) : (
+                <Download className="w-4 h-4 text-[#8FA7D6]" />
+              )}
+              <span className="hidden sm:inline">
+                {descargandoPdf ? 'Generando PDF...' : 'Descargar PDF'}
+              </span>
+            </button>
+            <button
+              type="button"
               onClick={() => window.print()}
               className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
               title="Imprimir contrato completo"
@@ -398,8 +437,35 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
             </div>
           )}
 
-          {/* Encabezado Formal del Contrato según Modelo de la Empresa */}
-          <div className="border-2 border-[#18235C] rounded-2xl p-5 bg-slate-50/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Banner de Descarga Previa a la Firma */}
+          {!contrato?.firmaFechaHora && !firmaCapturada && (
+            <div className="p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-sky-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <FileText className="w-4 h-4 text-sky-700 shrink-0" />
+                <span>
+                  Puedes descargar una copia oficial en PDF con las <strong>25 cláusulas</strong> y la <strong>Ficha de Condiciones Particulares</strong> antes de estampar la firma electrónica.
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={descargandoPdf}
+                onClick={handleDescargarPdf}
+                className="px-3 py-1.5 rounded-xl bg-[#18235C] hover:bg-[#1E3A8A] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs shrink-0 cursor-pointer transition-colors disabled:opacity-50"
+              >
+                {descargandoPdf ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 text-white" />
+                )}
+                <span>Descargar PDF</span>
+              </button>
+            </div>
+          )}
+
+          {/* ÁREA EXCLUSIVA DE IMPRESIÓN Y EXPORTACIÓN A PDF */}
+          <div id="area-impresion-contrato-laboral" className="documento-imprimible space-y-6 bg-white">
+            {/* Encabezado Formal del Contrato según Modelo de la Empresa */}
+            <div className="border-2 border-[#18235C] rounded-2xl p-5 bg-slate-50/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 evitar-salto">
             <div className="flex items-center gap-3">
               <CorporateLogo
                 logoUrl={empresa?.identidadVisual?.logoUrl}
@@ -790,8 +856,11 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
                         className="max-h-18 max-w-full object-contain"
                       />
                     ) : (
-                      <div className="text-center text-slate-400 text-[10px] italic">
-                        [Pendiente de estampar en el panel interactivo inferior]
+                      <div className="text-center text-slate-400 text-[10px] italic flex flex-col items-center justify-end h-full pb-1">
+                        <span className="font-serif text-slate-300 select-none tracking-tighter">_________________________________</span>
+                        <span className="text-[9px] text-slate-400 mt-1 font-sans">
+                          (Firma Persona Trabajadora · Borrador Previo a Suscripción)
+                        </span>
                       </div>
                     )}
                     {contrato?.hashSha256 && (
@@ -817,6 +886,7 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
               </div>
             </div>
           </div>
+        </div> {/* Cierre de #area-impresion-contrato-laboral */}
 
           {/* Panel Interactivo de Captura de Firma Digital (Ley 527 de 1999) */}
           <div className="p-5 bg-gradient-to-br from-indigo-50/60 to-slate-50 border-2 border-indigo-200 rounded-3xl space-y-3">
@@ -924,7 +994,21 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+              <button
+                type="button"
+                disabled={descargandoPdf}
+                onClick={handleDescargarPdf}
+                className="px-4 py-2.5 rounded-xl border border-[#18235C] bg-[#18235C]/5 hover:bg-[#18235C]/15 text-[#18235C] font-black text-xs flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                title="Descargar copia oficial en PDF del contrato antes o después de ser firmado"
+              >
+                {descargandoPdf ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#18235C]" />
+                ) : (
+                  <Download className="w-4 h-4 text-[#18235C]" />
+                )}
+                <span>{descargandoPdf ? 'Generando PDF...' : 'Descargar Contrato (PDF)'}</span>
+              </button>
               <button
                 type="button"
                 onClick={onClose}
