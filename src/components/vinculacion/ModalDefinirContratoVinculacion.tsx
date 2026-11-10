@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Empleado,
   Cargo,
@@ -23,9 +23,12 @@ import {
   Send,
   Clock,
   MapPin,
-  Sparkles
+  Sparkles,
+  GitFork,
+  ArrowRight
 } from 'lucide-react';
 import { uid } from '../../data/initialData';
+import { useCompanySyncOptional } from '../../context/SyncContext';
 import { TIPOS_CONTRATO_COLOMBIA, MODALIDADES_TRABAJO, JORNADAS_LABORALES, BANCOS_COLOMBIA } from '../../data/colombiaData';
 import {
   calcularPeriodoPruebaAutomaticoCST,
@@ -62,19 +65,154 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
   // Pestaña interna
   const [tabContrato, setTabContrato] = useState<'estructura' | 'salario' | 'contrato'>('estructura');
 
-  // 1. Estructura Orgánica
-  const [cargoId, setCargoId] = useState(empleado.cargoId || (cargos.length > 0 ? cargos[0].id : ''));
-  const [areaId, setAreaId] = useState(empleado.areaId || (areas.length > 0 ? areas[0].id : ''));
-  const [procesoId, setProcesoId] = useState(procesos.length > 0 ? procesos[0].id : '');
-  const [centroTrabajoId, setCentroTrabajoId] = useState(centrosTrabajo.length > 0 ? centrosTrabajo[0].id : '');
+  // Respaldo dinámico desde SyncContext para alimentar siempre desde "Estructura Orgánica & Cargos"
+  const companySync = useCompanySyncOptional();
+
+  const listaProcesos = useMemo(() => {
+    return (procesos && procesos.length > 0) ? procesos : (companySync?.procesos || []);
+  }, [procesos, companySync?.procesos]);
+
+  const listaAreas = useMemo(() => {
+    return (areas && areas.length > 0) ? areas : (companySync?.areas || []);
+  }, [areas, companySync?.areas]);
+
+  const listaCargos = useMemo(() => {
+    return (cargos && cargos.length > 0) ? cargos : (companySync?.cargos || []);
+  }, [cargos, companySync?.cargos]);
+
+  const listaCentros = useMemo(() => {
+    return (centrosTrabajo && centrosTrabajo.length > 0) ? centrosTrabajo : [];
+  }, [centrosTrabajo]);
+
+  const listaEmpleados = useMemo(() => {
+    return (empleados && empleados.length > 0) ? empleados : (companySync?.empleados || []);
+  }, [empleados, companySync?.empleados]);
+
+  // Helpers para relacionar un cargo con su proceso y área orgánica
+  const obtenerProcesoDeCargo = (cargo: Cargo | undefined): ProcesoOrganizacion | undefined => {
+    if (!cargo) return undefined;
+    if (cargo.procesoId) {
+      const p = listaProcesos.find(proc => proc.id === cargo.procesoId);
+      if (p) return p;
+    }
+    const procNombre = cargo.procesoNombre || cargo.ficha?.identificacion?.proceso;
+    if (procNombre) {
+      const p = listaProcesos.find(proc => proc.nombre.toLowerCase().trim() === procNombre.toLowerCase().trim());
+      if (p) return p;
+    }
+    const areaNombre = cargo.ficha?.identificacion?.area;
+    const areaObj = listaAreas.find(a => a.id === cargo.areaId || (areaNombre && a.nombre.toLowerCase().trim() === areaNombre.toLowerCase().trim()));
+    if (areaObj) {
+      if (areaObj.procesoId) {
+        const p = listaProcesos.find(proc => proc.id === areaObj.procesoId);
+        if (p) return p;
+      }
+      if (areaObj.procesoNombre) {
+        const p = listaProcesos.find(proc => proc.nombre.toLowerCase().trim() === areaObj.procesoNombre?.toLowerCase().trim());
+        if (p) return p;
+      }
+    }
+    return undefined;
+  };
+
+  const obtenerAreaDeCargo = (cargo: Cargo | undefined): AreaOrganizacion | undefined => {
+    if (!cargo) return undefined;
+    if (cargo.areaId) {
+      const a = listaAreas.find(ar => ar.id === cargo.areaId);
+      if (a) return a;
+    }
+    const areaNombre = cargo.ficha?.identificacion?.area;
+    if (areaNombre) {
+      const a = listaAreas.find(ar => ar.nombre.toLowerCase().trim() === areaNombre.toLowerCase().trim());
+      if (a) return a;
+    }
+    return undefined;
+  };
+
+  // 1. Estructura Orgánica - Estados iniciales
+  const [cargoId, setCargoId] = useState<string>(() => {
+    if (empleado.cargoId) return empleado.cargoId;
+    return listaCargos.length > 0 ? listaCargos[0].id : '';
+  });
+
+  const [procesoId, setProcesoId] = useState<string>(() => {
+    const cargoBase = listaCargos.find(c => c.id === (empleado.cargoId || ''));
+    if (cargoBase) {
+      const p = obtenerProcesoDeCargo(cargoBase);
+      if (p) return p.id;
+    }
+    return listaProcesos.length > 0 ? listaProcesos[0].id : '';
+  });
+
+  const [areaId, setAreaId] = useState<string>(() => {
+    if (empleado.areaId) return empleado.areaId;
+    const cargoBase = listaCargos.find(c => c.id === (empleado.cargoId || ''));
+    if (cargoBase) {
+      const a = obtenerAreaDeCargo(cargoBase);
+      if (a) return a.id;
+    }
+    return listaAreas.length > 0 ? listaAreas[0].id : '';
+  });
+
+  const [centroTrabajoId, setCentroTrabajoId] = useState(listaCentros.length > 0 ? listaCentros[0].id : '');
   const [jefeInmediatoId, setJefeInmediatoId] = useState(empleado.laboral?.jefeInmediatoId || '');
   const [modalidadTrabajo, setModalidadTrabajo] = useState<'Presencial' | 'Híbrida' | 'Trabajo remoto' | 'Teletrabajo'>(
     empleado.laboral?.modalidadTrabajo || 'Presencial'
   );
   const [lugarTrabajo, setLugarTrabajo] = useState(empleado.laboral?.lugarTrabajo || empleado.contacto?.ciudad || 'Bogotá D.C.');
+  const [filtrarPorProceso, setFiltrarPorProceso] = useState<boolean>(true);
+
+  // Sincronización reactiva si las listas cargan asincrónicamente desde la nube
+  useEffect(() => {
+    if (!cargoId && listaCargos.length > 0) {
+      setCargoId(listaCargos[0].id);
+    }
+    if (!procesoId && listaProcesos.length > 0) {
+      setProcesoId(listaProcesos[0].id);
+    }
+    if (!areaId && listaAreas.length > 0) {
+      setAreaId(listaAreas[0].id);
+    }
+  }, [listaCargos, listaProcesos, listaAreas]);
+
+  // Áreas asociadas al Proceso seleccionado
+  const areasFiltradas = useMemo(() => {
+    if (!procesoId) return listaAreas;
+    const proc = listaProcesos.find(p => p.id === procesoId);
+    if (!proc) return listaAreas;
+    const matching = listaAreas.filter(a => {
+      return a.procesoId === procesoId || (proc.nombre && a.procesoNombre?.toLowerCase().trim() === proc.nombre.toLowerCase().trim());
+    });
+    return matching.length > 0 ? matching : listaAreas;
+  }, [listaAreas, listaProcesos, procesoId]);
+
+  // Cargos asociados al Proceso y Área seleccionados
+  const cargosFiltrados = useMemo(() => {
+    if (!filtrarPorProceso || !procesoId) return listaCargos;
+    const proc = listaProcesos.find(p => p.id === procesoId);
+    if (!proc) return listaCargos;
+
+    const matching = listaCargos.filter(c => {
+      // Coincidencia directa por proceso
+      if (c.procesoId === procesoId) return true;
+      if (c.procesoNombre && proc.nombre && c.procesoNombre.toLowerCase().trim() === proc.nombre.toLowerCase().trim()) return true;
+      if (c.ficha?.identificacion?.proceso && proc.nombre && c.ficha.identificacion.proceso.toLowerCase().trim() === proc.nombre.toLowerCase().trim()) return true;
+
+      // Coincidencia por área asociada
+      const cArea = obtenerAreaDeCargo(c);
+      if (cArea) {
+        if (cArea.procesoId === procesoId) return true;
+        if (proc.nombre && cArea.procesoNombre?.toLowerCase().trim() === proc.nombre.toLowerCase().trim()) return true;
+        if (areaId && cArea.id === areaId) return true;
+      }
+      return false;
+    });
+
+    return matching.length > 0 ? matching : listaCargos;
+  }, [filtrarPorProceso, procesoId, areaId, listaCargos, listaProcesos, listaAreas]);
 
   // 2. Asignación Salarial
-  const cargoActual = cargos.find(c => c.id === cargoId);
+  const cargoActual = listaCargos.find(c => c.id === cargoId);
   const salarioInicial = cargoActual?.salarioReferencia || empleado.salarioBase || 1600000;
 
   const [salarioBasico, setSalarioBasico] = useState<number>(salarioInicial);
@@ -125,16 +263,88 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
     ) {
       return normalizarCodigoContratoLaboral(codigoExistente);
     }
-    const siguienteConsecutivo = obtenerSiguienteConsecutivoContratoLaboral(empleados);
+    const siguienteConsecutivo = obtenerSiguienteConsecutivoContratoLaboral(listaEmpleados);
     return generarCodigoContratoLaboral(siguienteConsecutivo);
-  }, [empleado.vinculacion?.contratoDigital?.codigoContrato, empleados]);
+  }, [empleado.vinculacion?.contratoDigital?.codigoContrato, listaEmpleados]);
 
-  // Al cambiar cargo, sugerir área y salario si están definidos
+  // Manejador bidireccional al seleccionar un Proceso Organizacional
+  const handleSeleccionarProceso = (nuevoProcesoId: string) => {
+    setProcesoId(nuevoProcesoId);
+    const proc = listaProcesos.find(p => p.id === nuevoProcesoId);
+    if (proc) {
+      // Sugerir o filtrar áreas
+      const matchingAreas = listaAreas.filter(a =>
+        a.procesoId === nuevoProcesoId || (proc.nombre && a.procesoNombre?.toLowerCase().trim() === proc.nombre.toLowerCase().trim())
+      );
+      if (matchingAreas.length > 0) {
+        setAreaId(matchingAreas[0].id);
+      }
+
+      // Sugerir primer cargo del proceso
+      const matchingCargos = listaCargos.filter(c => {
+        if (c.procesoId === nuevoProcesoId) return true;
+        if (c.procesoNombre && proc.nombre && c.procesoNombre.toLowerCase().trim() === proc.nombre.toLowerCase().trim()) return true;
+        if (c.ficha?.identificacion?.proceso && proc.nombre && c.ficha.identificacion.proceso.toLowerCase().trim() === proc.nombre.toLowerCase().trim()) return true;
+        const cArea = obtenerAreaDeCargo(c);
+        if (cArea && (cArea.procesoId === nuevoProcesoId || (proc.nombre && cArea.procesoNombre?.toLowerCase().trim() === proc.nombre.toLowerCase().trim()))) return true;
+        return false;
+      });
+
+      if (matchingCargos.length > 0) {
+        const c = matchingCargos[0];
+        setCargoId(c.id);
+        if (c.salarioReferencia && c.salarioReferencia > 0) {
+          setSalarioBasico(c.salarioReferencia);
+        }
+      }
+    }
+  };
+
+  // Manejador bidireccional al seleccionar un Área / Departamento
+  const handleSeleccionarArea = (nuevaAreaId: string) => {
+    setAreaId(nuevaAreaId);
+    const a = listaAreas.find(ar => ar.id === nuevaAreaId);
+    if (a) {
+      if (a.procesoId) {
+        setProcesoId(a.procesoId);
+      } else if (a.procesoNombre) {
+        const p = listaProcesos.find(pr => pr.nombre.toLowerCase().trim() === a.procesoNombre?.toLowerCase().trim());
+        if (p) setProcesoId(p.id);
+      }
+
+      // Filtrar cargos que coincidan con esta área
+      const matchingCargos = listaCargos.filter(c => {
+        if (c.areaId === nuevaAreaId) return true;
+        if (c.ficha?.identificacion?.area && a.nombre && c.ficha.identificacion.area.toLowerCase().trim() === a.nombre.toLowerCase().trim()) return true;
+        return false;
+      });
+
+      if (matchingCargos.length > 0) {
+        const c = matchingCargos[0];
+        setCargoId(c.id);
+        if (c.salarioReferencia && c.salarioReferencia > 0) {
+          setSalarioBasico(c.salarioReferencia);
+        }
+      }
+    }
+  };
+
+  // Manejador bidireccional al seleccionar un Cargo Oficial
   const handleSeleccionarCargo = (nuevoCargoId: string) => {
     setCargoId(nuevoCargoId);
-    const c = cargos.find(cg => cg.id === nuevoCargoId);
+    const c = listaCargos.find(cg => cg.id === nuevoCargoId);
     if (c) {
-      if (c.areaId) setAreaId(c.areaId);
+      // Auto-seleccionar área
+      const a = obtenerAreaDeCargo(c);
+      if (a) {
+        setAreaId(a.id);
+      }
+      // Auto-seleccionar proceso
+      const p = obtenerProcesoDeCargo(c);
+      if (p) {
+        setProcesoId(p.id);
+      }
+      // Actualizar salario de referencia
       if (c.salarioReferencia && c.salarioReferencia > 0) {
         setSalarioBasico(c.salarioReferencia);
       }
@@ -157,11 +367,11 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
     setPeriodoPruebaDias(dias);
   };
 
-  // Nombres descriptivos
-  const areaSeleccionada = areas.find(a => a.id === areaId);
-  const procesoSeleccionado = procesos.find(p => p.id === procesoId);
-  const centroSeleccionado = centrosTrabajo.find(ct => ct.id === centroTrabajoId);
-  const jefeSeleccionado = empleados.find(e => e.id === jefeInmediatoId);
+  // Nombres descriptivos calculados desde las listas efectivas
+  const areaSeleccionada = listaAreas.find(a => a.id === areaId);
+  const procesoSeleccionado = listaProcesos.find(p => p.id === procesoId);
+  const centroSeleccionado = listaCentros.find(ct => ct.id === centroTrabajoId);
+  const jefeSeleccionado = listaEmpleados.find(e => e.id === jefeInmediatoId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -440,67 +650,196 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
           {/* TAB 1: ESTRUCTURA ORGÁNICA */}
           {tabContrato === 'estructura' && (
             <div className="space-y-4 animate-fadeIn">
-              <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 text-blue-900 leading-relaxed">
-                <strong className="block text-blue-950 font-bold mb-0.5">Ubicación en el Organigrama Institucional:</strong>
-                Asocie al colaborador al cargo oficial, área o departamento, proceso corporativo y centro de trabajo donde desempeñará sus funciones.
+              <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 text-blue-900 leading-relaxed text-xs">
+                <strong className="block text-blue-950 font-bold mb-0.5">Alineación con la Estructura Orgánica Institucional:</strong>
+                Seleccione el <strong>Proceso</strong>, el <strong>Área</strong> y el <strong>Cargo Oficial</strong> registrados en el módulo de <em>Estructura Orgánica & Cargos</em>. Al elegir cualquiera de ellos, los campos se sincronizan bidireccionalmente y cargan el salario de referencia oficial.
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Paso 1: Proceso Organizacional */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-[#18235C] text-white flex items-center justify-center text-[10px] font-extrabold">1</span>
+                    <label className="font-bold text-xs text-[#18235C]">Proceso Organizacional (Mapa de Macroprocesos) *</label>
+                  </div>
+                  {procesoSeleccionado && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300">
+                      Macroproceso {procesoSeleccionado.tipo}
+                    </span>
+                  )}
+                </div>
+
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Cargo Oficial de la Estructura *</label>
+                  <select
+                    value={procesoId}
+                    onChange={e => handleSeleccionarProceso(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-xs text-slate-800"
+                  >
+                    <optgroup label="Macroprocesos Estratégicos">
+                      {listaProcesos
+                        .filter(p => p.tipo?.toLowerCase().includes('estrateg'))
+                        .map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} ({p.codigo || 'PE'})
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label="Macroprocesos Misionales / Operativos">
+                      {listaProcesos
+                        .filter(p => p.tipo?.toLowerCase().includes('mision') || p.tipo?.toLowerCase().includes('operat'))
+                        .map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} ({p.codigo || 'PM'})
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label="Macroprocesos de Apoyo / Soporte">
+                      {listaProcesos
+                        .filter(p => p.tipo?.toLowerCase().includes('apoyo') || p.tipo?.toLowerCase().includes('soport'))
+                        .map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} ({p.codigo || 'PA'})
+                          </option>
+                        ))}
+                    </optgroup>
+                    {/* Fallback para procesos sin tipo específico */}
+                    {listaProcesos.filter(
+                      p =>
+                        !p.tipo?.toLowerCase().includes('estrateg') &&
+                        !p.tipo?.toLowerCase().includes('mision') &&
+                        !p.tipo?.toLowerCase().includes('operat') &&
+                        !p.tipo?.toLowerCase().includes('apoyo') &&
+                        !p.tipo?.toLowerCase().includes('soport')
+                    ).length > 0 && (
+                      <optgroup label="Otros Procesos">
+                        {listaProcesos
+                          .filter(
+                            p =>
+                              !p.tipo?.toLowerCase().includes('estrateg') &&
+                              !p.tipo?.toLowerCase().includes('mision') &&
+                              !p.tipo?.toLowerCase().includes('operat') &&
+                              !p.tipo?.toLowerCase().includes('apoyo') &&
+                              !p.tipo?.toLowerCase().includes('soport')
+                          )
+                          .map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.nombre}
+                            </option>
+                          ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Paso 2 y Paso 3: Área y Cargo Oficial */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Paso 2: Área */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-[#18235C] text-white flex items-center justify-center text-[10px] font-extrabold">2</span>
+                      <label className="font-bold text-xs text-[#18235C]">Área o Departamento *</label>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {areasFiltradas.length} {areasFiltradas.length === 1 ? 'área' : 'áreas'}
+                    </span>
+                  </div>
+
+                  <select
+                    value={areaId}
+                    onChange={e => handleSeleccionarArea(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-xs text-slate-800"
+                  >
+                    {areasFiltradas.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.nombre} {a.codigo ? `(${a.codigo})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-[10px] text-slate-500 block">
+                    Vinculada al proceso: {areaSeleccionada?.procesoNombre || procesoSeleccionado?.nombre || 'General'}
+                  </span>
+                </div>
+
+                {/* Paso 3: Cargo Oficial */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-[#18235C] text-white flex items-center justify-center text-[10px] font-extrabold">3</span>
+                      <label className="font-bold text-xs text-[#18235C]">Cargo Oficial de la Estructura *</label>
+                    </div>
+                    <label className="flex items-center gap-1.5 text-[10px] text-slate-600 font-medium cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filtrarPorProceso}
+                        onChange={e => setFiltrarPorProceso(e.target.checked)}
+                        className="rounded text-[#18235C]"
+                      />
+                      <span>Filtrar por proceso</span>
+                    </label>
+                  </div>
+
                   <select
                     value={cargoId}
                     onChange={e => handleSeleccionarCargo(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-xs text-slate-800"
                   >
-                    {cargos.map(c => (
+                    {cargosFiltrados.map(c => (
                       <option key={c.id} value={c.id}>
-                        {c.nombre} {c.nivel ? `— Nivel: ${c.nivel}` : ''}
+                        {c.nombre} {c.ficha?.identificacion?.codigo ? `(${c.ficha.identificacion.codigo})` : ''} {c.nivel ? `— Nivel: ${c.nivel}` : ''}
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Área / Departamento *</label>
-                  <select
-                    value={areaId}
-                    onChange={e => setAreaId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  >
-                    {areas.map(a => (
-                      <option key={a.id} value={a.id}>
-                        {a.nombre}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="text-[10px] text-slate-500 block">
+                    {cargoActual?.salarioReferencia && cargoActual.salarioReferencia > 0
+                      ? `Salario de referencia en catálogo: $${cargoActual.salarioReferencia.toLocaleString('es-CO')} COP`
+                      : 'Sin salario de referencia predefinido'}
+                  </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Proceso Organizacional</label>
-                  <select
-                    value={procesoId}
-                    onChange={e => setProcesoId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
-                  >
-                    {procesos.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre} ({p.tipo})
-                      </option>
-                    ))}
-                  </select>
+              {/* Panel de Confirmación de Alineación Orgánica */}
+              <div className="p-3.5 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-slate-50 border border-blue-200 rounded-2xl space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#18235C] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#F59E0B]" />
+                  <span>Alineación Jerárquica Seleccionada:</span>
+                </span>
+                <div className="flex items-center gap-2 flex-wrap text-xs text-slate-800 font-semibold">
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 shadow-2xs">
+                    {procesoSeleccionado?.tipo || 'Macroproceso'}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-blue-200 text-[#18235C] font-bold shadow-2xs">
+                    {procesoSeleccionado?.nombre || 'Proceso no seleccionado'}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 shadow-2xs">
+                    {areaSeleccionada?.nombre || 'Área general'}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="px-2.5 py-1 rounded-lg bg-[#18235C] text-white font-bold shadow-2xs flex items-center gap-1.5">
+                    <Briefcase className="w-3 h-3 text-[#F59E0B]" />
+                    <span>{cargoActual?.nombre || 'Cargo Asignado'}</span>
+                    {cargoActual?.ficha?.identificacion?.codigo && (
+                      <span className="text-[10px] text-blue-200 font-mono">
+                        ({cargoActual.ficha.identificacion.codigo})
+                      </span>
+                    )}
+                  </span>
                 </div>
+              </div>
 
+              {/* Información complementaria de puesto */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Centro de Trabajo / Sede</label>
+                  <label className="block font-bold text-slate-700 mb-1">Centro de Trabajo / Sede *</label>
                   <select
                     value={centroTrabajoId}
                     onChange={e => setCentroTrabajoId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-xs"
                   >
-                    {centrosTrabajo.map(ct => (
+                    {listaCentros.map(ct => (
                       <option key={ct.id} value={ct.id}>
                         {ct.nombre} ({ct.ciudad})
                       </option>
@@ -513,10 +852,10 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
                   <select
                     value={jefeInmediatoId}
                     onChange={e => setJefeInmediatoId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-xs"
                   >
-                    <option value="">-- Sin jefe asignado / Gerencia --</option>
-                    {empleados
+                    <option value="">-- Sin jefe asignado / Reporta a Dirección General --</option>
+                    {listaEmpleados
                       .filter(emp => emp.id !== empleado.id)
                       .map(emp => (
                         <option key={emp.id} value={emp.id}>
@@ -525,15 +864,13 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
                       ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Modalidad de Trabajo</label>
+                  <label className="block font-bold text-slate-700 mb-1">Modalidad de Trabajo *</label>
                   <select
                     value={modalidadTrabajo}
                     onChange={e => setModalidadTrabajo(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-xs"
                   >
                     {MODALIDADES_TRABAJO.map(m => (
                       <option key={m} value={m}>
@@ -544,12 +881,12 @@ export const ModalDefinirContratoVinculacion: React.FC<ModalDefinirContratoVincu
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Ciudad o Lugar de Labores</label>
+                  <label className="block font-bold text-slate-700 mb-1">Ciudad o Lugar de Labores *</label>
                   <input
                     type="text"
                     value={lugarTrabajo}
                     onChange={e => setLugarTrabajo(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-xs"
                   />
                 </div>
               </div>

@@ -32,10 +32,22 @@ import {
   WifiOff,
   RotateCcw,
   Check,
-  Clock
+  Clock,
+  HardHat,
+  Shirt
 } from 'lucide-react';
 import { uid } from '../../data/initialData';
-import { DEPARTAMENTOS_COLOMBIA, NIVELES_EDUCATIVOS, ESTADOS_CIVILES } from '../../data/colombiaData';
+import {
+  DEPARTAMENTOS_COLOMBIA,
+  NIVELES_EDUCATIVOS,
+  ESTADOS_CIVILES,
+  EPS_COLOMBIA,
+  AFP_COLOMBIA,
+  CESANTIAS_COLOMBIA,
+  TALLAS_CAMISA_DOTACION,
+  TALLAS_PANTALON_DOTACION,
+  TALLAS_CALZADO_DOTACION
+} from '../../data/colombiaData';
 import { CorporateLogo } from '../CorporateLogo';
 import {
   generarTextoNotificacionHojaVidaCompletada,
@@ -203,7 +215,35 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
   const yaEstaSeleccionado = Boolean(candidato && !estaEnPreseleccion);
 
   // Pestañas del formulario o vista de consulta
-  const [tabActual, setTabActual] = useState<'personal' | 'residencia' | 'estudios' | 'experiencia' | 'declaracion'>('personal');
+  const [tabActual, setTabActual] = useState<
+    'personal' | 'residencia' | 'afiliaciones_dotacion' | 'estudios' | 'experiencia' | 'declaracion'
+  >('personal');
+
+  // Seguridad Social Previa & Afiliaciones (EPS, Fondo Pensión, Cesantías)
+  const [epsCandidato, setEpsCandidato] = useState(
+    candidato?.seguridadSocial?.eps && candidato.seguridadSocial.eps !== 'Pendiente afiliación'
+      ? candidato.seguridadSocial.eps
+      : 'EPS Sanitas'
+  );
+  const [fondoPensionesCandidato, setFondoPensionesCandidato] = useState(
+    candidato?.seguridadSocial?.fondoPensiones && candidato.seguridadSocial.fondoPensiones !== 'Pendiente afiliación'
+      ? candidato.seguridadSocial.fondoPensiones
+      : 'Porvenir (Fondo Privado)'
+  );
+  const [fondoCesantiasCandidato, setFondoCesantiasCandidato] = useState(
+    candidato?.seguridadSocial?.fondoCesantias || 'Porvenir Cesantías'
+  );
+
+  // Tallas de Ropa de Trabajo y Dotación (Camisa, Pantalón, Botas/Calzado)
+  const [tallaCamisa, setTallaCamisa] = useState(
+    candidato?.dotacion?.camisa || candidato?.tallasDotacion?.camisa || candidato?.sst?.tallas?.camisa || 'M'
+  );
+  const [tallaPantalon, setTallaPantalon] = useState(
+    candidato?.dotacion?.pantalon || candidato?.tallasDotacion?.pantalon || candidato?.sst?.tallas?.pantalon || '32'
+  );
+  const [tallaCalzado, setTallaCalzado] = useState(
+    candidato?.dotacion?.calzado || candidato?.tallasDotacion?.calzado || candidato?.sst?.tallas?.calzado || '40'
+  );
 
   // Datos personales (SIN datos de prueba falsos)
   const [fechaNacimiento, setFechaNacimiento] = useState(candidato?.persona?.fechaNacimiento || '');
@@ -291,6 +331,26 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
       setContactoEmergenciaTelefono(candidato.contacto?.contactoEmergenciaTelefono || '');
       setEstudios(candidato.estudios || []);
       setExperiencias(candidato.experiencias || []);
+
+      if (candidato.seguridadSocial?.eps && candidato.seguridadSocial.eps !== 'Pendiente afiliación') {
+        setEpsCandidato(candidato.seguridadSocial.eps);
+      }
+      if (candidato.seguridadSocial?.fondoPensiones && candidato.seguridadSocial.fondoPensiones !== 'Pendiente afiliación') {
+        setFondoPensionesCandidato(candidato.seguridadSocial.fondoPensiones);
+      }
+      if (candidato.seguridadSocial?.fondoCesantias) {
+        setFondoCesantiasCandidato(candidato.seguridadSocial.fondoCesantias);
+      }
+      if (candidato.dotacion?.camisa || candidato.tallasDotacion?.camisa) {
+        setTallaCamisa(candidato.dotacion?.camisa || candidato.tallasDotacion?.camisa || 'M');
+      }
+      if (candidato.dotacion?.pantalon || candidato.tallasDotacion?.pantalon) {
+        setTallaPantalon(candidato.dotacion?.pantalon || candidato.tallasDotacion?.pantalon || '32');
+      }
+      if (candidato.dotacion?.calzado || candidato.tallasDotacion?.calzado) {
+        setTallaCalzado(candidato.dotacion?.calzado || candidato.tallasDotacion?.calzado || '40');
+      }
+
       setAutorizaHabeasData(false);
       setDeclaraBajoJuramento(false);
       setErrorValidacion(null);
@@ -462,6 +522,36 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
         },
         estudios,
         experiencias,
+        seguridadSocial: {
+          ...(candidato.seguridadSocial || {}),
+          eps: epsCandidato.trim(),
+          fondoPensiones: fondoPensionesCandidato.trim(),
+          fondoCesantias: fondoCesantiasCandidato.trim(),
+          arl: candidato.seguridadSocial?.arl || empresa?.seguridadSocial?.arl || 'Positiva Compañía de Seguros',
+          nivelRiesgoArl: candidato.seguridadSocial?.nivelRiesgoArl || 'I (0.522%)',
+          cajaCompensacion: candidato.seguridadSocial?.cajaCompensacion || empresa?.seguridadSocial?.cajaCompensacion || 'Compensar',
+          fechaAfiliacion: candidato.seguridadSocial?.fechaAfiliacion || '',
+          estadoAfiliacion: candidato.seguridadSocial?.estadoAfiliacion || 'En trámite',
+          tipoAfiliacion: candidato.seguridadSocial?.tipoAfiliacion || 'Cotizante Dependiente'
+        },
+        dotacion: {
+          camisa: tallaCamisa,
+          pantalon: tallaPantalon,
+          calzado: tallaCalzado
+        },
+        tallasDotacion: {
+          camisa: tallaCamisa,
+          pantalon: tallaPantalon,
+          calzado: tallaCalzado
+        },
+        sst: {
+          ...(candidato.sst || { examenesOcupacionales: [] }),
+          tallas: {
+            camisa: tallaCamisa,
+            pantalon: tallaPantalon,
+            calzado: tallaCalzado
+          }
+        },
         vinculacion: {
           ...(candidato.vinculacion || {
             fechaRegistroCandidato: fechaHoy,
@@ -832,9 +922,10 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                 {[
                   { id: 'personal', label: '1. Datos Personales', icon: User },
                   { id: 'residencia', label: '2. Residencia & Contacto', icon: MapPin },
-                  { id: 'estudios', label: `3. Formación Académica (${(candidato.estudios || []).length})`, icon: GraduationCap },
-                  { id: 'experiencia', label: `4. Experiencia Previa (${(candidato.experiencias || []).length})`, icon: History },
-                  { id: 'declaracion', label: '5. Habeas Data & Trazabilidad', icon: ShieldCheck }
+                  { id: 'afiliaciones_dotacion', label: '3. Seguridad Social & Dotación', icon: ShieldCheck },
+                  { id: 'estudios', label: `4. Formación Académica (${(candidato.estudios || []).length})`, icon: GraduationCap },
+                  { id: 'experiencia', label: `5. Experiencia Previa (${(candidato.experiencias || []).length})`, icon: History },
+                  { id: 'declaracion', label: '6. Habeas Data & Trazabilidad', icon: ShieldCheck }
                 ].map(t => {
                   const Icon = t.icon;
                   const isActive = tabActual === t.id;
@@ -979,7 +1070,66 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                 </div>
               )}
 
-              {/* TAB 3: FORMACIÓN ACADÉMICA */}
+              {/* TAB 3: SEGURIDAD SOCIAL PREVIA Y TALLAS DE DOTACIÓN (CONSULTA) */}
+              {tabActual === 'afiliaciones_dotacion' && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                    <h3 className="font-bold text-sm text-[#F59E0B] flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>Entidades de Seguridad Social para Afiliaciones</span>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-3 bg-slate-900 rounded-lg space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-semibold">Entidad Promotora de Salud (EPS)</span>
+                        <span className="text-white font-bold text-sm">
+                          {candidato.seguridadSocial?.eps || 'No registrada'}
+                        </span>
+                      </div>
+                      <div className="p-3 bg-slate-900 rounded-lg space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-semibold">Fondo de Pensiones (AFP)</span>
+                        <span className="text-white font-bold text-sm">
+                          {candidato.seguridadSocial?.fondoPensiones || 'No registrado'}
+                        </span>
+                      </div>
+                      <div className="p-3 bg-slate-900 rounded-lg space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-semibold">Fondo de Cesantías</span>
+                        <span className="text-white font-bold text-sm">
+                          {candidato.seguridadSocial?.fondoCesantias || 'No registrado'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                    <h3 className="font-bold text-sm text-[#F59E0B] flex items-center gap-2">
+                      <HardHat className="w-4 h-4 text-amber-400" />
+                      <span>Tallas para Dotación & Calzado de Trabajo (Art. 230 CST)</span>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-3 bg-slate-900 rounded-lg space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-semibold">Talla de Camisa / Camiseta</span>
+                        <span className="text-white font-mono font-bold text-sm">
+                          {candidato.dotacion?.camisa || candidato.tallasDotacion?.camisa || 'No registrada'}
+                        </span>
+                      </div>
+                      <div className="p-3 bg-slate-900 rounded-lg space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-semibold">Talla de Pantalón</span>
+                        <span className="text-white font-mono font-bold text-sm">
+                          {candidato.dotacion?.pantalon || candidato.tallasDotacion?.pantalon || 'No registrada'}
+                        </span>
+                      </div>
+                      <div className="p-3 bg-slate-900 rounded-lg space-y-1">
+                        <span className="text-[10px] text-slate-400 block font-semibold">Talla de Botas / Calzado</span>
+                        <span className="text-white font-mono font-bold text-sm">
+                          {candidato.dotacion?.calzado || candidato.tallasDotacion?.calzado || 'No registrada'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: FORMACIÓN ACADÉMICA */}
               {tabActual === 'estudios' && (
                 <div className="space-y-3 animate-fadeIn">
                   {(candidato.estudios || []).length > 0 ? (
@@ -1106,9 +1256,10 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                 {[
                   { id: 'personal', label: '1. Datos Personales', icon: User },
                   { id: 'residencia', label: '2. Residencia & Contacto', icon: MapPin },
-                  { id: 'estudios', label: `3. Formación Académica (${estudios.length})`, icon: GraduationCap },
-                  { id: 'experiencia', label: `4. Experiencia Laboral (${experiencias.length})`, icon: History },
-                  { id: 'declaracion', label: '5. Habeas Data & Firma', icon: ShieldCheck }
+                  { id: 'afiliaciones_dotacion', label: '3. Seguridad Social & Dotación', icon: ShieldCheck },
+                  { id: 'estudios', label: `4. Formación Académica (${estudios.length})`, icon: GraduationCap },
+                  { id: 'experiencia', label: `5. Experiencia Laboral (${experiencias.length})`, icon: History },
+                  { id: 'declaracion', label: '6. Habeas Data & Firma', icon: ShieldCheck }
                 ].map(t => {
                   const Icon = t.icon;
                   const isActive = tabActual === t.id;
@@ -1367,6 +1518,145 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                     </button>
                     <button
                       type="button"
+                      onClick={() => setTabActual('afiliaciones_dotacion')}
+                      className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <span>Siguiente: Seguridad Social & Dotación</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* SECCIÓN 3: SEGURIDAD SOCIAL PREVIA Y TALLAS DE DOTACIÓN */}
+              {tabActual === 'afiliaciones_dotacion' && (
+                <div className="space-y-5 animate-fadeIn">
+                  {/* Banner Explicativo */}
+                  <div className="p-4 bg-purple-950/40 border border-purple-800/60 rounded-xl text-purple-200 text-xs leading-relaxed">
+                    <strong className="text-white block mb-1 flex items-center gap-1.5 font-bold">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      Información para Afiliación a Seguridad Social & Dotación de Trabajo:
+                    </strong>
+                    Registre las entidades en las que se encuentra actualmente afiliado (EPS, Fondo de Pensiones y Cesantías) para que Gestión Humana pueda tramitar oportunamente sus afiliaciones antes del ingreso laboral. Asimismo, especifique sus tallas de vestimenta laboral para coordinar la entrega de su dotación de trabajo y calzado de seguridad.
+                  </div>
+
+                  {/* 1. Seguridad Social */}
+                  <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
+                    <h3 className="font-bold text-sm text-[#F59E0B] flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>Entidades de Seguridad Social (Salud, Pensión y Cesantías) *</span>
+                    </h3>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block font-bold text-slate-300 mb-1">Entidad Promotora de Salud (EPS) *</label>
+                        <select
+                          value={epsCandidato}
+                          onChange={e => setEpsCandidato(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-semibold"
+                        >
+                          {EPS_COLOMBIA.map(eps => (
+                            <option key={eps} value={eps}>{eps}</option>
+                          ))}
+                        </select>
+                        <span className="text-[10px] text-slate-400 mt-1 block">EPS actual a la que pertenece o desea afiliación</span>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-300 mb-1">Fondo de Pensiones (AFP) *</label>
+                        <select
+                          value={fondoPensionesCandidato}
+                          onChange={e => setFondoPensionesCandidato(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-semibold"
+                        >
+                          {AFP_COLOMBIA.map(afp => (
+                            <option key={afp} value={afp}>{afp}</option>
+                          ))}
+                        </select>
+                        <span className="text-[10px] text-slate-400 mt-1 block">Fondo privado o Colpensiones</span>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-300 mb-1">Fondo de Cesantías *</label>
+                        <select
+                          value={fondoCesantiasCandidato}
+                          onChange={e => setFondoCesantiasCandidato(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-semibold"
+                        >
+                          {CESANTIAS_COLOMBIA.map(ces => (
+                            <option key={ces} value={ces}>{ces}</option>
+                          ))}
+                        </select>
+                        <span className="text-[10px] text-slate-400 mt-1 block">Fondo de Cesantías o FNA</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Tallas de Dotación */}
+                  <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
+                    <h3 className="font-bold text-sm text-[#F59E0B] flex items-center gap-2">
+                      <HardHat className="w-4 h-4 text-amber-400" />
+                      <span>Tallas para Dotación & Calzado de Trabajo (Art. 230 CST) *</span>
+                    </h3>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                          <Shirt className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Talla de Camisa / Camiseta *</span>
+                        </label>
+                        <select
+                          value={tallaCamisa}
+                          onChange={e => setTallaCamisa(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold"
+                        >
+                          {TALLAS_CAMISA_DOTACION.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                        <span className="text-[10px] text-slate-400 mt-1 block">Talla estándar de dotación</span>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-300 mb-1">Talla de Pantalón *</label>
+                        <select
+                          value={tallaPantalon}
+                          onChange={e => setTallaPantalon(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold"
+                        >
+                          {TALLAS_PANTALON_DOTACION.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                        <span className="text-[10px] text-slate-400 mt-1 block">Talla numérica colombiana</span>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-300 mb-1">Talla de Botas / Calzado *</label>
+                        <select
+                          value={tallaCalzado}
+                          onChange={e => setTallaCalzado(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold"
+                        >
+                          {TALLAS_CALZADO_DOTACION.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                        <span className="text-[10px] text-slate-400 mt-1 block">Calzado de seguridad / botas</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setTabActual('residencia')}
+                      className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setTabActual('estudios')}
                       className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
                     >
@@ -1377,7 +1667,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                 </div>
               )}
 
-              {/* SECCIÓN 3: FORMACIÓN ACADÉMICA */}
+              {/* SECCIÓN 4: FORMACIÓN ACADÉMICA */}
               {tabActual === 'estudios' && (
                 <div className="space-y-4 animate-fadeIn">
                   <div className="flex items-center justify-between">
@@ -1475,7 +1765,7 @@ export const PortalCandidatoPublicoView: React.FC<PortalCandidatoPublicoViewProp
                   <div className="flex justify-between pt-4">
                     <button
                       type="button"
-                      onClick={() => setTabActual('residencia')}
+                      onClick={() => setTabActual('afiliaciones_dotacion')}
                       className="px-4 py-2 border border-slate-700 rounded-xl text-slate-400 hover:text-white cursor-pointer"
                     >
                       Anterior

@@ -1503,3 +1503,40 @@ export const ESTADOS_CIVILES = [
   'Divorciado(a)',
   'Viudo(a)'
 ];
+
+export const TALLAS_CAMISA_DOTACION = [
+  'XS',
+  'S',
+  'M',
+  'L',
+  'XL',
+  'XXL',
+  '3XL'
+];
+
+export const TALLAS_PANTALON_DOTACION = [
+  '28',
+  '30',
+  '32',
+  '34',
+  '36',
+  '38',
+  '40',
+  '42'
+];
+
+export const TALLAS_CALZADO_DOTACION = [
+  '35',
+  '36',
+  '37',
+  '38',
+  '39',
+  '40',
+  '41',
+  '42',
+  '43',
+  '44',
+  '45',
+  '46'
+];
+

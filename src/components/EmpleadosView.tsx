@@ -477,6 +477,8 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
         empresa={empresa}
         centrosTrabajo={centrosTrabajo || empresa?.centrosTrabajo}
         areas={areas}
+        procesos={procesos}
+        empleados={empleados}
         currentUser={currentUser}
         solicitudes={solicitudes.filter(s => s.empleadoId === currentEmpleadoPersonal.id)}
         evaluaciones={evaluaciones.filter(ev => ev.empleadoId === currentEmpleadoPersonal.id)}
@@ -504,6 +506,8 @@ export const EmpleadosView: React.FC<EmpleadosViewProps> = ({
         empresa={empresa}
         centrosTrabajo={centrosTrabajo || empresa?.centrosTrabajo}
         areas={areas}
+        procesos={procesos}
+        empleados={empleados}
         currentUser={currentUser}
         solicitudes={solicitudes.filter(s => s.empleadoId === currentEmpleadoSeleccionado.id)}
         evaluaciones={evaluaciones.filter(ev => ev.empleadoId === currentEmpleadoSeleccionado.id)}

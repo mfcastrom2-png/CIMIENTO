@@ -22,10 +22,22 @@ import {
   Phone,
   Printer,
   Edit,
-  ArrowRight
+  ArrowRight,
+  HardHat,
+  Shirt
 } from 'lucide-react';
 import { uid } from '../../data/initialData';
-import { DEPARTAMENTOS_COLOMBIA, NIVELES_EDUCATIVOS, ESTADOS_CIVILES } from '../../data/colombiaData';
+import {
+  DEPARTAMENTOS_COLOMBIA,
+  NIVELES_EDUCATIVOS,
+  ESTADOS_CIVILES,
+  EPS_COLOMBIA,
+  AFP_COLOMBIA,
+  CESANTIAS_COLOMBIA,
+  TALLAS_CAMISA_DOTACION,
+  TALLAS_PANTALON_DOTACION,
+  TALLAS_CALZADO_DOTACION
+} from '../../data/colombiaData';
 import { generarTextoNotificacionHojaVidaCompletada } from '../../services/vinculacionService';
 
 interface ModalDiligenciarHojaVidaProps {
@@ -42,7 +54,7 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
   esVistaCandidato = false
 }) => {
   // Pestaña activa del formulario o visualización de Hoja de Vida
-  const [tabHv, setTabHv] = useState<'personal' | 'residencia' | 'estudios' | 'experiencia' | 'declaracion'>('personal');
+  const [tabHv, setTabHv] = useState<'personal' | 'residencia' | 'afiliaciones_dotacion' | 'estudios' | 'experiencia' | 'declaracion'>('personal');
 
   // Identificar si el colaborador se encuentra en etapa inicial de Pre-selección
   const estaEnPreseleccion = Boolean(
@@ -96,6 +108,26 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
   );
   const [contactoEmergenciaTelefono, setContactoEmergenciaTelefono] = useState(
     empleado.contacto?.contactoEmergenciaTelefono || ''
+  );
+
+  // Pre-afiliaciones a Seguridad Social & Dotación de Ropa de Trabajo
+  const [epsCandidato, setEpsCandidato] = useState(
+    empleado.seguridadSocial?.eps || 'SURA EPS'
+  );
+  const [fondoPensionesCandidato, setFondoPensionesCandidato] = useState(
+    empleado.seguridadSocial?.fondoPensiones || 'Protección'
+  );
+  const [fondoCesantiasCandidato, setFondoCesantiasCandidato] = useState(
+    empleado.seguridadSocial?.fondoCesantias || 'Protección'
+  );
+  const [tallaCamisa, setTallaCamisa] = useState(
+    empleado.tallasDotacion?.camisa || empleado.dotacion?.camisa || empleado.sst?.tallas?.camisa || 'M'
+  );
+  const [tallaPantalon, setTallaPantalon] = useState(
+    empleado.tallasDotacion?.pantalon || empleado.dotacion?.pantalon || empleado.sst?.tallas?.pantalon || '32'
+  );
+  const [tallaCalzado, setTallaCalzado] = useState(
+    empleado.tallasDotacion?.calzado || empleado.dotacion?.calzado || empleado.sst?.tallas?.calzado || '40'
   );
 
   // Formación Académica (SIN datos de prueba)
@@ -261,6 +293,32 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
         },
         estudios,
         experiencias,
+        seguridadSocial: {
+          ...(empleado.seguridadSocial || {}),
+          eps: epsCandidato,
+          fondoPensiones: fondoPensionesCandidato,
+          fondoCesantias: fondoCesantiasCandidato,
+          arl: empleado.seguridadSocial?.arl || 'Positiva Compañía de Seguros S.A.',
+          cajaCompensacion: empleado.seguridadSocial?.cajaCompensacion || 'Compensar'
+        },
+        dotacion: {
+          camisa: tallaCamisa,
+          pantalon: tallaPantalon,
+          calzado: tallaCalzado
+        },
+        tallasDotacion: {
+          camisa: tallaCamisa,
+          pantalon: tallaPantalon,
+          calzado: tallaCalzado
+        },
+        sst: {
+          ...(empleado.sst || {}),
+          tallas: {
+            camisa: tallaCamisa,
+            pantalon: tallaPantalon,
+            calzado: tallaCalzado
+          }
+        },
         vinculacion: vinculacionActualizada,
         historialLaboral: [
           {
@@ -385,13 +443,24 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
 
           <button
             type="button"
+            onClick={() => setTabHv('afiliaciones_dotacion')}
+            className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer ${
+              tabHv === 'afiliaciones_dotacion' ? 'bg-[#18235C] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+            <span>3. Seguridad Social & Dotación</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setTabHv('estudios')}
             className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer ${
               tabHv === 'estudios' ? 'bg-[#18235C] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200'
             }`}
           >
             <GraduationCap className="w-3.5 h-3.5" />
-            <span>3. Formación Académica ({estudios.length})</span>
+            <span>4. Formación Académica ({estudios.length})</span>
           </button>
 
           <button
@@ -402,7 +471,7 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
             }`}
           >
             <History className="w-3.5 h-3.5" />
-            <span>4. Experiencia Previa ({experiencias.length})</span>
+            <span>5. Experiencia Previa ({experiencias.length})</span>
           </button>
 
           <button
@@ -413,7 +482,7 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            <span>5. Habeas Data & Veracidad</span>
+            <span>6. Habeas Data & Veracidad</span>
           </button>
         </div>
 
@@ -549,7 +618,91 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
               </div>
             )}
 
-            {/* TAB 3: FORMACIÓN ACADÉMICA (CONSULTA) */}
+            {/* TAB 3: AFILIACIONES PREVIAS & DOTACIÓN (CONSULTA) */}
+            {tabHv === 'afiliaciones_dotacion' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="p-4 bg-blue-50/80 border border-blue-200 rounded-2xl flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-[#18235C] shrink-0 mt-0.5" />
+                  <div className="leading-relaxed text-blue-950 text-xs">
+                    <strong>Pre-afiliaciones & Tallas de Dotación Registradas:</strong> Información registrada por el aspirante durante la fase de pre-selección para anticipar las afiliaciones a seguridad social y el suministro reglamentario de dotación laboral (Art. 230 del CST).
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-2 border-b border-slate-200 pb-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Entidades de Seguridad Social Elegidas por el Colaborador</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">EPS (Salud)</span>
+                      <span className="font-bold text-[#18235C] text-sm">
+                        {empleado.seguridadSocial?.eps || 'No registrada'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">AFP (Fondo de Pensiones)</span>
+                      <span className="font-bold text-[#18235C] text-sm">
+                        {empleado.seguridadSocial?.fondoPensiones || 'No registrado'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">Fondo de Cesantías</span>
+                      <span className="font-bold text-[#18235C] text-sm">
+                        {empleado.seguridadSocial?.fondoCesantias || 'No registrado'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">ARL Asignada (Empresa)</span>
+                      <span className="font-bold text-slate-800 text-sm">
+                        {empleado.seguridadSocial?.arl || 'Positiva Compañía de Seguros S.A.'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">Caja de Compensación</span>
+                      <span className="font-bold text-slate-800 text-sm">
+                        {empleado.seguridadSocial?.cajaCompensacion || 'Compensar'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">Fecha de Afiliación Formal</span>
+                      <span className="font-bold text-emerald-700 text-sm font-mono">
+                        {empleado.seguridadSocial?.fechaAfiliacion || empleado.laboral?.fechaIngreso || 'Pendiente de formalizar en módulo de afiliación'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-2 border-b border-slate-200 pb-2">
+                    <Shirt className="w-4 h-4 text-[#F59E0B]" />
+                    <span>Tallas para Dotación & EPP (Art. 230 Código Sustantivo del Trabajo)</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl text-center space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">Talla de Camisa / Blusa</span>
+                      <span className="font-extrabold text-[#18235C] text-base">
+                        {empleado.tallasDotacion?.camisa || empleado.dotacion?.camisa || empleado.sst?.tallas?.camisa || 'M'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl text-center space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">Talla de Pantalón</span>
+                      <span className="font-extrabold text-[#18235C] text-base">
+                        {empleado.tallasDotacion?.pantalon || empleado.dotacion?.pantalon || empleado.sst?.tallas?.pantalon || '32'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl text-center space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">Calzado / Botas de Seguridad</span>
+                      <span className="font-extrabold text-[#18235C] text-base font-mono">
+                        {empleado.tallasDotacion?.calzado || empleado.dotacion?.calzado || empleado.sst?.tallas?.calzado || '40'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: FORMACIÓN ACADÉMICA (CONSULTA) */}
             {tabHv === 'estudios' && (
               <div className="space-y-3 animate-fadeIn">
                 {(empleado.estudios || []).length > 0 ? (
@@ -890,6 +1043,146 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
                   </button>
                   <button
                     type="button"
+                    onClick={() => setTabHv('afiliaciones_dotacion')}
+                    className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer"
+                  >
+                    Continuar a Seguridad Social & Dotación →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: AFILIACIONES PREVIAS & TALLAS DE DOTACIÓN */}
+            {tabHv === 'afiliaciones_dotacion' && (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1">
+                  <span className="font-bold text-[#18235C] block flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Seguridad Social & Tallas de Dotación (Pre-selección)</span>
+                  </span>
+                  <span className="text-[11px] text-slate-600 leading-relaxed block">
+                    Indique sus fondos y EPS actuales para agilizar su vinculación formal. Asimismo, registre sus tallas de dotación de trabajo y calzado de seguridad según el <strong>Artículo 230 del Código Sustantivo del Trabajo (CST)</strong>.
+                  </span>
+                </div>
+
+                {/* 1. Seguridad Social */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Entidades de Seguridad Social Previas (EPS, Pensión, Cesantías)</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">EPS (Entidad Promotora de Salud) *</label>
+                      <select
+                        value={epsCandidato}
+                        onChange={e => setEpsCandidato(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-xs"
+                      >
+                        {EPS_COLOMBIA.map(eps => (
+                          <option key={eps} value={eps}>{eps}</option>
+                        ))}
+                      </select>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">Donde se encuentra afiliado actualmente</span>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Fondo de Pensiones (AFP) *</label>
+                      <select
+                        value={fondoPensionesCandidato}
+                        onChange={e => setFondoPensionesCandidato(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-xs"
+                      >
+                        {AFP_COLOMBIA.map(afp => (
+                          <option key={afp} value={afp}>{afp}</option>
+                        ))}
+                      </select>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">Para aportes pensionales de ley</span>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Fondo de Cesantías *</label>
+                      <select
+                        value={fondoCesantiasCandidato}
+                        onChange={e => setFondoCesantiasCandidato(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-xs"
+                      >
+                        {CESANTIAS_COLOMBIA.map(ces => (
+                          <option key={ces} value={ces}>{ces}</option>
+                        ))}
+                      </select>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">Para consignación de cesantías anuales</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Tallas de Dotación */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-2">
+                    <Shirt className="w-3.5 h-3.5 text-[#F59E0B]" />
+                    <span>Tallas para Ropa de Trabajo & Calzado (Art. 230 CST)</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                        <Shirt className="w-3 h-3 text-[#18235C]" />
+                        <span>Talla de Camisa / Blusa *</span>
+                      </label>
+                      <select
+                        value={tallaCamisa}
+                        onChange={e => setTallaCamisa(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-xs"
+                      >
+                        {TALLAS_CAMISA_DOTACION.map(t => (
+                          <option key={t} value={t}>Talla {t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                        <HardHat className="w-3 h-3 text-[#18235C]" />
+                        <span>Talla de Pantalón *</span>
+                      </label>
+                      <select
+                        value={tallaPantalon}
+                        onChange={e => setTallaPantalon(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-xs font-mono"
+                      >
+                        {TALLAS_PANTALON_DOTACION.map(t => (
+                          <option key={t} value={t}>Talla {t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                        <HardHat className="w-3 h-3 text-[#F59E0B]" />
+                        <span>Talla Calzado / Botas de Seguridad *</span>
+                      </label>
+                      <select
+                        value={tallaCalzado}
+                        onChange={e => setTallaCalzado(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-xs font-mono"
+                      >
+                        {TALLAS_CALZADO_DOTACION.map(t => (
+                          <option key={t} value={t}>Calzado {t} (Colombia)</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setTabHv('residencia')}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
+                  >
+                    ← Anterior
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setTabHv('estudios')}
                     className="px-4 py-2 bg-[#18235C] text-white font-bold rounded-xl cursor-pointer"
                   >
@@ -899,7 +1192,7 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
               </div>
             )}
 
-            {/* TAB 3: FORMACIÓN ACADÉMICA */}
+            {/* TAB 4: FORMACIÓN ACADÉMICA */}
             {tabHv === 'estudios' && (
               <div className="space-y-4 animate-fadeIn">
                 <div className="flex items-center justify-between">
@@ -1006,7 +1299,7 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
                 <div className="flex justify-between pt-3">
                   <button
                     type="button"
-                    onClick={() => setTabHv('residencia')}
+                    onClick={() => setTabHv('afiliaciones_dotacion')}
                     className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl cursor-pointer"
                   >
                     ← Anterior
@@ -1022,7 +1315,7 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
               </div>
             )}
 
-            {/* TAB 4: EXPERIENCIA LABORAL */}
+            {/* TAB 5: EXPERIENCIA LABORAL */}
             {tabHv === 'experiencia' && (
               <div className="space-y-4 animate-fadeIn">
                 <div className="flex items-center justify-between">
@@ -1153,7 +1446,7 @@ export const ModalDiligenciarHojaVida: React.FC<ModalDiligenciarHojaVidaProps> =
               </div>
             )}
 
-            {/* TAB 5: AUTORIZACIONES LEGALES Y VERACIDAD */}
+            {/* TAB 6: AUTORIZACIONES LEGALES Y VERACIDAD */}
             {tabHv === 'declaracion' && (
               <div className="space-y-4 animate-fadeIn">
                 <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2">

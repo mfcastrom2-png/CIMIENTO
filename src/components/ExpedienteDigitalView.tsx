@@ -45,9 +45,11 @@ import {
   HardDrive,
   Database,
   PenTool,
-  Bell
+  Bell,
+  Shirt
 } from 'lucide-react';
 import { uid, initialEmpresa } from '../data/initialData';
+import { useCompanySyncOptional } from '../context/SyncContext';
 import { DriveLinkField } from './common/DriveLinkField';
 import { formatDriveViewUrl, isGoogleDriveUrl } from '../utils/driveUtils';
 import { BannerFlujoVinculacionExpediente } from './vinculacion/BannerFlujoVinculacionExpediente';
@@ -120,11 +122,65 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
   const [nuevoDocUrlDrive, setNuevoDocUrlDrive] = useState('');
   const [nuevoDocObs, setNuevoDocObs] = useState('');
 
+  // Respaldo dinámico desde SyncContext para garantizar sincronización total de estructura
+  const companySync = useCompanySyncOptional();
+  const cargosEfectivos = (cargos && cargos.length > 0) ? cargos : (companySync?.cargos || []);
+  const areasEfectivas = (areas && areas.length > 0) ? areas : (companySync?.areas || []);
+  const procesosEfectivos = (procesos && procesos.length > 0) ? procesos : (companySync?.procesos || []);
+  const empleadosEfectivos = (empleados && empleados.length > 0) ? empleados : (companySync?.empleados || []);
+
   // Modales del Flujo de Vinculación y Contratación Laboral
   const [modalDiligenciarHv, setModalDiligenciarHv] = useState(false);
   const [modalDefinirContrato, setModalDefinirContrato] = useState(false);
   const [modalFirmaContrato, setModalFirmaContrato] = useState(false);
   const [modalNotificacionesVinculacion, setModalNotificacionesVinculacion] = useState(false);
+
+  // Registro de Fecha de Afiliación a Seguridad Social (Módulo de Afiliación)
+  const [fechaAfiliacionInput, setFechaAfiliacionInput] = useState<string>(
+    empleado.seguridadSocial?.fechaAfiliacion || empleado.laboral?.fechaIngreso || new Date().toISOString().slice(0, 10)
+  );
+  const [guardandoAfiliacion, setGuardandoAfiliacion] = useState(false);
+  const [mensajeAfiliacion, setMensajeAfiliacion] = useState<string | null>(null);
+
+  const handleGuardarFechaAfiliacion = async () => {
+    if (!onActualizarEmpleado || !fechaAfiliacionInput) return;
+    setGuardandoAfiliacion(true);
+    try {
+      const fechaHoy = new Date().toISOString();
+      const empleadoActualizado: Empleado = {
+        ...empleado,
+        seguridadSocial: {
+          ...(empleado.seguridadSocial || {}),
+          eps: empleado.seguridadSocial?.eps || 'SURA EPS',
+          fondoPensiones: empleado.seguridadSocial?.fondoPensiones || 'Protección',
+          fondoCesantias: empleado.seguridadSocial?.fondoCesantias || 'Porvenir',
+          arl: empleado.seguridadSocial?.arl || 'Positiva Compañía de Seguros S.A.',
+          cajaCompensacion: empleado.seguridadSocial?.cajaCompensacion || 'Compensar',
+          fechaAfiliacion: fechaAfiliacionInput,
+          estadoAfiliacion: 'Activa'
+        },
+        historialLaboral: [
+          {
+            id: uid(),
+            fechaHora: fechaHoy,
+            usuario: currentUser?.nombre || 'Gestión Humana',
+            accion: 'CAMBIO_DATOS',
+            titulo: 'Fecha de Afiliación a Seguridad Social Registrada',
+            motivo: 'Formalización de fecha de afiliación con las entidades seleccionadas por el trabajador en su hoja de vida digital.',
+            valorNuevo: `Fecha Afiliación: ${fechaAfiliacionInput} · Estado: Activa`
+          },
+          ...(empleado.historialLaboral || [])
+        ]
+      };
+      await onActualizarEmpleado(empleadoActualizado);
+      setMensajeAfiliacion('Fecha de afiliación guardada exitosamente.');
+      setTimeout(() => setMensajeAfiliacion(null), 4000);
+    } catch (err: any) {
+      console.error('Error al guardar fecha de afiliación:', err);
+    } finally {
+      setGuardandoAfiliacion(false);
+    }
+  };
 
   // Eliminación de Documento Erróneo por parte del Administrador
   const handleConfirmarEliminarDoc = async () => {
@@ -803,45 +859,164 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
         {/* TAB 6: SEGURIDAD SOCIAL */}
         {activeTab === 'seguridadSocial' && (
           <div className="space-y-4">
-            <h3 className="font-bold text-base text-[#18235C] border-b border-slate-200 pb-2">
-              Expediente Digital – Pestaña 6: Afiliaciones a Seguridad Social Integral
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">EPS (Salud):</span>
-                <span className="text-[#18235C] font-bold text-sm">{empleado.seguridadSocial?.eps || 'SURA EPS'}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2">
+              <div>
+                <h3 className="font-bold text-base text-[#18235C]">
+                  Expediente Digital – Pestaña 6: Afiliaciones a Seguridad Social Integral & Dotación
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Entidades seleccionadas por el trabajador en su Hoja de Vida Digital para radicación previa de afiliaciones y suministro de dotación.
+                </p>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">AFP (Fondo de Pensiones):</span>
-                <span className="text-[#18235C] font-bold text-sm">{empleado.seguridadSocial?.fondoPensiones || 'Protección'}</span>
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0 self-start sm:self-auto">
+                {empleado.seguridadSocial?.estadoAfiliacion || 'Activa'}
+              </span>
+            </div>
+
+            {/* Aviso informativo de pre-selección */}
+            <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-2xl flex items-start gap-2.5 text-xs text-blue-950">
+              <ShieldCheck className="w-4 h-4 text-[#18235C] shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <strong>Afiliaciones Anticipadas desde Hoja de Vida:</strong> El colaborador indicó en su formulario digital sus entidades de seguridad social actuales (EPS, Fondo de Pensiones y Cesantías). En este módulo de Gestión Humana únicamente se requiere registrar la <strong>Fecha de Afiliación</strong> efectiva para completar la vinculación formal.
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">ARL (Riesgos Laborales):</span>
-                <span className="text-[#18235C] font-bold text-sm">{empleado.seguridadSocial?.arl || 'Positiva Compañía de Seguros'}</span>
+            </div>
+
+            {/* Formulario rápido para formalizar Fecha de Afiliación */}
+            {!esColaborador && (
+              <div className="p-4 bg-gradient-to-r from-slate-50 to-amber-50/50 border border-amber-200/80 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-[#F59E0B]" />
+                    <span>Formalizar Fecha de Afiliación en Seguridad Social</span>
+                  </h4>
+                  {mensajeAfiliacion && (
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                      ✓ {mensajeAfiliacion}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 text-xs">
+                  <div className="flex-1">
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Fecha Efectiva de Afiliación *
+                    </label>
+                    <input
+                      type="date"
+                      value={fechaAfiliacionInput}
+                      onChange={e => setFechaAfiliacionInput(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-mono text-xs font-semibold"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGuardarFechaAfiliacion}
+                    disabled={guardandoAfiliacion || !fechaAfiliacionInput}
+                    className="px-4 py-2 bg-[#18235C] hover:bg-[#1E3A8A] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shrink-0 shadow-xs"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>{guardandoAfiliacion ? 'Guardando...' : 'Guardar Fecha de Afiliación'}</span>
+                  </button>
+                </div>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Nivel de Riesgo ARL:</span>
-                <span className="text-amber-900 font-bold font-mono">{empleado.seguridadSocial?.nivelRiesgoArl || 'V (6.960%)'}</span>
+            )}
+
+            {/* Cuadrícula de Entidades de Seguridad Social */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 block font-semibold text-[10px]">EPS (Salud) · Seleccionada por Trabajador:</span>
+                <span className="text-[#18235C] font-bold text-sm block">{empleado.seguridadSocial?.eps || 'SURA EPS'}</span>
+                <span className="text-[10px] text-emerald-700 font-medium">✓ Registrada en pre-selección</span>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Caja de Compensación Familiar:</span>
-                <span className="text-slate-800 font-bold">{empleado.seguridadSocial?.cajaCompensacion || 'Compensar'}</span>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 block font-semibold text-[10px]">AFP (Fondo de Pensiones) · Trabajador:</span>
+                <span className="text-[#18235C] font-bold text-sm block">{empleado.seguridadSocial?.fondoPensiones || 'Protección'}</span>
+                <span className="text-[10px] text-emerald-700 font-medium">✓ Registrado en pre-selección</span>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Fondo de Cesantías:</span>
-                <span className="text-slate-800 font-bold">{empleado.seguridadSocial?.fondoCesantias || 'Porvenir'}</span>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 block font-semibold text-[10px]">Fondo de Cesantías · Trabajador:</span>
+                <span className="text-[#18235C] font-bold text-sm block">{empleado.seguridadSocial?.fondoCesantias || 'Porvenir'}</span>
+                <span className="text-[10px] text-emerald-700 font-medium">✓ Registrado en pre-selección</span>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Fecha de Afiliación:</span>
-                <span className="text-slate-800 font-semibold">{empleado.seguridadSocial?.fechaAfiliacion || empleado.laboral?.fechaIngreso || '—'}</span>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 block font-semibold text-[10px]">ARL (Riesgos Laborales) · Empresa:</span>
+                <span className="text-[#18235C] font-bold text-sm block">{empleado.seguridadSocial?.arl || 'Positiva Compañía de Seguros S.A.'}</span>
+                <span className="text-[10px] text-slate-500">Póliza patronal vigente</span>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Estado de Afiliación:</span>
-                <span className="text-emerald-700 font-bold">{empleado.seguridadSocial?.estadoAfiliacion || 'Activa'}</span>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 block font-semibold text-[10px]">Nivel de Riesgo ARL:</span>
+                <span className="text-amber-900 font-bold font-mono text-sm block">{empleado.seguridadSocial?.nivelRiesgoArl || 'V (6.960%)'}</span>
+                <span className="text-[10px] text-slate-500">Según clase de riesgo del centro</span>
               </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <span className="text-slate-500 block font-semibold">Tipo de Cotizante:</span>
-                <span className="text-slate-800 font-semibold">{empleado.seguridadSocial?.tipoAfiliacion || 'Cotizante Dependiente'}</span>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 block font-semibold text-[10px]">Caja de Compensación Familiar (CCF):</span>
+                <span className="text-slate-800 font-bold text-sm block">{empleado.seguridadSocial?.cajaCompensacion || 'Compensar'}</span>
+                <span className="text-[10px] text-slate-500">Aportes parafiscales de ley</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 block font-semibold text-[10px]">Fecha Efectiva de Afiliación:</span>
+                <span className="text-emerald-800 font-bold font-mono text-sm block">
+                  {empleado.seguridadSocial?.fechaAfiliacion || empleado.laboral?.fechaIngreso || 'Pendiente'}
+                </span>
+                <span className="text-[10px] text-slate-500">Fecha de radicación o ingreso</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 block font-semibold text-[10px]">Estado de Afiliación:</span>
+                <span className="text-emerald-700 font-bold text-sm block">{empleado.seguridadSocial?.estadoAfiliacion || 'Activa'}</span>
+                <span className="text-[10px] text-slate-500">Cobertura integral activa</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <span className="text-slate-500 block font-semibold text-[10px]">Tipo de Cotizante:</span>
+                <span className="text-slate-800 font-bold text-sm block">{empleado.seguridadSocial?.tipoAfiliacion || 'Cotizante Dependiente'}</span>
+                <span className="text-[10px] text-slate-500">Planilla Integrada PILA</span>
+              </div>
+            </div>
+
+            {/* Tallas de Ropa de Trabajo & Calzado para Dotación (Art. 230 CST) */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-2">
+                  <Shirt className="w-4 h-4 text-[#F59E0B]" />
+                  <span>Tallas para Dotación & EPP (Art. 230 Código Sustantivo del Trabajo)</span>
+                </h4>
+                <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  Registrado en Hoja de Vida Digital
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 bg-white rounded-xl border border-slate-200 text-center space-y-1">
+                  <span className="text-[10px] text-slate-500 block font-semibold">Talla de Camisa / Blusa</span>
+                  <span className="font-extrabold text-base text-[#18235C]">
+                    {empleado.tallasDotacion?.camisa || empleado.dotacion?.camisa || empleado.sst?.tallas?.camisa || 'M'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">Dotación cuatrimestral</span>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-200 text-center space-y-1">
+                  <span className="text-[10px] text-slate-500 block font-semibold">Talla de Pantalón</span>
+                  <span className="font-extrabold text-base text-[#18235C]">
+                    {empleado.tallasDotacion?.pantalon || empleado.dotacion?.pantalon || empleado.sst?.tallas?.pantalon || '32'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">Dotación cuatrimestral</span>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-200 text-center space-y-1">
+                  <span className="text-[10px] text-slate-500 block font-semibold">Calzado / Botas de Seguridad</span>
+                  <span className="font-extrabold text-base text-[#18235C] font-mono">
+                    {empleado.tallasDotacion?.calzado || empleado.dotacion?.calzado || empleado.sst?.tallas?.calzado || '40'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">Calzado de labor CST</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1149,6 +1324,42 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                       {ex.recomendaciones && <p className="text-slate-700"><strong>Recomendaciones:</strong> {ex.recomendaciones}</p>}
                     </div>
                   ))}
+                </div>
+
+                {/* Tallas de Dotación & EPP */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <h4 className="font-bold text-xs text-[#18235C] flex items-center gap-2">
+                      <Shirt className="w-4 h-4 text-[#F59E0B]" />
+                      <span>Dotación Laboral & Elementos de Protección Personal (EPP)</span>
+                    </h4>
+                    <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      Suministro Legal (Art. 230 CST)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 text-center space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">Talla de Camisa / Blusa</span>
+                      <span className="font-extrabold text-base text-[#18235C]">
+                        {empleado.tallasDotacion?.camisa || empleado.dotacion?.camisa || empleado.sst?.tallas?.camisa || 'M'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 text-center space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">Talla de Pantalón</span>
+                      <span className="font-extrabold text-base text-[#18235C]">
+                        {empleado.tallasDotacion?.pantalon || empleado.dotacion?.pantalon || empleado.sst?.tallas?.pantalon || '32'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 text-center space-y-1">
+                      <span className="text-[10px] text-slate-500 block font-semibold">Calzado / Botas de Seguridad</span>
+                      <span className="font-extrabold text-base text-[#18235C] font-mono">
+                        {empleado.tallasDotacion?.calzado || empleado.dotacion?.calzado || empleado.sst?.tallas?.calzado || '40'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1643,11 +1854,11 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
       {modalDefinirContrato && (
         <ModalDefinirContratoVinculacion
           empleado={empleado}
-          cargos={cargos}
-          areas={areas}
-          procesos={procesos}
+          cargos={cargosEfectivos}
+          areas={areasEfectivas}
+          procesos={procesosEfectivos}
           centrosTrabajo={centrosTrabajo}
-          empleados={empleados}
+          empleados={empleadosEfectivos}
           empresa={empresa}
           onClose={() => setModalDefinirContrato(false)}
           onContratoDefinido={async (empActualizado) => {

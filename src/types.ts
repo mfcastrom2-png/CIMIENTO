@@ -177,6 +177,8 @@ export interface Cargo {
   reportaA: string | null;
   ficha: FichaCargo;
   areaId?: string;
+  procesoId?: string;
+  procesoNombre?: string;
   salarioReferencia?: number;
   nivel?: string;
 }
@@ -413,12 +415,12 @@ export interface SeguridadSocialEmpleado {
   eps: string;
   fondoPensiones: string;
   arl: string;
-  nivelRiesgoArl: 'I (0.522%)' | 'II (1.044%)' | 'III (2.436%)' | 'IV (4.350%)' | 'V (6.960%)';
+  nivelRiesgoArl?: 'I (0.522%)' | 'II (1.044%)' | 'III (2.436%)' | 'IV (4.350%)' | 'V (6.960%)';
   cajaCompensacion: string;
   fondoCesantias: string;
-  fechaAfiliacion: string;
-  estadoAfiliacion: 'Activa' | 'En trámite' | 'Retirada';
-  tipoAfiliacion: 'Cotizante Dependiente' | 'Aprendiz' | 'Practicante' | string;
+  fechaAfiliacion?: string;
+  estadoAfiliacion?: 'Activa' | 'En trámite' | 'Retirada';
+  tipoAfiliacion?: 'Cotizante Dependiente' | 'Aprendiz' | 'Practicante' | string;
 }
 
 export interface EstudioAcademicoEmpleado {
@@ -469,13 +471,21 @@ export interface ExamenOcupacionalEmpleado {
   cargoNombre?: string;
 }
 
+export interface TallasDotacionEmpleado {
+  camisa?: string; // ej. 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'
+  pantalon?: string; // ej. '28', '30', '32', '34', '36', '38', '40', '42'
+  calzado?: string; // ej. '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'
+  observaciones?: string;
+}
+
 export interface InfoSstEmpleado {
-  examenesOcupacionales: ExamenOcupacionalEmpleado[];
+  examenesOcupacionales?: ExamenOcupacionalEmpleado[];
   restriccionesActivas?: string;
   conceptoAptitudVigente?: 'Apto' | 'Apto con recomendaciones' | 'Apto con restricciones' | 'No apto' | 'Pendiente' | string;
   dotacionesEntregadasIds?: string[];
   capacitacionesCompletadasIds?: string[];
   incidentesRelacionadosIds?: string[];
+  tallas?: TallasDotacionEmpleado;
 }
 
 export interface DocumentoExpedienteEmpleado {
@@ -559,6 +569,8 @@ export interface Empleado {
   estudios?: EstudioAcademicoEmpleado[];
   experiencias?: ExperienciaLaboralEmpleado[];
   sst?: InfoSstEmpleado;
+  dotacion?: TallasDotacionEmpleado;
+  tallasDotacion?: TallasDotacionEmpleado;
   documentos?: DocumentoExpedienteEmpleado[];
   historialLaboral?: EventoHistorialLaboral[];
   saldoInicial?: SaldoInicialEmpleadoNomina;
