@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   PenTool,
   ShieldCheck,
@@ -6,10 +6,12 @@ import {
   Trash2,
   Type,
   RotateCcw,
+  Undo2,
   CheckCircle2,
   Lock,
   Copy,
   Check,
+  AlertTriangle,
   FileText,
   FileCheck,
   Building2,
@@ -30,6 +32,25 @@ interface FirmaDigitalStudioViewProps {
   empresa?: ConfiguracionEmpresa;
 }
 
+interface StudioStrokePoint {
+  x: number;
+  y: number;
+  pressure: number;
+}
+
+interface StudioStroke {
+  points: StudioStrokePoint[];
+  color: string;
+  baseWidth: number;
+}
+
+const LOGICAL_STUDIO_WIDTH = 560;
+const LOGICAL_STUDIO_HEIGHT = 200;
+// Umbral mínimo de distancia recorrida (px lógicos) para evitar que un punto accidental finalice la firma
+const MIN_TRAVERSED_PIXELS = 45;
+// Umbral mínimo de presión cuando el dispositivo táctil o lápiz reporta sensibilidad real (0 < pressure < 1)
+const MIN_PRESSURE_THRESHOLD = 0.08;
+
 export const FirmaDigitalStudioView: React.FC<FirmaDigitalStudioViewProps> = ({
   currentUser,
   empleados = [],
@@ -37,8 +58,15 @@ export const FirmaDigitalStudioView: React.FC<FirmaDigitalStudioViewProps> = ({
   empresa = initialEmpresa
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [hasDrawn, setHasDrawn] = useState(false);
+  const strokesRef = useRef<StudioStroke[]>([]);
+  const currentStrokeRef = useRef<StudioStroke | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
+  const isDrawingRef = useRef<boolean>(false);
+
+  const [strokeCount, setStrokeCount] = useState(0);
+  const [traversedPixels, setTraversedPixels] = useState(0);
+  const [lastPressure, setLastPressure] = useState<number | null>(null);
+  const [errorTrazo, setErrorTrazo] = useState<string | null>(null);
   const [modoFirma, setModoFirma] = useState<'dibujar' | 'escribir'>('dibujar');
 
   // Datos del firmante
@@ -62,6 +90,8 @@ export const FirmaDigitalStudioView: React.FC<FirmaDigitalStudioViewProps> = ({
   const [copiadoHash, setCopiadoHash] = useState(false);
   const [mensajeGuardado, setMensajeGuardado] = useState(false);
 
+  const hasValidSignature = traversedPixels >= MIN_TRAVERSED_PIXELS;
+
   // Cargar datos de empleado si existe
   useEffect(() => {
     if (currentUser?.empleadoId && empleados.length > 0) {
@@ -76,59 +106,241 @@ export const FirmaDigitalStudioView: React.FC<FirmaDigitalStudioViewProps> = ({
     }
   }, [currentUser, empleados, cargos]);
 
+  const calcularDistanciaTotal = useCallback((trazos: StudioStroke[], trazoEnCurso?: StudioStroke | null): number => {
+    let total = 0;
+    const acumular = (pts: StudioStrokePoint[]) => {
+      for (let i = 1; i < pts.length; i++) {
+        total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      }
+    };
+    trazos.forEach(t => acumular(t.points));
+    if (trazoEnCurso) acumular(trazoEnCurso.points);
+    return Math.round(total);
+  }, []);
+
+  // Renderizado HiDPI con suavizado cuadrático y modulación natural por presión
+  const renderizarCanvas = useCallback((trazos: StudioStroke[], trazoEnCurso?: StudioStroke | null) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const targetWidth = Math.round(LOGICAL_STUDIO_WIDTH * dpr);
+    const targetHeight = Math.round(LOGICAL_STUDIO_HEIGHT * dpr);
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, LOGICAL_STUDIO_WIDTH, LOGICAL_STUDIO_HEIGHT);
+
+    const dibujarTrazoNatural = (stroke: StudioStroke) => {
+      const pts = stroke.points;
+      if (pts.length === 0) return;
+
+      ctx.strokeStyle = stroke.color;
+      ctx.fillStyle = stroke.color;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (pts.length === 1) {
+        const radius = Math.max(1.1, (stroke.baseWidth * (0.65 + pts[0].pressure * 0.7)) / 2);
+        ctx.beginPath();
+        ctx.arc(pts[0].x, pts[0].y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+
+      if (pts.length === 2) {
+        const avgP = (pts[0].pressure + pts[1].pressure) / 2;
+        ctx.lineWidth = Math.max(1.2, stroke.baseWidth * (0.65 + avgP * 0.7));
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        ctx.lineTo(pts[1].x, pts[1].y);
+        ctx.stroke();
+        return;
+      }
+
+      // Curvas cuadráticas por segmentos con grosor modulado suavemente por presión
+      let prevMidX = pts[0].x;
+      let prevMidY = pts[0].y;
+      for (let i = 1; i < pts.length - 1; i++) {
+        const midX = (pts[i].x + pts[i + 1].x) / 2;
+        const midY = (pts[i].y + pts[i + 1].y) / 2;
+        const pressureFactor = 0.65 + pts[i].pressure * 0.7;
+        ctx.lineWidth = Math.max(1.2, stroke.baseWidth * pressureFactor);
+        ctx.beginPath();
+        ctx.moveTo(prevMidX, prevMidY);
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+        ctx.stroke();
+        prevMidX = midX;
+        prevMidY = midY;
+      }
+
+      const last = pts[pts.length - 1];
+      ctx.lineWidth = Math.max(1.2, stroke.baseWidth * (0.65 + last.pressure * 0.7));
+      ctx.beginPath();
+      ctx.moveTo(prevMidX, prevMidY);
+      ctx.lineTo(last.x, last.y);
+      ctx.stroke();
+    };
+
+    trazos.forEach(dibujarTrazoNatural);
+    if (trazoEnCurso) dibujarTrazoNatural(trazoEnCurso);
+
+    ctx.restore();
+  }, []);
+
+  useEffect(() => {
+    if (modoFirma === 'dibujar') {
+      renderizarCanvas(strokesRef.current, currentStrokeRef.current);
+    }
+  }, [modoFirma, renderizarCanvas]);
+
   const limpiarCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setHasDrawn(false);
+    strokesRef.current = [];
+    currentStrokeRef.current = null;
+    activePointerIdRef.current = null;
+    isDrawingRef.current = false;
+    setStrokeCount(0);
+    setTraversedPixels(0);
+    setLastPressure(null);
+    setErrorTrazo(null);
+    renderizarCanvas([]);
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const deshacerUltimoTrazo = () => {
+    if (strokesRef.current.length === 0) return;
+    strokesRef.current = strokesRef.current.slice(0, -1);
+    setStrokeCount(strokesRef.current.length);
+    setTraversedPixels(calcularDistanciaTotal(strokesRef.current));
+    setErrorTrazo(null);
+    renderizarCanvas(strokesRef.current);
+  };
 
-    setIsDrawing(true);
-    setHasDrawn(true);
+  // Extraer presión normalizada respetando dispositivos sin sensor real
+  const extraerPresionNormalizada = (e: React.PointerEvent<HTMLCanvasElement>): { pressure: number; valid: boolean } => {
+    const raw = typeof e.pressure === 'number' ? e.pressure : 0.5;
+    // Si es mouse con botón presionado o pantalla sin sensor de presión (0 o 0.5 constante), usar 0.5 por defecto
+    if (e.pointerType === 'mouse') {
+      return { pressure: raw > 0 ? Math.min(1, raw) : 0.5, valid: true };
+    }
+    // En táctil o lápiz óptico, validar umbral mínimo cuando hay sensor de presión activo
+    if (raw > 0 && raw < MIN_PRESSURE_THRESHOLD) {
+      return { pressure: raw, valid: false };
+    }
+    const normalized = raw <= 0 ? 0.5 : Math.min(1, raw);
+    return { pressure: normalized, valid: true };
+  };
 
+  const obtenerPuntoStudio = (e: React.PointerEvent<HTMLCanvasElement>, pressure: number): StudioStrokePoint => {
+    const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    ctx.beginPath();
-    ctx.moveTo((clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY);
-    ctx.strokeStyle = colorTrazo;
-    ctx.lineWidth = grosorTrazo;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    const scaleX = rect.width > 0 ? LOGICAL_STUDIO_WIDTH / rect.width : 1;
+    const scaleY = rect.height > 0 ? LOGICAL_STUDIO_HEIGHT / rect.height : 1;
+    return {
+      x: Math.max(0, Math.min(LOGICAL_STUDIO_WIDTH, (e.clientX - rect.left) * scaleX)),
+      y: Math.max(0, Math.min(LOGICAL_STUDIO_HEIGHT, (e.clientY - rect.top) * scaleY)),
+      pressure
+    };
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId) return;
+
+    const { pressure, valid } = extraerPresionNormalizada(e);
+    if (!valid) {
+      setErrorTrazo('Contacto demasiado leve detectado. Aplique un trazo firme para iniciar su firma.');
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    e.preventDefault();
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {}
 
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    activePointerIdRef.current = e.pointerId;
+    isDrawingRef.current = true;
+    setErrorTrazo(null);
+    setLastPressure(pressure);
 
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const punto = obtenerPuntoStudio(e, pressure);
+    currentStrokeRef.current = {
+      points: [punto],
+      color: colorTrazo,
+      baseWidth: grosorTrazo
+    };
 
-    ctx.lineTo((clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY);
-    ctx.stroke();
+    renderizarCanvas(strokesRef.current, currentStrokeRef.current);
   };
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || activePointerIdRef.current !== e.pointerId || !currentStrokeRef.current) return;
+    e.preventDefault();
+
+    const { pressure, valid } = extraerPresionNormalizada(e);
+    if (!valid) return;
+
+    const punto = obtenerPuntoStudio(e, pressure);
+    const pts = currentStrokeRef.current.points;
+    const ultimo = pts[pts.length - 1];
+
+    if (ultimo) {
+      const dx = punto.x - ultimo.x;
+      const dy = punto.y - ultimo.y;
+      if (dx * dx + dy * dy < 0.8) return;
+    }
+
+    pts.push(punto);
+    renderizarCanvas(strokesRef.current, currentStrokeRef.current);
+  };
+
+  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointerIdRef.current !== e.pointerId) return;
+    e.preventDefault();
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      try {
+        if (canvas.hasPointerCapture(e.pointerId)) {
+          canvas.releasePointerCapture(e.pointerId);
+        }
+      } catch {}
+    }
+
+    const { pressure } = extraerPresionNormalizada(e);
+    setLastPressure(pressure);
+
+    const trazo = currentStrokeRef.current;
+    if (trazo && trazo.points.length > 0) {
+      const distanciaTrazo = calcularDistanciaTotal([trazo]);
+      // Descartar toques micro-accidentales si aún no hay trazos reales (< 3px y único toque aislado)
+      if (trazo.points.length === 1 && strokesRef.current.length === 0 && distanciaTrazo < 2) {
+        setErrorTrazo(`Se detectó un solo punto de contacto. Realice un trazo mínimo de ${MIN_TRAVERSED_PIXELS} px para registrar una firma válida.`);
+      } else {
+        strokesRef.current = [...strokesRef.current, trazo];
+        const distTotal = calcularDistanciaTotal(strokesRef.current);
+        setStrokeCount(strokesRef.current.length);
+        setTraversedPixels(distTotal);
+        if (distTotal < MIN_TRAVERSED_PIXELS) {
+          setErrorTrazo(`Trazo aún insuficiente (${distTotal} / ${MIN_TRAVERSED_PIXELS} px). Complete su firma antes de guardarla.`);
+        } else {
+          setErrorTrazo(null);
+        }
+      }
+    }
+
+    currentStrokeRef.current = null;
+    activePointerIdRef.current = null;
+    isDrawingRef.current = false;
+    renderizarCanvas(strokesRef.current);
   };
 
   const renderizarFirmaTipografica = (): string => {
@@ -168,7 +380,14 @@ export const FirmaDigitalStudioView: React.FC<FirmaDigitalStudioViewProps> = ({
     let dataUrl = '';
     if (modoFirma === 'dibujar') {
       const canvas = canvasRef.current;
-      if (!canvas || !hasDrawn) return;
+      const distancia = calcularDistanciaTotal(strokesRef.current);
+      if (!canvas || strokesRef.current.length === 0 || distancia < MIN_TRAVERSED_PIXELS) {
+        setErrorTrazo(
+          `La firma requiere al menos ${MIN_TRAVERSED_PIXELS} px de recorrido acumulado (actual: ${distancia} px). Un toque puntual no se registra como firma válida.`
+        );
+        return;
+      }
+      renderizarCanvas(strokesRef.current);
       dataUrl = canvas.toDataURL('image/png');
     } else {
       dataUrl = renderizarFirmaTipografica();
@@ -328,51 +547,128 @@ export const FirmaDigitalStudioView: React.FC<FirmaDigitalStudioViewProps> = ({
             {modoFirma === 'dibujar' ? (
               <div className="space-y-3">
                 <div className="relative border-2 border-dashed border-[#8FA7D6]/60 rounded-2xl bg-slate-50/50 p-2 overflow-hidden">
-                  <canvas
-                    ref={canvasRef}
-                    width={560}
-                    height={200}
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    onTouchStart={startDrawing}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDrawing}
-                    className="w-full h-48 bg-white rounded-xl touch-none cursor-crosshair shadow-inner"
-                  />
-                  {!hasDrawn && (
-                    <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-slate-400 gap-1">
-                      <PenTool className="w-6 h-6 stroke-1" />
-                      <span className="text-xs font-medium">Dibuje su firma con mouse o pantalla táctil</span>
-                    </div>
-                  )}
+                  <div className="relative bg-white rounded-xl shadow-inner overflow-hidden">
+                    <div className="absolute inset-x-6 bottom-8 border-b border-slate-200 pointer-events-none" />
+                    <canvas
+                      ref={canvasRef}
+                      onPointerDown={startDrawing}
+                      onPointerMove={draw}
+                      onPointerUp={stopDrawing}
+                      onPointerCancel={stopDrawing}
+                      onContextMenu={e => e.preventDefault()}
+                      className="w-full h-48 block touch-none select-none cursor-crosshair relative z-10"
+                    />
+                    {strokeCount === 0 && (
+                      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-slate-400 gap-1 z-0 px-4 text-center">
+                        <PenTool className="w-6 h-6 stroke-1" />
+                        <span className="text-xs font-medium">Dibuje su firma con mouse, lápiz táctil o dedo (puede levantar entre caracteres)</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between">
+                {/* Indicador de recorrido mínimo y sensibilidad de presión */}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-500">Color:</span>
-                    {['#18235C', '#000000', '#0F4C81'].map(color => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setColorTrazo(color)}
-                        style={{ backgroundColor: color }}
-                        className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                          colorTrazo === color ? 'scale-110 border-emerald-500 shadow-xs' : 'border-white'
-                        }`}
-                      />
-                    ))}
+                    <span
+                      className={`inline-flex items-center gap-1 font-semibold ${
+                        hasValidSignature ? 'text-emerald-700' : 'text-slate-600'
+                      }`}
+                    >
+                      {hasValidSignature ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <PenTool className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                      <span>
+                        Recorrido:{' '}
+                        <strong className="font-mono tabular-nums">
+                          {traversedPixels} / {MIN_TRAVERSED_PIXELS} px
+                        </strong>
+                      </span>
+                    </span>
+                    <span className="text-slate-300">|</span>
+                    <span className="text-slate-500 font-mono tabular-nums">
+                      Trazos: {strokeCount}
+                    </span>
+                    {lastPressure !== null && (
+                      <>
+                        <span className="text-slate-300">|</span>
+                        <span className="text-slate-500 font-mono tabular-nums">
+                          Presión: {Math.round(lastPressure * 100)}%
+                        </span>
+                      </>
+                    )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={limpiarCanvas}
-                    className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                  <span
+                    className={`font-semibold ${
+                      hasValidSignature ? 'text-emerald-700' : 'text-amber-700'
+                    }`}
                   >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Borrar Trazo</span>
-                  </button>
+                    {hasValidSignature ? 'Trazo válido para guardar' : 'Complete su firma'}
+                  </span>
+                </div>
+
+                {errorTrazo && (
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>{errorTrazo}</span>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-500">Color:</span>
+                      {['#18235C', '#000000', '#0F4C81'].map(color => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setColorTrazo(color)}
+                          style={{ backgroundColor: color }}
+                          className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer ${
+                            colorTrazo === color ? 'scale-110 border-emerald-500 shadow-xs' : 'border-white'
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-slate-500">Grosor:</span>
+                      <input
+                        type="range"
+                        min="1.5"
+                        max="4.5"
+                        step="0.5"
+                        value={grosorTrazo}
+                        onChange={e => setGrosorTrazo(parseFloat(e.target.value))}
+                        className="w-20 accent-[#18235C] cursor-pointer"
+                        title={`Grosor base: ${grosorTrazo}px`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {strokeCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={deshacerUltimoTrazo}
+                        className="px-2.5 py-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Undo2 className="w-3 h-3" />
+                        <span>Deshacer</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={limpiarCanvas}
+                      className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Borrar Trazo</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -455,9 +751,14 @@ export const FirmaDigitalStudioView: React.FC<FirmaDigitalStudioViewProps> = ({
             <button
               type="button"
               onClick={guardarFirmaOficial}
-              className="w-full py-3 bg-[#18235C] hover:bg-[#101740] text-white font-extrabold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              disabled={modoFirma === 'dibujar' && !hasValidSignature}
+              className={`w-full py-3 font-extrabold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 ${
+                modoFirma === 'dibujar' && !hasValidSignature
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  : 'bg-[#18235C] hover:bg-[#101740] text-white cursor-pointer'
+              }`}
             >
-              <ShieldCheck className="w-5 h-5 text-[#00FF00]" />
+              <ShieldCheck className={`w-5 h-5 ${modoFirma === 'dibujar' && !hasValidSignature ? 'text-slate-400' : 'text-[#00FF00]'}`} />
               <span>Guardar Rúbrica & Credencial Criptográfica</span>
             </button>
           </div>

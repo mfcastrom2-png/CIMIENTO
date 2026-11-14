@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Empleado,
   ConfiguracionEmpresa,
@@ -9,6 +9,7 @@ import {
   PenTool,
   ShieldCheck,
   RotateCcw,
+  Undo2,
   Sparkles,
   Printer,
   CheckCircle2,
@@ -95,6 +96,14 @@ function formatFechaEspanolFormal(fechaStr?: string): { mayusculas: string; form
   };
 }
 
+interface StrokePoint {
+  x: number;
+  y: number;
+}
+
+const LOGICAL_CANVAS_WIDTH = 650;
+const LOGICAL_CANVAS_HEIGHT = 180;
+
 export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps> = ({
   empleado,
   empresa,
@@ -104,8 +113,14 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
 }) => {
   const contrato = empleado.vinculacion?.contratoDigital;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const strokesRef = useRef<StrokePoint[][]>([]);
+  const currentStrokeRef = useRef<StrokePoint[]>([]);
+  const activePointerIdRef = useRef<number | null>(null);
+  const isDrawingRef = useRef<boolean>(false);
+  const dprRef = useRef<number>(1);
 
-  const [dibujando, setDibujando] = useState(false);
+  const [cantidadTrazos, setCantidadTrazos] = useState(0);
+  const [esRubricaAutomatica, setEsRubricaAutomatica] = useState(false);
   const [firmaCapturada, setFirmaCapturada] = useState<string | null>(
     contrato?.firmaCandidatoUrl || null
   );
@@ -138,79 +153,257 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
     }
   };
 
-  // Manejo del Canvas de Firma
-  const empezarDibujo = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  // Configurar escala HiDPI y renderizar todos los trazos guardados
+  const configurarYRedibujarCanvas = useCallback((trazos: StrokePoint[][], trazoEnCurso?: StrokePoint[]) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    setDibujando(true);
-    const rect = canvas.getBoundingClientRect();
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.beginPath();
-    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
-    ctx.moveTo(x, y);
-  };
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    dprRef.current = dpr;
 
-  const dibujar = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!dibujando) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const targetWidth = Math.round(LOGICAL_CANVAS_WIDTH * dpr);
+    const targetHeight = Math.round(LOGICAL_CANVAS_HEIGHT * dpr);
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+    }
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
+
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, LOGICAL_CANVAS_WIDTH, LOGICAL_CANVAS_HEIGHT);
+
     ctx.strokeStyle = '#18235C';
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    ctx.fillStyle = '#18235C';
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const dibujarTrazo = (puntos: StrokePoint[]) => {
+      if (puntos.length === 0) return;
+      if (puntos.length === 1) {
+        ctx.beginPath();
+        ctx.arc(puntos[0].x, puntos[0].y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+      if (puntos.length === 2) {
+        ctx.beginPath();
+        ctx.moveTo(puntos[0].x, puntos[0].y);
+        ctx.lineTo(puntos[1].x, puntos[1].y);
+        ctx.stroke();
+        return;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(puntos[0].x, puntos[0].y);
+      for (let i = 1; i < puntos.length - 1; i++) {
+        const midX = (puntos[i].x + puntos[i + 1].x) / 2;
+        const midY = (puntos[i].y + puntos[i + 1].y) / 2;
+        ctx.quadraticCurveTo(puntos[i].x, puntos[i].y, midX, midY);
+      }
+      const last = puntos[puntos.length - 1];
+      ctx.lineTo(last.x, last.y);
+      ctx.stroke();
+    };
+
+    trazos.forEach(dibujarTrazo);
+    if (trazoEnCurso && trazoEnCurso.length > 0) {
+      dibujarTrazo(trazoEnCurso);
+    }
+
+    ctx.restore();
+  }, []);
+
+  useEffect(() => {
+    configurarYRedibujarCanvas(strokesRef.current);
+  }, [configurarYRedibujarCanvas]);
+
+  // Convertir coordenadas de cliente a coordenadas lógicas reales del lienzo (650x180)
+  const obtenerPuntoLogico = (e: React.PointerEvent<HTMLCanvasElement>): StrokePoint => {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? LOGICAL_CANVAS_WIDTH / rect.width : 1;
+    const scaleY = rect.height > 0 ? LOGICAL_CANVAS_HEIGHT / rect.height : 1;
+    return {
+      x: Math.max(0, Math.min(LOGICAL_CANVAS_WIDTH, (e.clientX - rect.left) * scaleX)),
+      y: Math.max(0, Math.min(LOGICAL_CANVAS_HEIGHT, (e.clientY - rect.top) * scaleY))
+    };
   };
 
-  const terminarDibujo = () => {
-    if (!dibujando) return;
-    setDibujando(false);
+  // Manejo del Canvas de Firma con Pointer Events (soporta múltiples trazos separados para letra no cursiva / imprenta)
+  const manejarPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Ignorar botones secundarios del mouse
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // Evitar interferencia de un segundo dedo o palma mientras ya hay un puntero activo
+    if (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    e.preventDefault();
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+      // Algunos navegadores móviles no requieren captura explícita
+    }
+
+    // Si estaba usando rúbrica automática previa, limpiar para iniciar trazo manual limpio
+    if (esRubricaAutomatica) {
+      strokesRef.current = [];
+      setCantidadTrazos(0);
+      setEsRubricaAutomatica(false);
+    }
+
+    // Si el usuario vuelve a trazar después de fijar vista previa, desbloqueamos para agregar nuevos caracteres
+    if (firmaCapturada) {
+      setFirmaCapturada(null);
+    }
+
+    activePointerIdRef.current = e.pointerId;
+    isDrawingRef.current = true;
+    const punto = obtenerPuntoLogico(e);
+    currentStrokeRef.current = [punto];
+    setErrorValidacion(null);
+    configurarYRedibujarCanvas(strokesRef.current, currentStrokeRef.current);
+  };
+
+  const manejarPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || activePointerIdRef.current !== e.pointerId) return;
+    e.preventDefault();
+
+    const punto = obtenerPuntoLogico(e);
+    const actual = currentStrokeRef.current;
+    const ultimo = actual[actual.length - 1];
+
+    // Filtrar micro-movimientos menores a 0.8px para suavidad y rendimiento táctil
+    if (ultimo) {
+      const dx = punto.x - ultimo.x;
+      const dy = punto.y - ultimo.y;
+      if (dx * dx + dy * dy < 0.64) return;
+    }
+
+    actual.push(punto);
+    configurarYRedibujarCanvas(strokesRef.current, actual);
+  };
+
+  const finalizarTrazoIndividual = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointerIdRef.current !== e.pointerId) return;
+    e.preventDefault();
+
     const canvas = canvasRef.current;
     if (canvas) {
-      setFirmaCapturada(canvas.toDataURL('image/png'));
+      try {
+        if (canvas.hasPointerCapture(e.pointerId)) {
+          canvas.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        // Ignorar si ya fue liberado
+      }
     }
+
+    if (currentStrokeRef.current.length > 0) {
+      strokesRef.current = [...strokesRef.current, [...currentStrokeRef.current]];
+      setCantidadTrazos(strokesRef.current.length);
+    }
+    currentStrokeRef.current = [];
+    activePointerIdRef.current = null;
+    isDrawingRef.current = false;
+    configurarYRedibujarCanvas(strokesRef.current);
+    // NOTA: NO finalizamos ni fijamos `firmaCapturada` aquí para que el usuario pueda levantar
+    // el dedo o cursor libremente entre cada letra o carácter de su firma (ej. letra imprenta / despegada).
+  };
+
+  const calcularLongitudTotalTrazos = (trazos: StrokePoint[][]): number => {
+    let total = 0;
+    for (const stroke of trazos) {
+      for (let i = 1; i < stroke.length; i++) {
+        const dx = stroke[i].x - stroke[i - 1].x;
+        const dy = stroke[i].y - stroke[i - 1].y;
+        total += Math.hypot(dx, dy);
+      }
+    }
+    return total;
+  };
+
+  const confirmarFirmaDesdeCanvas = (): string | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    if (strokesRef.current.length === 0) return null;
+
+    const longitud = calcularLongitudTotalTrazos(strokesRef.current);
+    if (strokesRef.current.length === 1 && longitud < 8) {
+      setErrorValidacion('El trazo capturado es muy corto o parece un toque accidental. Complete su firma realizando los trazos completos antes de confirmarla.');
+      return null;
+    }
+
+    configurarYRedibujarCanvas(strokesRef.current);
+    const dataUrl = canvas.toDataURL('image/png');
+    setFirmaCapturada(dataUrl);
+    setErrorValidacion(null);
+    return dataUrl;
+  };
+
+  const deshacerUltimoTrazo = () => {
+    if (strokesRef.current.length === 0) return;
+    strokesRef.current = strokesRef.current.slice(0, -1);
+    setCantidadTrazos(strokesRef.current.length);
+    setFirmaCapturada(null);
+    setErrorValidacion(null);
+    configurarYRedibujarCanvas(strokesRef.current);
   };
 
   const limpiarCanvas = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-    }
+    strokesRef.current = [];
+    currentStrokeRef.current = [];
+    activePointerIdRef.current = null;
+    isDrawingRef.current = false;
+    setCantidadTrazos(0);
+    setEsRubricaAutomatica(false);
     setFirmaCapturada(null);
+    setErrorValidacion(null);
+    configurarYRedibujarCanvas([]);
   };
 
   const generarRubricaAutomatica = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    dprRef.current = dpr;
+    canvas.width = Math.round(LOGICAL_CANVAS_WIDTH * dpr);
+    canvas.height = Math.round(LOGICAL_CANVAS_HEIGHT * dpr);
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const texto = (firmaNombre || empleado.nombre || 'Trabajador').trim();
+    strokesRef.current = [];
+    currentStrokeRef.current = [];
+    activePointerIdRef.current = null;
+    isDrawingRef.current = false;
+    setCantidadTrazos(0);
+    setEsRubricaAutomatica(true);
+    setErrorValidacion(null);
+
     ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, LOGICAL_CANVAS_WIDTH, LOGICAL_CANVAS_HEIGHT);
     ctx.strokeStyle = '#18235C';
     ctx.fillStyle = '#18235C';
     ctx.lineWidth = 2.2;
     ctx.lineCap = 'round';
 
+    const texto = (firmaNombre || empleado.nombre || 'Trabajador').trim();
+
     // Trazo de rúbrica caligráfica
     ctx.beginPath();
-    ctx.moveTo(40, 95);
-    ctx.bezierCurveTo(110, 25, 190, 115, 270, 45);
-    ctx.bezierCurveTo(330, 20, 380, 85, 460, 55);
+    ctx.moveTo(40, 108);
+    ctx.bezierCurveTo(110, 32, 190, 128, 270, 52);
+    ctx.bezierCurveTo(330, 24, 380, 96, 460, 62);
     ctx.stroke();
 
     ctx.font = 'italic bold 24px Georgia, serif';
-    ctx.fillText(texto.slice(0, 28), 50, 75);
+    ctx.fillText(texto.slice(0, 28), 50, 84);
     ctx.restore();
 
     setFirmaCapturada(canvas.toDataURL('image/png'));
@@ -220,8 +413,15 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
     e.preventDefault();
     setErrorValidacion(null);
 
-    if (!firmaCapturada) {
-      setErrorValidacion('Por favor estampe su firma manuscrita en el recuadro interactivo (o use el botón de Generar Rúbrica Caligráfica).');
+    // Si el colaborador trazó su firma manualmente pero no presionó "Confirmar y Fijar Firma", la capturamos automáticamente aquí
+    let firmaFinalUrl = firmaCapturada;
+    if (!firmaFinalUrl && strokesRef.current.length > 0) {
+      firmaFinalUrl = confirmarFirmaDesdeCanvas();
+      if (!firmaFinalUrl) return;
+    }
+
+    if (!firmaFinalUrl) {
+      setErrorValidacion('Por favor trace su firma en el recuadro interactivo (puede levantar el dedo entre cada letra) y confirme su firma, o use "Generar Rúbrica Caligráfica".');
       return;
     }
 
@@ -278,7 +478,7 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
         fechaCarga: fechaHoy.slice(0, 10),
         fechaExpedicion: fechaHoy.slice(0, 10),
         usuarioCarga: 'Firma Digital Ley 527/1999',
-        urlArchivo: firmaCapturada,
+        urlArchivo: firmaFinalUrl,
         observaciones: `Suscrito digitalmente por ${empleado.nombre}. Sello SHA-256: ${hash.slice(0, 16)}...`,
         estado: 'Vigente'
       };
@@ -286,7 +486,7 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
       const contratoActualizado: any = {
         ...(contrato || {}),
         codigoContrato: codContrato,
-        firmaCandidatoUrl: firmaCapturada,
+        firmaCandidatoUrl: firmaFinalUrl,
         firmaCandidatoNombre: firmaNombre.trim(),
         firmaCandidatoDocumento: firmaDocumento.trim(),
         firmaFechaHora: fechaHoy,
@@ -891,49 +1091,96 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
           {/* Panel Interactivo de Captura de Firma Digital (Ley 527 de 1999) */}
           <div className="p-5 bg-gradient-to-br from-indigo-50/60 to-slate-50 border-2 border-indigo-200 rounded-3xl space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-200/80 pb-2">
-              <span className="font-black text-[#18235C] text-xs flex items-center gap-1.5">
-                <PenTool className="w-4 h-4 text-indigo-700" />
-                <span>Panel de Firma Digital del Colaborador (Ley 527 de 1999) *</span>
-              </span>
+              <div className="space-y-0.5">
+                <span className="font-black text-[#18235C] text-xs flex items-center gap-1.5">
+                  <PenTool className="w-4 h-4 text-indigo-700" />
+                  <span>Panel de Firma Digital del Colaborador (Ley 527 de 1999) *</span>
+                </span>
+                <p className="text-[11px] text-slate-600">
+                  Puede escribir su firma en letra imprenta o cursiva levantando el dedo o cursor entre cada carácter. Cuando termine toda su firma, pulse <strong>Confirmar Firma</strong>.
+                </p>
+              </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {cantidadTrazos > 0 && (
+                  <button
+                    type="button"
+                    onClick={deshacerUltimoTrazo}
+                    className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Undo2 className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Deshacer trazo ({cantidadTrazos})</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={generarRubricaAutomatica}
-                  className="text-xs font-bold text-indigo-800 hover:text-indigo-900 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                  className="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-xs font-bold text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Generar Rúbrica Caligráfica</span>
+                  <span>Generar Rúbrica</span>
                 </button>
                 <button
                   type="button"
                   onClick={limpiarCanvas}
-                  className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                  className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-700 flex items-center gap-1 cursor-pointer transition-colors"
                 >
                   <RotateCcw className="w-3 h-3" />
-                  <span>Limpiar Trazo</span>
+                  <span>Limpiar todo</span>
                 </button>
               </div>
             </div>
 
             <div className="border-2 border-dashed border-indigo-300 rounded-2xl bg-white overflow-hidden relative shadow-inner">
+              {/* Línea guía visual de firma (no se exporta en el PNG) */}
+              <div className="absolute inset-x-8 bottom-8 border-b border-slate-200 pointer-events-none" />
+
               <canvas
                 ref={canvasRef}
-                width={650}
-                height={160}
-                onMouseDown={empezarDibujo}
-                onMouseMove={dibujar}
-                onMouseUp={terminarDibujo}
-                onMouseLeave={terminarDibujo}
-                onTouchStart={empezarDibujo}
-                onTouchMove={dibujar}
-                onTouchEnd={terminarDibujo}
-                className="w-full h-36 cursor-crosshair touch-none"
+                onPointerDown={manejarPointerDown}
+                onPointerMove={manejarPointerMove}
+                onPointerUp={finalizarTrazoIndividual}
+                onPointerCancel={finalizarTrazoIndividual}
+                onContextMenu={e => e.preventDefault()}
+                className="w-full h-44 block cursor-crosshair touch-none select-none relative z-10"
               />
-              {!firmaCapturada && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-slate-400 text-xs font-medium px-4 text-center">
-                  Estampe aquí su firma manuscrita con el ratón o el dedo táctil (o pulse "Generar Rúbrica Caligráfica")
+
+              {cantidadTrazos === 0 && !firmaCapturada && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-slate-400 text-xs font-medium px-6 text-center z-0">
+                  Trace aquí su firma letra por letra o en trazo continuo con el dedo, lápiz táctil o ratón
                 </div>
+              )}
+            </div>
+
+            {/* Barra de estado del trazo y confirmación explícita */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+              <div className="text-[11px] flex items-center gap-2">
+                {firmaCapturada ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Firma confirmada y aplicada al contrato (puede seguir trazando si desea ajustarla)
+                  </span>
+                ) : cantidadTrazos > 0 ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 font-semibold">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    {cantidadTrazos} {cantidadTrazos === 1 ? 'trazo capturado' : 'trazos capturados'} — continúe escribiendo o pulse Confirmar Firma
+                  </span>
+                ) : (
+                  <span className="text-slate-500">
+                    Múltiples trazos habilitados: ideal para firmas en letra imprenta o despegada.
+                  </span>
+                )}
+              </div>
+
+              {cantidadTrazos > 0 && !firmaCapturada && (
+                <button
+                  type="button"
+                  onClick={confirmarFirmaDesdeCanvas}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#18235C] hover:bg-[#101740] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition-colors"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Confirmar y Fijar Firma</span>
+                </button>
               )}
             </div>
 

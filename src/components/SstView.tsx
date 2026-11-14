@@ -19,6 +19,7 @@ import { MatrizRiesgosGTC45View } from './MatrizRiesgosGTC45View';
 import { useAuth } from '../context/AuthContext';
 import { puedeEditarSST } from '../utils/sstAuthUtils';
 import { BannerPermisoSst } from './sst/BannerPermisoSst';
+import { ProgresoEstandaresSstBar } from './sst/ProgresoEstandaresSstBar';
 import {
   AlertCircle,
   AlertOctagon,
@@ -379,6 +380,15 @@ export function SstView({
       {/* TAB 1: AUTOEVALUACIÓN 21 ESTÁNDARES RESOLUCIÓN 0312 */}
       {activeTab === 'estandares' && (
         <div className="space-y-4">
+          {/* Barra de Progreso Visual de los 21 Estándares Mínimos (Resolución 0312 de 2019) */}
+          <ProgresoEstandaresSstBar
+            estandares={estandares}
+            filtroCiclo={filtroCiclo}
+            filtroEstado={filtroEstado}
+            onSelectCiclo={setFiltroCiclo}
+            onSelectEstado={setFiltroEstado}
+          />
+
           {/* Barra de Filtros y Búsqueda */}
           <div className="bg-white rounded-xl border border-[#8FA7D6] p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm">
             <div className="flex flex-wrap items-center gap-2 text-xs">
