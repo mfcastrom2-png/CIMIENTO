@@ -1,5 +1,8 @@
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
+import { Empleado, ConfiguracionEmpresa } from '../types';
+import { normalizarCodigoContratoLaboral } from '../services/vinculacionService';
+import { construirJsonQrDocumentoPdf } from '../services/verificacionCertificadosService';
 
 export interface DatosPdfContratoLaboral {
   codigoContrato: string;
@@ -33,6 +36,205 @@ export interface DatosPdfContratoLaboral {
   hashSha256?: string;
 }
 
+const MESES_CONTRATO = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+];
+
+const NUMEROS_LETRAS_CONTRATO: Record<number, string> = {
+  1: 'un (1)', 2: 'dos (2)', 3: 'tres (3)', 4: 'cuatro (4)', 5: 'cinco (5)',
+  6: 'seis (6)', 7: 'siete (7)', 8: 'ocho (8)', 9: 'nueve (9)', 10: 'diez (10)',
+  11: 'once (11)', 12: 'doce (12)', 13: 'trece (13)', 14: 'catorce (14)', 15: 'quince (15)',
+  16: 'dieciséis (16)', 17: 'diecisiete (17)', 18: 'dieciocho (18)', 19: 'diecinueve (19)', 20: 'veinte (20)',
+  21: 'veintiún (21)', 22: 'veintidós (22)', 23: 'veintitrés (23)', 24: 'veinticuatro (24)', 25: 'veinticinco (25)',
+  26: 'veintiséis (26)', 27: 'veintisiete (27)', 28: 'veintiocho (28)', 29: 'veintinueve (29)', 30: 'treinta (30)',
+  31: 'treinta y un (31)'
+};
+
+export function formatFechaEspanolFormal(fechaStr?: string): { mayusculas: string; formalLarga: string } {
+  const anioEnLetras = (anio: number) =>
+    anio === 2025 ? 'dos mil veinticinco (2025)' :
+    anio === 2026 ? 'dos mil veintiséis (2026)' :
+    anio === 2027 ? 'dos mil veintisiete (2027)' :
+    `${anio}`;
+
+  if (!fechaStr) {
+    const hoy = new Date();
+    const dia = hoy.getDate();
+    const mes = MESES_CONTRATO[hoy.getMonth()];
+    const anio = hoy.getFullYear();
+    const diaLetras = NUMEROS_LETRAS_CONTRATO[dia] || `${dia}`;
+    return {
+      mayusculas: `${dia < 10 ? '0' : ''}${dia} DE ${mes.toUpperCase()} DE ${anio}`,
+      formalLarga: `${diaLetras} de ${mes} de ${anioEnLetras(anio)}`
+    };
+  }
+
+  const parts = fechaStr.slice(0, 10).split('-');
+  if (parts.length === 3) {
+    const anio = parseInt(parts[0], 10);
+    const mesIndex = parseInt(parts[1], 10) - 1;
+    const dia = parseInt(parts[2], 10);
+    if (!Number.isNaN(anio) && !Number.isNaN(mesIndex) && !Number.isNaN(dia)) {
+      const mes = MESES_CONTRATO[mesIndex] || 'noviembre';
+      const diaLetras = NUMEROS_LETRAS_CONTRATO[dia] || `${dia}`;
+      return {
+        mayusculas: `${dia < 10 ? '0' : ''}${dia} DE ${mes.toUpperCase()} DE ${anio}`,
+        formalLarga: `${diaLetras} de ${mes} de ${anioEnLetras(anio)}`
+      };
+    }
+  }
+
+  return {
+    mayusculas: '03 DE NOVIEMBRE DE 2026',
+    formalLarga: 'tres (3) de noviembre de dos mil veintiséis (2026)'
+  };
+}
+
+export interface OpcionesConstruccionDatosContrato {
+  cargoNombreOverride?: string;
+  areaNombreOverride?: string;
+  firmaCapturadaUrlOverride?: string | null;
+  firmaNombreOverride?: string;
+  firmaDocumentoOverride?: string;
+}
+
+export function construirDatosPdfContratoDesdeEmpleado(
+  empleado: Empleado,
+  empresa?: ConfiguracionEmpresa,
+  opciones?: OpcionesConstruccionDatosContrato
+): DatosPdfContratoLaboral {
+  const contrato = empleado.vinculacion?.contratoDigital;
+
+  const nombreCompletoEmpleado = (
+    empleado.nombre?.trim() ||
+    [
+      empleado.persona?.primerNombre,
+      empleado.persona?.segundoNombre,
+      empleado.persona?.primerApellido,
+      empleado.persona?.segundoApellido
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    'COLABORADOR'
+  );
+
+  const documentoEmpleado = empleado.documento?.trim() || empleado.laboral?.codigoInterno || 'N/A';
+  const tipoDocumentoEmpleado = empleado.persona?.tipoDocumento || empleado.tipoDocumento || 'C.C.';
+
+  const nombreEmpresa = empresa?.razonSocial || 'B GROUP INGENIERÍA S.A.S.';
+  const nitEmpresa = empresa?.nit
+    ? `NIT ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}`
+    : 'NIT 900.995.955-2';
+  const domicilioEmpresa = empresa?.contacto?.direccion || 'Urbanización Villa Rubia, Manzana F, Lote 4';
+  const ciudadEmpresa = empresa?.contacto?.ciudad || 'Cartagena de Indias';
+  const repLegalNombre = empresa?.representanteLegal?.nombre || 'HERNAN RIQUELME BORJA BENITEZ';
+  const repLegalDocumento = empresa?.representanteLegal?.numeroDocumento || '73.008.881';
+
+  const cargoTitulo = (
+    opciones?.cargoNombreOverride ||
+    contrato?.cargoNombre ||
+    empleado.laboral?.cargoNombre ||
+    'TÉCNICO DE SOPORTE E INSTALACIONES'
+  ).toUpperCase();
+
+  const areaTitulo =
+    opciones?.areaNombreOverride ||
+    contrato?.areaNombre ||
+    empleado.laboral?.areaNombre ||
+    'Operaciones';
+
+  const salarioValor = Number(
+    contrato?.salarioBasico ||
+    empleado.salarioBase ||
+    empleado.compensacion?.salarioBasico ||
+    1423500
+  );
+
+  const codigoContrato = normalizarCodigoContratoLaboral(contrato?.codigoContrato);
+
+  const fechaInicioRaw =
+    contrato?.fechaInicio ||
+    empleado.laboral?.fechaInicioContrato ||
+    empleado.laboral?.fechaIngreso ||
+    new Date().toISOString().slice(0, 10);
+
+  const duracionMeses = Number(contrato?.duracionMeses || 6);
+  const fechaFinRaw =
+    contrato?.fechaFin ||
+    empleado.laboral?.fechaTerminacionContrato ||
+    (() => {
+      const f = new Date(fechaInicioRaw);
+      if (Number.isNaN(f.getTime())) return new Date().toISOString().slice(0, 10);
+      f.setMonth(f.getMonth() + duracionMeses);
+      f.setDate(f.getDate() - 1);
+      return f.toISOString().slice(0, 10);
+    })();
+
+  const fechaFirmaInfo = formatFechaEspanolFormal(fechaInicioRaw);
+  const fechaInicioInfo = formatFechaEspanolFormal(fechaInicioRaw);
+  const fechaFinInfo = formatFechaEspanolFormal(fechaFinRaw);
+
+  const duracionTexto =
+    duracionMeses === 6
+      ? 'SEIS (6) MESES'
+      : duracionMeses === 12
+      ? 'DOCE (12) MESES'
+      : `${duracionMeses} MESES`;
+
+  const periodoPruebaDias = Number(contrato?.periodoPruebaDias || 30);
+  const periodoPruebaTexto =
+    periodoPruebaDias === 30
+      ? 'TREINTA (30) DÍAS CALENDARIO'
+      : `${periodoPruebaDias} DÍAS CALENDARIO`;
+
+  const celularCandidato = empleado.contacto?.celular || 'Sin registrar';
+  const correoCandidato =
+    empleado.contacto?.correoPersonal ||
+    empleado.contacto?.correoCorporativo ||
+    empleado.email ||
+    'Sin registrar';
+  const direccionCandidato = empleado.contacto?.direccion || ciudadEmpresa;
+
+  const firmaCapturadaUrl =
+    opciones?.firmaCapturadaUrlOverride !== undefined
+      ? opciones.firmaCapturadaUrlOverride
+      : contrato?.firmaCandidatoUrl || null;
+
+  return {
+    codigoContrato,
+    nombreEmpresa,
+    nitEmpresa,
+    domicilioEmpresa,
+    ciudadEmpresa,
+    repLegalNombre,
+    repLegalDocumento,
+    empleadoNombre: nombreCompletoEmpleado,
+    empleadoTipoDocumento: tipoDocumentoEmpleado,
+    empleadoDocumento: documentoEmpleado,
+    celularCandidato,
+    correoCandidato,
+    direccionCandidato,
+    cargoTitulo,
+    areaTitulo,
+    salarioValor,
+    duracionTexto,
+    periodoPruebaTexto,
+    fechaFirmaMayusculas: fechaFirmaInfo.mayusculas,
+    fechaFirmaFormalLarga: fechaFirmaInfo.formalLarga,
+    fechaInicioMayusculas: fechaInicioInfo.mayusculas,
+    fechaInicioFormalLarga: fechaInicioInfo.formalLarga,
+    fechaFinMayusculas: fechaFinInfo.mayusculas,
+    fechaFinFormalLarga: fechaFinInfo.formalLarga,
+    firmaCapturadaUrl,
+    firmaNombre: opciones?.firmaNombreOverride?.trim() || contrato?.firmaCandidatoNombre || nombreCompletoEmpleado,
+    firmaDocumento: opciones?.firmaDocumentoOverride?.trim() || contrato?.firmaCandidatoDocumento || documentoEmpleado,
+    firmaFechaHora: contrato?.firmaFechaHora,
+    hashSha256: contrato?.hashSha256
+  };
+}
+
 interface ClausulaPdfItem {
   titulo: string;
   cuerpo?: string;
@@ -45,7 +247,7 @@ interface ClausulaPdfItem {
  * del Contrato Individual de Trabajo a Término Fijo de la empresa.
  */
 export function construirClausulasContratoLaboral(datos: DatosPdfContratoLaboral): ClausulaPdfItem[] {
-  const salarioFormateado = `$${datos.salarioValor.toLocaleString('es-CO')} COP`;
+  const salarioFormateado = `$${Number(datos.salarioValor || 0).toLocaleString('es-CO')} COP`;
 
   return [
     {
@@ -544,20 +746,29 @@ export async function generarPdfContratoLaboralVectorial(
 
     cursorY += 62;
 
-    // 6. BLOQUE QR Y CERTIFICADO DE INTEGRIDAD
-    ensureSpace(26);
+    // 6. BLOQUE QR Y CERTIFICADO DE INTEGRIDAD (JSON CODIFICADO + URL DE VALIDACIÓN FIRMADA)
+    ensureSpace(28);
     doc.setFillColor(...BG_SOFT);
     doc.setDrawColor(...BORDER_LIGHT);
-    doc.roundedRect(marginX, cursorY, contentWidth, 23, 1.5, 1.5, 'FD');
+    doc.roundedRect(marginX, cursorY, contentWidth, 25, 1.5, 1.5, 'FD');
 
+    let urlValidacionFirmada = '';
     try {
-      const qrPayload = `BGROUP|CONTRATO:${datos.codigoContrato}|DOC:${datos.empleadoDocumento}|HASH:${datos.hashSha256 || 'BORRADOR'}`;
+      const { jsonString: qrPayload, payload } = await construirJsonQrDocumentoPdf({
+        nombreEmpleado: datos.empleadoNombre,
+        numeroDocumento: datos.empleadoDocumento,
+        idContrato: datos.codigoContrato,
+        tipoDocumento: 'Contrato Laboral',
+        hashSha256: datos.hashSha256
+      });
+      urlValidacionFirmada = payload.urlValidacionFirmada;
       const qrDataUrl = await QRCode.toDataURL(qrPayload, {
-        width: 140,
+        width: 240,
         margin: 1,
+        errorCorrectionLevel: 'M',
         color: { dark: '#18235C', light: '#FFFFFF' }
       });
-      doc.addImage(qrDataUrl, 'PNG', marginX + 3, cursorY + 2.5, 18, 18);
+      doc.addImage(qrDataUrl, 'PNG', marginX + 3, cursorY + 2.5, 20, 20);
     } catch {
       // Si QRCode falla por alguna razón, continuamos sin bloquear la descarga
     }
@@ -565,25 +776,35 @@ export async function generarPdfContratoLaboralVectorial(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...SLATE_DARK);
-    doc.text('Certificado de Firma Electrónica e Integridad Documental', marginX + 24, cursorY + 7);
+    doc.text('Certificado de Firma Electrónica e Integridad Documental', marginX + 26, cursorY + 6.5);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.4);
+    doc.setFontSize(7.3);
     doc.setTextColor(...SLATE_BODY);
     doc.text(
-      `Radicado: ${datos.codigoContrato} · Ley 527 de 1999 y Decreto 2364 de 2012 · Válido ante el Ministerio del Trabajo de Colombia.`,
-      marginX + 24,
-      cursorY + 12
+      `Radicado: ${datos.codigoContrato} · Titular: ${datos.empleadoNombre} (${datos.empleadoDocumento}) · Ley 527 de 1999.`,
+      marginX + 26,
+      cursorY + 11.5
     );
     doc.setFont('courier', 'normal');
-    doc.setFontSize(7);
+    doc.setFontSize(6.8);
     doc.setTextColor(...SLATE_MUTED);
     doc.text(
       datos.hashSha256
         ? `Sello SHA-256: ${datos.hashSha256}`
         : 'Estado: Borrador previo a firma digital (el sello SHA-256 se genera al suscribir el contrato).',
-      marginX + 24,
-      cursorY + 17.5
+      marginX + 26,
+      cursorY + 16.5
+    );
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(6.6);
+    doc.setTextColor(...NAVY);
+    doc.text(
+      urlValidacionFirmada
+        ? `QR JSON autenticado con URL firmada de validación en sistema (#/verificar · Ley 527/1999).`
+        : `QR con metadatos verificables en plataforma oficial.`,
+      marginX + 26,
+      cursorY + 21.5
     );
 
     // 7. ENCABEZADOS Y PIES DE PÁGINA CORRELATIVOS EN TODAS LAS PÁGINAS

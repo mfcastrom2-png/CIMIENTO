@@ -22,6 +22,7 @@ import {
   Award,
   GraduationCap,
   Stethoscope,
+  Camera,
   LucideIcon
 } from 'lucide-react';
 import type { RolSistema } from '../../types';
@@ -227,6 +228,17 @@ export const MODULOS_DOCUMENTOS_GOBERNANZA: PortalModule[] = [
     requierePermiso: 'documentos',
     esAdmin: true,
     badge: 'QR'
+  },
+  {
+    id: 'escaner-contratos',
+    titulo: 'Escáner QR de Contratos',
+    descripcion: 'Validación por cámara contra hash en Firestore.',
+    icono: Camera,
+    enlace: 'escaner-contratos',
+    color: 'success',
+    requierePermiso: 'documentos',
+    esAdmin: true,
+    badge: 'Cámara'
   },
   {
     id: 'firma-digital',

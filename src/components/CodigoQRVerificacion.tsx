@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import { construirJsonQrDocumentoPdf } from '../services/verificacionCertificadosService';
 
 interface CodigoQRVerificacionProps {
   codigoVerificacion: string;
   tipoDocumento?: string;
   titularNombre?: string;
   titularDocumento?: string;
+  hashSha256?: string;
   fechaEmision?: string;
   size?: number;
   className?: string;
@@ -17,7 +19,7 @@ export const CodigoQRVerificacion: React.FC<CodigoQRVerificacionProps> = ({
   tipoDocumento = 'Certificado Laboral',
   titularNombre,
   titularDocumento,
-  fechaEmision,
+  hashSha256,
   size = 90,
   className = '',
   showText = true
@@ -25,14 +27,19 @@ export const CodigoQRVerificacion: React.FC<CodigoQRVerificacionProps> = ({
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   useEffect(() => {
+    let cancelled = false;
     const generarQR = async () => {
       try {
-        // Generar URL institucional de validación pública
-        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://bgroup-talento-humano.co';
-        const urlVerificacion = `${baseUrl}/verificar?codigo=${encodeURIComponent(codigoVerificacion)}`;
+        const { jsonString } = await construirJsonQrDocumentoPdf({
+          nombreEmpleado: titularNombre || 'COLABORADOR INSTITUCIONAL',
+          numeroDocumento: titularDocumento || 'N/A',
+          idContrato: codigoVerificacion,
+          tipoDocumento,
+          hashSha256
+        });
 
-        const dataUrl = await QRCode.toDataURL(urlVerificacion, {
-          width: size * 2,
+        const dataUrl = await QRCode.toDataURL(jsonString, {
+          width: Math.max(size * 2, 200),
           margin: 1,
           color: {
             dark: '#18235C',
@@ -40,14 +47,19 @@ export const CodigoQRVerificacion: React.FC<CodigoQRVerificacionProps> = ({
           },
           errorCorrectionLevel: 'M'
         });
-        setQrDataUrl(dataUrl);
+        if (!cancelled) {
+          setQrDataUrl(dataUrl);
+        }
       } catch (err) {
         console.warn('Error generando código QR de verificación:', err);
       }
     };
 
     generarQR();
-  }, [codigoVerificacion, size]);
+    return () => {
+      cancelled = true;
+    };
+  }, [codigoVerificacion, tipoDocumento, titularNombre, titularDocumento, hashSha256, size]);
 
   return (
     <div className={`flex flex-col items-center justify-center text-center p-2 bg-white rounded-xl border border-slate-200 shadow-2xs ${className}`}>

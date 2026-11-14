@@ -39,6 +39,7 @@ import { ConfiguracionBuzonCorreoView } from './components/ConfiguracionBuzonCor
 import { SaldosInicialesView } from './components/SaldosInicialesView';
 import { FirmaDigitalStudioView } from './components/FirmaDigitalStudioView';
 import { VerificadorCertificadosView } from './components/VerificadorCertificadosView';
+import { EscanerQrContratosView } from './components/admin/EscanerQrContratosView';
 import { PortalCandidatoPublicoView } from './components/vinculacion/PortalCandidatoPublicoView';
 import { ModuloSelectorView } from './components/ModuloSelectorView';
 import { CimientoComercialDashboard } from './components/comercial/CimientoComercialDashboard';
@@ -1102,7 +1103,10 @@ function AppLayout() {
                       </button>
                     </div>
                   ) : (
-                    <VerificadorCertificadosView empresa={empresa} />
+                    <VerificadorCertificadosView
+                      empresa={empresa}
+                      onAbrirEscanerCamara={() => navigate('/escaner-contratos')}
+                    />
                   )
                 }
               />
@@ -1126,7 +1130,56 @@ function AppLayout() {
                       </button>
                     </div>
                   ) : (
-                    <VerificadorCertificadosView empresa={empresa} />
+                    <VerificadorCertificadosView
+                      empresa={empresa}
+                      onAbrirEscanerCamara={() => navigate('/escaner-contratos')}
+                    />
+                  )
+                }
+              />
+              <Route
+                path="/escaner-contratos"
+                element={
+                  !isSuperAdmin && currentUser?.rol !== 'admin_gh' ? (
+                    <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-2xl shadow-xs border border-amber-200 text-center space-y-3">
+                      <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                        <Lock className="w-6 h-6" />
+                      </div>
+                      <h2 className="text-lg font-bold text-[#18235C]">Escáner QR Exclusivo para Administradores</h2>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        El escáner de contratos físicos por cámara y auditoría criptográfica en Firestore está reservado para Administradores y Gestión Humana.
+                      </p>
+                      <button
+                        onClick={() => navigate('/dashboard')}
+                        className="mt-2 px-4 py-2 bg-[#18235C] hover:bg-[#101740] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                      >
+                        Volver a Mi Tablero
+                      </button>
+                    </div>
+                  ) : (
+                    <EscanerQrContratosView
+                      empleados={empleados}
+                      empresa={empresa}
+                      currentUser={currentUser}
+                      onIrAEmpleados={() => navigate('/empleados')}
+                      onIrAVerificadorManual={() => navigate('/verificar-certificados')}
+                    />
+                  )
+                }
+              />
+              <Route
+                path="/escaner-qr"
+                element={
+                  !isSuperAdmin && currentUser?.rol !== 'admin_gh' ? (
+                    <Navigate to="/dashboard" replace />
+                  ) : (
+                    <EscanerQrContratosView
+                      empleados={empleados}
+                      empresa={empresa}
+                      currentUser={currentUser}
+                      onIrAEmpleados={() => navigate('/empleados')}
+                      onIrAVerificadorManual={() => navigate('/verificar-certificados')}
+                    />
                   )
                 }
               />

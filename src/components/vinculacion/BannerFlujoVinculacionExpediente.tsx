@@ -32,6 +32,7 @@ interface BannerFlujoVinculacionExpedienteProps {
   onAbrirDiligenciarHv: () => void;
   onAbrirDefinirContrato: () => void;
   onAbrirFirmaContrato: () => void;
+  onDescargarContratoPdf?: () => void;
   onAbrirNotificaciones: () => void;
   onFinalizarVinculacion: () => void;
   onIrAPestana: (tabId: string) => void;
@@ -43,6 +44,7 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
   onAbrirDiligenciarHv,
   onAbrirDefinirContrato,
   onAbrirFirmaContrato,
+  onDescargarContratoPdf,
   onAbrirNotificaciones,
   onFinalizarVinculacion,
   onIrAPestana,
@@ -340,9 +342,9 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
 
                   <button
                     type="button"
-                    onClick={onAbrirFirmaContrato}
+                    onClick={onDescargarContratoPdf || onAbrirFirmaContrato}
                     className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-[#18235C] border border-[#18235C]/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
-                    title="Ver y descargar borrador de contrato en formato PDF antes de firmar"
+                    title="Descargar borrador completo de contrato en formato PDF antes de firmar"
                   >
                     <Download className="w-4 h-4 text-[#18235C]" />
                     <span>Descargar Contrato (PDF)</span>
@@ -395,6 +397,18 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
                     <span>Ver Contrato Firmado</span>
                   </button>
 
+                  {onDescargarContratoPdf && (
+                    <button
+                      type="button"
+                      onClick={onDescargarContratoPdf}
+                      className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-[#18235C] border border-[#18235C]/30 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                      title="Descargar copia oficial en PDF del contrato firmado con 25 cláusulas"
+                    >
+                      <Download className="w-4 h-4 text-[#18235C]" />
+                      <span>Descargar PDF</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={onFinalizarVinculacion}
@@ -441,6 +455,18 @@ export const BannerFlujoVinculacionExpediente: React.FC<BannerFlujoVinculacionEx
                     <ShieldCheck className="w-4 h-4 text-indigo-600" />
                     <span>Ver Contrato Laboral CST</span>
                   </button>
+
+                  {onDescargarContratoPdf && (
+                    <button
+                      type="button"
+                      onClick={onDescargarContratoPdf}
+                      className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-[#18235C] font-bold text-xs flex items-center gap-1.5 border border-[#18235C]/30 cursor-pointer shadow-2xs"
+                      title="Descargar copia oficial en PDF del contrato laboral con 25 cláusulas"
+                    >
+                      <Download className="w-4 h-4 text-[#18235C]" />
+                      <span>Descargar Contrato (PDF)</span>
+                    </button>
+                  )}
                 </div>
               </>
             )}

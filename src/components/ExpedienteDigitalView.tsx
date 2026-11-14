@@ -57,6 +57,11 @@ import { ModalDiligenciarHojaVida } from './vinculacion/ModalDiligenciarHojaVida
 import { ModalDefinirContratoVinculacion } from './vinculacion/ModalDefinirContratoVinculacion';
 import { ModalFirmaContratoLaboral } from './vinculacion/ModalFirmaContratoLaboral';
 import { ModalVerNotificacionesVinculacion } from './vinculacion/ModalVerNotificacionesVinculacion';
+import {
+  generarPdfContratoLaboralVectorial,
+  construirDatosPdfContratoDesdeEmpleado
+} from '../utils/contratoPdfGenerator';
+import { normalizarCodigoContratoLaboral } from '../services/vinculacionService';
 
 interface ExpedienteDigitalViewProps {
   empleado: Empleado;
@@ -296,7 +301,60 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
     }
   };
 
-  const handleDescargarDocumento = (nombreArchivo: string, tipo: string = 'Documento') => {
+  const cargoNombre = cargosEfectivos.find(c => c.id === empleado.cargoId)?.nombre || empleado.laboral?.cargoNombre || 'Cargo no definido';
+  const areaNombre = areasEfectivas.find(a => a.id === empleado.areaId)?.nombre || empleado.laboral?.areaNombre || 'Operaciones';
+
+  const esEnlaceNubeReal = (url?: string) => Boolean(url && url !== '#' && /^https?:\/\//i.test(url));
+
+  const handleDescargarContratoPdfDirecto = async (firmaOverride?: string | null) => {
+    const empresaActiva = empresa || companySync?.empresa;
+    const codContrato = normalizarCodigoContratoLaboral(empleado.vinculacion?.contratoDigital?.codigoContrato);
+    const firmaEfectiva =
+      empleado.vinculacion?.contratoDigital?.firmaCandidatoUrl ||
+      (firmaOverride && firmaOverride.startsWith('data:image/') ? firmaOverride : null);
+
+    const datosContrato = construirDatosPdfContratoDesdeEmpleado(empleado, empresaActiva, {
+      cargoNombreOverride: cargoNombre !== 'Cargo no definido' ? cargoNombre : undefined,
+      areaNombreOverride: areaNombre,
+      firmaCapturadaUrlOverride: firmaEfectiva
+    });
+
+    const estadoDoc = firmaEfectiva ? 'Firmado' : 'Borrador_Previo_Firma';
+    const nombreArchivo = `Contrato_Termino_Fijo_${codContrato}_${datosContrato.empleadoDocumento}_${estadoDoc}.pdf`;
+    await generarPdfContratoLaboralVectorial(datosContrato, nombreArchivo);
+  };
+
+  const handleDescargarDocumento = async (
+    docOrNombre: DocumentoExpedienteEmpleado | string,
+    tipoArg: string = 'Documento'
+  ) => {
+    const docObj = typeof docOrNombre === 'string' ? null : docOrNombre;
+    const nombreArchivo: string = typeof docOrNombre === 'string' ? docOrNombre : docOrNombre.nombreArchivo;
+    const tipo: string = typeof docOrNombre === 'string' ? tipoArg : docOrNombre.tipoDocumento;
+
+    // Si es un Contrato Laboral del expediente, generar el PDF vectorial legal completo (25 cláusulas + ficha + firma + QR)
+    const esContratoLaboral =
+      tipo === 'Contrato Laboral' ||
+      (nombreArchivo.toLowerCase().includes('contrato') && !esEnlaceNubeReal(docObj?.urlArchivo));
+
+    if (esContratoLaboral) {
+      await handleDescargarContratoPdfDirecto(docObj?.urlArchivo);
+      return;
+    }
+
+    // Si es un documento externo en Google Drive / URL web válida, abrir en pestaña nueva
+    if (docObj?.urlArchivo && esEnlaceNubeReal(docObj.urlArchivo)) {
+      const a = document.createElement('a');
+      a.href = formatDriveViewUrl(docObj.urlArchivo);
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    // Para constancias simples sin archivo PDF adjunto, generar constancia en texto (.txt) sin extensión engañosa .pdf
     const nombreOrg = empresa?.razonSocial || empresa?.nombreComercial || 'EMPRESA';
     const nitOrg = empresa?.nit ? `NIT: ${empresa.nit}${empresa.digitoVerificacion ? `-${empresa.digitoVerificacion}` : ''}` : '';
     const dirOrg = (empresa as any)?.direccion || empresa?.contacto?.direccion ? `Dirección: ${(empresa as any)?.direccion || empresa?.contacto?.direccion}` : '';
@@ -306,15 +364,13 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = nombreArchivo.endsWith('.txt') || nombreArchivo.endsWith('.pdf') ? nombreArchivo : `${nombreArchivo}.txt`;
+    const baseName = nombreArchivo.replace(/\.pdf$/i, '');
+    link.download = baseName.endsWith('.txt') ? baseName : `Constancia_${baseName}.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-
-  const cargoNombre = cargos.find(c => c.id === empleado.cargoId)?.nombre || 'Cargo no definido';
-  const areaNombre = areas.find(a => a.id === empleado.areaId)?.nombre || empleado.laboral?.areaNombre || 'Operaciones';
 
   // Verificar si rol es restringido de ver datos médicos confidenciales (solo admin_gh, responsable_sst y superadmin tienen acceso completo)
   const puedeVerSSTConfidencial =
@@ -479,6 +535,7 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
         onAbrirDiligenciarHv={() => setModalDiligenciarHv(true)}
         onAbrirDefinirContrato={() => setModalDefinirContrato(true)}
         onAbrirFirmaContrato={() => setModalFirmaContrato(true)}
+        onDescargarContratoPdf={() => handleDescargarContratoPdfDirecto()}
         onAbrirNotificaciones={() => setModalNotificacionesVinculacion(true)}
         onFinalizarVinculacion={handleFinalizarVinculacion}
         onIrAPestana={(tabId) => setActiveTab(tabId)}
@@ -1430,7 +1487,7 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                       <td className="py-3 px-3 font-bold text-[#18235C]">{doc.tipoDocumento}</td>
                       <td className="py-3 px-3 text-slate-700 font-mono text-[11px]">{doc.nombreArchivo}</td>
                       <td className="py-3 px-3">
-                        {doc.urlArchivo && doc.urlArchivo !== '#' ? (
+                        {esEnlaceNubeReal(doc.urlArchivo) ? (
                           <a
                             href={formatDriveViewUrl(doc.urlArchivo)}
                             target="_blank"
@@ -1442,6 +1499,11 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                             <span>Abrir en Drive</span>
                             <ExternalLink className="w-2.5 h-2.5" />
                           </a>
+                        ) : doc.tipoDocumento === 'Contrato Laboral' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <FileText className="w-3 h-3" />
+                            <span>Contrato Digital (PDF)</span>
+                          </span>
                         ) : (
                           <span className="text-slate-400 text-[10px] italic">Sin enlace en nube</span>
                         )}
@@ -1454,7 +1516,7 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                       </td>
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {doc.urlArchivo && doc.urlArchivo !== '#' && (
+                          {esEnlaceNubeReal(doc.urlArchivo) && (
                             <a
                               href={formatDriveViewUrl(doc.urlArchivo)}
                               target="_blank"
@@ -1467,17 +1529,31 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                           )}
                           <button
                             type="button"
-                            onClick={() => setDocModalPreview(doc)}
+                            onClick={() => {
+                              if (doc.tipoDocumento === 'Contrato Laboral') {
+                                setModalFirmaContrato(true);
+                              } else {
+                                setDocModalPreview(doc);
+                              }
+                            }}
                             className="p-1 text-[#18235C] hover:bg-slate-100 rounded cursor-pointer"
-                            title="Visualizar ficha de radicación"
+                            title={
+                              doc.tipoDocumento === 'Contrato Laboral'
+                                ? 'Ver e imprimir contrato laboral completo (25 cláusulas)'
+                                : 'Visualizar ficha de radicación'
+                            }
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDescargarDocumento(doc.nombreArchivo, doc.tipoDocumento)}
+                            onClick={() => handleDescargarDocumento(doc)}
                             className="p-1 text-[#18235C] hover:bg-slate-100 rounded cursor-pointer"
-                            title="Descargar constancia documental"
+                            title={
+                              doc.tipoDocumento === 'Contrato Laboral'
+                                ? 'Descargar Contrato Laboral Completo en PDF'
+                                : 'Descargar constancia documental'
+                            }
                           >
                             <Download className="w-4 h-4" />
                           </button>
@@ -1680,7 +1756,7 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
               <p><strong>Fecha de Carga:</strong> {docModalPreview.fechaCarga}</p>
               <p><strong>Usuario Responsable:</strong> {docModalPreview.usuarioCarga}</p>
               <p><strong>Estado:</strong> {docModalPreview.estado}</p>
-              {docModalPreview.urlArchivo && docModalPreview.urlArchivo !== '#' && (
+              {esEnlaceNubeReal(docModalPreview.urlArchivo) && (
                 <p className="flex items-center gap-1.5 pt-1">
                   <strong>Enlace Nube:</strong>
                   <a
@@ -1716,7 +1792,7 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                   </button>
                 )}
               </div>
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setDocModalPreview(null)}
@@ -1724,7 +1800,20 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                 >
                   Cerrar
                 </button>
-                {docModalPreview.urlArchivo && docModalPreview.urlArchivo !== '#' && (
+                {docModalPreview.tipoDocumento === 'Contrato Laboral' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocModalPreview(null);
+                      setModalFirmaContrato(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Ver Contrato Completo</span>
+                  </button>
+                )}
+                {esEnlaceNubeReal(docModalPreview.urlArchivo) && (
                   <a
                     href={formatDriveViewUrl(docModalPreview.urlArchivo)}
                     target="_blank"
@@ -1737,11 +1826,15 @@ export const ExpedienteDigitalView: React.FC<ExpedienteDigitalViewProps> = ({
                 )}
                 <button
                   type="button"
-                  onClick={() => handleDescargarDocumento(docModalPreview.nombreArchivo, docModalPreview.tipoDocumento)}
+                  onClick={() => handleDescargarDocumento(docModalPreview)}
                   className="px-4 py-1.5 rounded bg-[#18235C] hover:bg-[#101740] text-white font-bold flex items-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Descargar Ficha</span>
+                  <span>
+                    {docModalPreview.tipoDocumento === 'Contrato Laboral'
+                      ? 'Descargar Contrato (PDF)'
+                      : 'Descargar Ficha'}
+                  </span>
                 </button>
               </div>
             </div>

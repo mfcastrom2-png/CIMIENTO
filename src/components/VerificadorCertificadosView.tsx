@@ -11,13 +11,16 @@ import {
   Lock,
   Award,
   Sparkles,
-  LogIn
+  LogIn,
+  Camera
 } from 'lucide-react';
 import {
   verificarAutenticidadCertificado,
   RegistroCertificadoVerificable,
   obtenerCertificadosLocales,
-  esTipoCertificadoPermitido
+  esTipoCertificadoPermitido,
+  ContextoValidacionUrl,
+  parsearEntradaQrOVerificacion
 } from '../services/verificacionCertificadosService';
 import { initialEmpresa } from '../data/initialData';
 import { ConfiguracionEmpresa } from '../types';
@@ -26,12 +29,14 @@ interface VerificadorCertificadosViewProps {
   empresa?: ConfiguracionEmpresa;
   isPublicLanding?: boolean;
   onIrALogin?: () => void;
+  onAbrirEscanerCamara?: () => void;
 }
 
 export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewProps> = ({
   empresa = initialEmpresa,
   isPublicLanding = false,
-  onIrALogin
+  onIrALogin,
+  onAbrirEscanerCamara
 }) => {
   const [codigoBusqueda, setCodigoBusqueda] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -40,46 +45,62 @@ export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewPr
   const [certificadosRecientes, setCertificadosRecientes] = useState<RegistroCertificadoVerificable[]>([]);
 
   useEffect(() => {
-    // 1. Cargar lista local permitida (solo Diploma SST y Certificado Laboral)
+    // 1. Cargar lista local permitida (Diploma SST, Certificado Laboral y Contrato Laboral)
     const locales = obtenerCertificadosLocales().filter(c => esTipoCertificadoPermitido(c.tipoDocumento));
     setCertificadosRecientes(locales);
 
-    // 2. Verificar si hay un parámetro ?verificar= o ?codigo= en la URL
+    // 2. Verificar parámetros en query string (?verificar= / ?codigo= y firma ?sig=) tanto en search como en hash (#/verificar?...)
     if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const codigoUrl = urlParams.get('verificar') || urlParams.get('codigo');
+      const searchParams = new URLSearchParams(window.location.search);
+      const hashStr = window.location.hash || '';
+      const qIndex = hashStr.indexOf('?');
+      const hashParams = qIndex !== -1 ? new URLSearchParams(hashStr.slice(qIndex)) : new URLSearchParams();
+
+      const getParam = (k: string) => hashParams.get(k) || searchParams.get(k);
+      const codigoUrl = getParam('verificar') || getParam('codigo');
+
       if (codigoUrl) {
+        const contextoUrl: ContextoValidacionUrl = {
+          doc: getParam('doc'),
+          nombre: getParam('nombre'),
+          hash: getParam('hash'),
+          sig: getParam('sig'),
+          tipo: getParam('tipo')
+        };
         setCodigoBusqueda(codigoUrl);
-        ejecutarVerificacion(codigoUrl);
+        ejecutarVerificacion(codigoUrl, contextoUrl);
       }
     }
   }, []);
 
-  const ejecutarVerificacion = async (codigo: string) => {
-    const term = codigo.trim();
-    if (!term) {
-      setErrorBusqueda('Por favor ingrese el código de verificación o radicado oficial.');
+  const ejecutarVerificacion = async (codigoOJson: string, contextoUrl?: ContextoValidacionUrl) => {
+    const rawTerm = codigoOJson.trim();
+    if (!rawTerm) {
+      setErrorBusqueda('Por favor ingrese el código de verificación, el JSON del QR o la URL firmada.');
       setResultado(null);
       return;
     }
 
+    const parsed = parsearEntradaQrOVerificacion(rawTerm);
+    const term = parsed.codigo || rawTerm;
+
     // Comprobación de exclusión inmediata para actas u otros tipos no admitidos
     if (term.toUpperCase().startsWith('ACTA-')) {
       setResultado(null);
-      setErrorBusqueda('Este verificador de autenticidad valida exclusivamente Diplomas SST y Certificados Laborales. Las actas de entrega no están sujetas a este verificador.');
+      setErrorBusqueda('Este verificador de autenticidad valida Diplomas SST, Certificados Laborales y Contratos Laborales. Las actas de entrega no están sujetas a este verificador.');
       return;
     }
 
     setCargando(true);
     setErrorBusqueda(null);
     try {
-      const res = await verificarAutenticidadCertificado(term);
+      const res = await verificarAutenticidadCertificado(rawTerm, contextoUrl);
       if (res && esTipoCertificadoPermitido(res.tipoDocumento)) {
         setResultado(res);
         setErrorBusqueda(null);
       } else {
         setResultado(null);
-        setErrorBusqueda(`No se encontró ningún Diploma SST o Certificado Laboral registrado con el código "${term}". Verifique los caracteres ingresados.`);
+        setErrorBusqueda(`No se pudo verificar ningún Diploma SST, Certificado Laboral o Contrato Laboral con "${term}" (o la firma criptográfica de validación es inválida).`);
       }
     } catch {
       setErrorBusqueda('Error al conectar con el servicio de validación de autenticidad.');
@@ -147,7 +168,7 @@ export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewPr
             Verificador de documentos
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto">
-            Valide en tiempo real la validez jurídica, integridad criptográfica y vigencia de <strong>Diplomas SST</strong> (Seguridad y Salud en el Trabajo) y <strong>Certificados Laborales</strong> expedidos por <strong>{razonSocial}</strong> bajo la <strong>Ley 527 de 1999</strong> y el <strong>Código Sustantivo del Trabajo (CST)</strong>.
+            Valide en tiempo real la validez jurídica, integridad criptográfica y vigencia de <strong>Diplomas SST</strong>, <strong>Certificados Laborales</strong> y <strong>Contratos Laborales</strong> expedidos por <strong>{razonSocial}</strong> bajo la <strong>Ley 527 de 1999</strong> y el <strong>Código Sustantivo del Trabajo (CST)</strong>.
           </p>
 
           {/* Categorías autorizadas */}
@@ -161,6 +182,10 @@ export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewPr
               <FileText className="w-3.5 h-3.5 text-emerald-600" />
               Certificado Laboral
             </span>
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-50 text-indigo-800 text-xs font-bold border border-indigo-200">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+              Contrato Laboral
+            </span>
           </div>
         </div>
 
@@ -168,7 +193,7 @@ export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewPr
         <div className="bg-white p-6 rounded-2xl border border-[#8FA7D6]/40 shadow-xs space-y-4">
           <form onSubmit={handleBuscar} className="space-y-3">
             <label className="block font-extrabold text-sm text-[#18235C]">
-              Ingrese el Código de Verificación
+              Ingrese el Código de Verificación, URL Firmada o JSON del QR
             </label>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
@@ -177,7 +202,7 @@ export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewPr
                   type="text"
                   value={codigoBusqueda}
                   onChange={e => setCodigoBusqueda(e.target.value)}
-                  placeholder="Ej: DIP-SST-2026-3391 o CERT-2026-774120..."
+                  placeholder="Ej: CTR-BGROUP-2026-0001, CERT-2026-... o pegue el JSON del QR"
                   className="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-[#8FA7D6] bg-slate-50 focus:bg-white text-sm font-mono font-bold text-[#18235C] focus:outline-none focus:border-[#18235C]"
                 />
               </div>
@@ -189,6 +214,16 @@ export const VerificadorCertificadosView: React.FC<VerificadorCertificadosViewPr
                 <ShieldCheck className="w-5 h-5 text-[#00FF00]" />
                 <span>{cargando ? 'Validando...' : 'Verificar Autenticidad'}</span>
               </button>
+              {!isPublicLanding && onAbrirEscanerCamara && (
+                <button
+                  type="button"
+                  onClick={onAbrirEscanerCamara}
+                  className="px-4 py-3 bg-white hover:bg-slate-50 text-[#18235C] font-bold text-sm rounded-xl border border-[#8FA7D6] transition-colors flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
+                >
+                  <Camera className="w-4 h-4 text-[#18235C]" />
+                  <span>Escáner Cámara QR</span>
+                </button>
+              )}
             </div>
           </form>
 

@@ -1791,6 +1791,8 @@ export const ContratosClientesView: React.FC<ContratosClientesViewProps> = ({
                     codigoVerificacion={contratoVer.codigoContrato}
                     tipoDocumento="Contrato Único de Servicios Fijos CRC"
                     titularNombre={contratoVer.clienteNombre}
+                    titularDocumento={contratoVer.clienteIdentificacion}
+                    hashSha256={contratoVer.hashIntegridadSha256}
                     size={76}
                   />
                 </div>

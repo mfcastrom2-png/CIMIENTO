@@ -32,13 +32,18 @@ import { CorporateLogo } from '../CorporateLogo';
 import { CodigoQRVerificacion } from '../CodigoQRVerificacion';
 import { exportarContenedorAPDF } from '../../utils/pdfExport';
 import { imprimirDocumento } from '../../utils/printUtils';
-import { generarPdfContratoLaboralVectorial } from '../../utils/contratoPdfGenerator';
+import {
+  generarPdfContratoLaboralVectorial,
+  formatFechaEspanolFormal,
+  construirDatosPdfContratoDesdeEmpleado
+} from '../../utils/contratoPdfGenerator';
 import {
   generarHashSha256,
   generarTextoNotificacionContratoFirmado,
   despacharNotificacionVinculacion,
   normalizarCodigoContratoLaboral
 } from '../../services/vinculacionService';
+import { registrarCertificadoEmitido } from '../../services/verificacionCertificadosService';
 
 interface ModalFirmaContratoLaboralProps {
   empleado: Empleado;
@@ -46,56 +51,6 @@ interface ModalFirmaContratoLaboralProps {
   onClose: () => void;
   onContratoFirmado: (empleadoActualizado: Empleado) => Promise<void> | void;
   esVistaCandidato?: boolean;
-}
-
-// Funciones auxiliares para formateo de fechas formales en español
-const MESES = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-];
-
-const NUMEROS_LETRAS: Record<number, string> = {
-  1: 'un (1)', 2: 'dos (2)', 3: 'tres (3)', 4: 'cuatro (4)', 5: 'cinco (5)',
-  6: 'seis (6)', 7: 'siete (7)', 8: 'ocho (8)', 9: 'nueve (9)', 10: 'diez (10)',
-  11: 'once (11)', 12: 'doce (12)', 13: 'trece (13)', 14: 'catorce (14)', 15: 'quince (15)',
-  16: 'dieciséis (16)', 17: 'diecisiete (17)', 18: 'dieciocho (18)', 19: 'diecinueve (19)', 20: 'veinte (20)',
-  21: 'veintiún (21)', 22: 'veintidós (22)', 23: 'veintitrés (23)', 24: 'veinticuatro (24)', 25: 'veinticinco (25)',
-  26: 'veintiséis (26)', 27: 'veintisiete (27)', 28: 'veintiocho (28)', 29: 'veintinueve (29)', 30: 'treinta (30)',
-  31: 'treinta y un (31)'
-};
-
-function formatFechaEspanolFormal(fechaStr?: string): { mayusculas: string; formalLarga: string } {
-  if (!fechaStr) {
-    const hoy = new Date();
-    const dia = hoy.getDate();
-    const mes = MESES[hoy.getMonth()];
-    const anio = hoy.getFullYear();
-    const diaLetras = NUMEROS_LETRAS[dia] || `${dia}`;
-    return {
-      mayusculas: `${dia < 10 ? '0' : ''}${dia} DE ${mes.toUpperCase()} DE ${anio}`,
-      formalLarga: `${diaLetras} de ${mes} de dos mil ${anio === 2026 ? 'veintiséis (2026)' : anio === 2027 ? 'veintisiete (2027)' : anio}`
-    };
-  }
-
-  // Parsear fecha YYYY-MM-DD
-  const parts = fechaStr.slice(0, 10).split('-');
-  if (parts.length === 3) {
-    const anio = parseInt(parts[0], 10);
-    const mesIndex = parseInt(parts[1], 10) - 1;
-    const dia = parseInt(parts[2], 10);
-    const mes = MESES[mesIndex] || 'noviembre';
-    const diaLetras = NUMEROS_LETRAS[dia] || `${dia}`;
-    const anioLetras = anio === 2026 ? 'dos mil veintiséis (2026)' : anio === 2027 ? 'dos mil veintisiete (2027)' : `${anio}`;
-    return {
-      mayusculas: `${dia < 10 ? '0' : ''}${dia} DE ${mes.toUpperCase()} DE ${anio}`,
-      formalLarga: `${diaLetras} de ${mes} de ${anioLetras}`
-    };
-  }
-
-  return {
-    mayusculas: '03 DE NOVIEMBRE DE 2026',
-    formalLarga: 'tres (3) de noviembre de dos mil veintiséis (2026)'
-  };
 }
 
 interface StrokePoint {
@@ -153,42 +108,15 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
       }
 
       const estadoDoc = firmaParaPdf ? 'Firmado' : 'Borrador_Previo_Firma';
-      const nombreArchivo = `Contrato_Termino_Fijo_${codContrato}_${empleado.documento}_${estadoDoc}`;
+      const nombreArchivo = `Contrato_Termino_Fijo_${codContrato}_${empleado.documento || empleado.laboral?.codigoInterno || 'COLABORADOR'}_${estadoDoc}`;
 
-      const exitoVectorial = await generarPdfContratoLaboralVectorial(
-        {
-          codigoContrato: codContrato,
-          nombreEmpresa: nombreEmp,
-          nitEmpresa: nitEmp,
-          domicilioEmpresa: domicilioEmp,
-          ciudadEmpresa: ciudadEmp,
-          repLegalNombre,
-          repLegalDocumento: repLegalDoc,
-          empleadoNombre: empleado.nombre,
-          empleadoTipoDocumento: empleado.tipoDocumento || 'C.C.',
-          empleadoDocumento: empleado.documento,
-          celularCandidato,
-          correoCandidato,
-          direccionCandidato,
-          cargoTitulo: cargoTit,
-          areaTitulo: areaTit,
-          salarioValor: salarioVal,
-          duracionTexto,
-          periodoPruebaTexto,
-          fechaFirmaMayusculas: fechaFirmaInfo.mayusculas,
-          fechaFirmaFormalLarga: fechaFirmaInfo.formalLarga,
-          fechaInicioMayusculas: fechaInicioInfo.mayusculas,
-          fechaInicioFormalLarga: fechaInicioInfo.formalLarga,
-          fechaFinMayusculas: fechaFinInfo.mayusculas,
-          fechaFinFormalLarga: fechaFinInfo.formalLarga,
-          firmaCapturadaUrl: firmaParaPdf,
-          firmaNombre: firmaNombre.trim() || empleado.nombre,
-          firmaDocumento: firmaDocumento.trim() || empleado.documento,
-          firmaFechaHora: contrato?.firmaFechaHora,
-          hashSha256: contrato?.hashSha256
-        },
-        nombreArchivo
-      );
+      const datosPdf = construirDatosPdfContratoDesdeEmpleado(empleado, empresa, {
+        firmaCapturadaUrlOverride: firmaParaPdf,
+        firmaNombreOverride: firmaNombre,
+        firmaDocumentoOverride: firmaDocumento
+      });
+
+      const exitoVectorial = await generarPdfContratoLaboralVectorial(datosPdf, nombreArchivo);
 
       if (!exitoVectorial) {
         const exitoFallback = await exportarContenedorAPDF('area-impresion-contrato-laboral', nombreArchivo);
@@ -538,7 +466,24 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
         tipo: 'contrato_firmado'
       });
 
-      // Documento del expediente
+      // Registrar en el verificador de autenticidad digital (no bloqueante)
+      registrarCertificadoEmitido({
+        codigoVerificacion: codContrato,
+        tipoDocumento: 'Contrato Laboral',
+        titularNombre: firmaNombre.trim() || empleado.nombre,
+        titularDocumento: firmaDocumento.trim() || empleado.documento,
+        titularCargo: cargoTit,
+        fechaEmision: new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }),
+        fechaRegistroISO: fechaHoy,
+        emisorRazonSocial: nombreEmp,
+        emisorNit: nitEmp,
+        firmanteNombre: repLegalNombre,
+        firmanteCargo: 'Representante Legal',
+        hashIntegridad: hash,
+        estado: 'VIGENTE_AUTENTICO'
+      }).catch(() => {});
+
+      // Documento del expediente (el PDF legal completo se genera dinámicamente con las 25 cláusulas)
       const nuevoDocExpediente: DocumentoExpedienteEmpleado = {
         id: uid(),
         tipoDocumento: 'Contrato Laboral',
@@ -546,7 +491,7 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
         fechaCarga: fechaHoy.slice(0, 10),
         fechaExpedicion: fechaHoy.slice(0, 10),
         usuarioCarga: 'Firma Digital Ley 527/1999',
-        urlArchivo: firmaFinalUrl,
+        urlArchivo: '#',
         observaciones: `Suscrito digitalmente por ${empleado.nombre}. Sello SHA-256: ${hash.slice(0, 16)}...`,
         estado: 'Vigente'
       };
@@ -1185,8 +1130,10 @@ export const ModalFirmaContratoLaboral: React.FC<ModalFirmaContratoLaboralProps>
             <div className="flex items-center gap-3">
               <CodigoQRVerificacion
                 codigoVerificacion={codigoContrato}
-                tipoDocumento="Contrato Individual de Trabajo a Término Fijo CST"
-                titularNombre={empleado.nombre}
+                tipoDocumento="Contrato Laboral"
+                titularNombre={firmaNombre || empleado.nombre}
+                titularDocumento={firmaDocumento || empleado.documento}
+                hashSha256={contrato?.hashSha256}
                 size={68}
               />
               <div className="text-[10.5px] text-slate-700 space-y-0.5">
