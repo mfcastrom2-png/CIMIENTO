@@ -244,12 +244,14 @@
   /* 3. Neutralizar overlays y modales cuando contienen un documento imprimible */
   .fixed.inset-0:has(.documento-imprimible),
   .fixed.inset-0:has(#area-impresion-documento),
+  .fixed.inset-0:has(#area-impresion-contrato-laboral),
   .fixed.inset-0.modal-imprimible-activo {
     position: static !important;
     inset: auto !important;
     width: 100% !important;
     height: auto !important;
     min-height: auto !important;
+    max-height: none !important;
     background: transparent !important;
     background-color: transparent !important;
     backdrop-filter: none !important;
@@ -261,13 +263,38 @@
     z-index: auto !important;
   }
 
+  /* Desplegar contenedores flex/scroll internos del modal para evitar recorte a 1 página */
+  .modal-imprimible-activo > div,
+  .modal-imprimible-contenedor,
+  .modal-imprimible-scroll,
+  .fixed.inset-0:has(.documento-imprimible) > div,
+  .fixed.inset-0:has(.documento-imprimible) > div > div {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #FFFFFF !important;
+  }
+
   /* 4. Estilo de la hoja o contenedor del documento imprimible */
   .documento-imprimible,
   #area-impresion-documento,
+  #area-impresion-contrato-laboral,
   .hoja-impresion-cst {
     position: relative !important;
     width: 100% !important;
     max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
     margin: 0 auto !important;
     padding: 0 !important;
     background: #FFFFFF !important;
@@ -277,6 +304,12 @@
     border-radius: 0 !important;
     overflow: visible !important;
     display: block !important;
+  }
+
+  .documento-imprimible p,
+  .documento-imprimible li {
+    orphans: 3;
+    widows: 3;
   }
 
   /* 5. Asegurar fidelidad de colores de marca, líneas y fondos de badges */

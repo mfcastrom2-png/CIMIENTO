@@ -365,17 +365,51 @@ export function inyectarEstilosImpresionEnClon(clonedDoc: Document, clonedTarget
     }
   });
 
-  // 3. Fondo base limpio para el contenedor del documento
+  // 3. Fondo base limpio para el contenedor del documento y despliegue de ancestros con scroll/max-height
   clonedTarget.style.setProperty('background-color', '#FFFFFF', 'important');
   clonedTarget.style.setProperty('box-shadow', 'none', 'important');
+  clonedTarget.style.setProperty('max-height', 'none', 'important');
+  clonedTarget.style.setProperty('height', 'auto', 'important');
+  clonedTarget.style.setProperty('overflow', 'visible', 'important');
 
-  // 4. Sanitizar todas las etiquetas <style> existentes en la copia del documento (evita crash por oklab de Tailwind v4)
+  let ancestor: HTMLElement | null = clonedTarget.parentElement;
+  while (ancestor && ancestor !== clonedDoc.body) {
+    ancestor.style.setProperty('overflow', 'visible', 'important');
+    ancestor.style.setProperty('max-height', 'none', 'important');
+    ancestor.style.setProperty('height', 'auto', 'important');
+    ancestor = ancestor.parentElement;
+  }
+
+  // 4. Sanitizar todas las etiquetas <style> y hojas <link rel="stylesheet"> en el clon (evita crash por oklab/oklch de Tailwind v4)
   const styles = clonedDoc.querySelectorAll('style:not(#pdf-export-dynamic-print-styles)');
   styles.forEach(style => {
     if (style.textContent) {
       style.textContent = sanearTextoCssSinOklab(style.textContent);
     }
   });
+
+  try {
+    const sheets = Array.from(clonedDoc.styleSheets);
+    for (const sheet of sheets) {
+      const ownerNode = sheet.ownerNode;
+      if (ownerNode instanceof HTMLLinkElement) {
+        try {
+          const rules = Array.from(sheet.cssRules || []);
+          const rawCss = rules.map(r => r.cssText).join('\n');
+          if (rawCss.includes('oklab') || rawCss.includes('oklch') || rawCss.includes('color-mix')) {
+            const replacementStyle = clonedDoc.createElement('style');
+            replacementStyle.setAttribute('type', 'text/css');
+            replacementStyle.textContent = sanearTextoCssSinOklab(rawCss);
+            ownerNode.parentNode?.replaceChild(replacementStyle, ownerNode);
+          }
+        } catch {
+          // Hoja de estilos de origen cruzado; ignorar de forma segura
+        }
+      }
+    }
+  } catch {
+    // Fallback silencioso si el navegador restringe el acceso a styleSheets
+  }
 }
 
 /**
@@ -541,14 +575,16 @@ export async function exportarContenedorAPDF(
     // Elemento original de referencia para copiar colores exactos
     const originalRefElement = targetElement;
 
-    // Captura con html2canvas manteniendo fielmente la estética visual
+    // Captura con html2canvas manteniendo fielmente la estética visual (allowTaint: false evita SecurityError en toDataURL)
     const canvas = await html2canvas(targetElement, {
       scale: 2, // Alta nitidez (300 DPI equivalente)
       useCORS: true,
-      allowTaint: true,
+      allowTaint: false,
       backgroundColor: '#FFFFFF',
       logging: false,
-      windowWidth: targetElement.scrollWidth,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: Math.max(targetElement.scrollWidth, targetElement.offsetWidth, 820),
       windowHeight: targetElement.scrollHeight,
       onclone: (clonedDoc, clonedElement) => {
         // 1. Inyectar dinámicamente estilos de impresión específicos de 'src/index.css'
